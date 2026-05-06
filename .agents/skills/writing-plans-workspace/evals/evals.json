@@ -4,7 +4,7 @@
     {
       "id": 0,
       "prompt": "Plan the implementation for adding a CSV export button for annotations. The ANNOTATION_SPEC governs this domain. The brainstorm decided on client-side CSV generation with rubric-aware column headers, a new buildAnnotationCSV utility, and a useExportAnnotationsCSV hook. Facilitator-only access.",
-      "expected_output": "A plan saved to .claude/plans/ with: spec header referencing ANNOTATION_SPEC, file map, TDD tasks with @pytest.mark.spec and @req tags, exact file paths, verification commands, coverage check final task, and a log entry for the spec's Implementation Log.",
+      "expected_output": "A plan saved to .agents/plans/ with: spec header referencing ANNOTATION_SPEC, file map, TDD tasks with @pytest.mark.spec and @req tags, exact file paths, verification commands, coverage check final task, and a log entry for the spec's Implementation Log.",
       "files": []
     },
     {

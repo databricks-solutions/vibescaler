@@ -151,5 +151,5 @@ just test-server && just spec-coverage
 - Spec files: `specs/*.md`
 - Coverage analyzer: `tools/spec_coverage_analyzer.py`
 - Coverage map: `specs/SPEC_COVERAGE_MAP.md`
-- Spec-tester agent: `.claude/agents/spec-tester.md`
-- Test tagging conventions: `.claude/skills/verification-testing/SKILL.md`
+- Spec-tester agent: `.agents/agents/spec-tester.md`
+- Test tagging conventions: `.agents/skills/verification-testing/SKILL.md`

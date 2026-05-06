@@ -36,7 +36,7 @@ If there's no governing spec, stop and invoke the `brainstorming` skill first.
 
 ## Plan Location
 
-Save plans to `.claude/plans/YYYY-MM-DD-<feature-name>.md`.
+Save plans to `.agents/plans/YYYY-MM-DD-<feature-name>.md`.
 
 After saving, append an entry to the governing spec's **Implementation Log** section. This creates a running record on each spec of what was planned and implemented against it. If the spec doesn't have an `## Implementation Log` section yet, add one at the bottom (before `## Future Work` if it exists).
 
@@ -47,7 +47,7 @@ After saving, append an entry to the governing spec's **Implementation Log** sec
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
-| 2026-03-12 | [Admin Dashboard](../.claude/plans/2026-03-12-admin-dashboard.md) | planned | Infrastructure health + workshop metrics dashboard |
+| 2026-03-12 | [Admin Dashboard](../.agents/plans/2026-03-12-admin-dashboard.md) | planned | Infrastructure health + workshop metrics dashboard |
 ```
 
 Update the `Status` column as work progresses: `planned` → `in-progress` → `complete`.
@@ -246,7 +246,7 @@ If the spec covers multiple independent subsystems, consider breaking this into 
 
 After the plan is written and saved:
 
-**"Plan saved to `.claude/plans/<filename>.md` and logged on [SPEC_NAME]. Ready to implement?"**
+**"Plan saved to `.agents/plans/<filename>.md` and logged on [SPEC_NAME]. Ready to implement?"**
 
 The pipeline is: brainstorming → **writing-plans** → implementation
 
@@ -256,5 +256,5 @@ Implementation uses the `verification-testing` skill to guide test writing and v
 
 - Spec index: `/specs/README.md`
 - Coverage map: `/specs/SPEC_COVERAGE_MAP.md`
-- Verification commands: `.claude/skills/verification-testing/SKILL.md`
-- Brainstorming: `.claude/skills/brainstorming/SKILL.md`
+- Verification commands: `.agents/skills/verification-testing/SKILL.md`
+- Brainstorming: `.agents/skills/brainstorming/SKILL.md`

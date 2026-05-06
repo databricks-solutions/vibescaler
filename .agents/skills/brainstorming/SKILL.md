@@ -174,4 +174,4 @@ brainstorming → writing-plans → implementation
 - Spec index: `/specs/README.md`
 - Spec coverage: `just spec-coverage`
 - Coverage map: `/specs/SPEC_COVERAGE_MAP.md`
-- Existing skills: `.claude/skills/`
+- Existing skills: `.agents/skills/`
