@@ -16,6 +16,8 @@ client/build/*
 coverage.xml
 # !client/build/README.md
 .env.local
+.npmrc
+client/.npmrc
 .venv/
 .venv
 workshop.db
