@@ -37,7 +37,7 @@ describe('ProjectSetupPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('submits the day-one bootstrap form and navigates to the workspace', async () => {
+  it('submits the day-one bootstrap form and shows the setup handoff', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
       if (init?.method === 'POST') {
         return new Response(
@@ -78,6 +78,9 @@ describe('ProjectSetupPage', () => {
       trace_uc_table_path: 'main.support.traces',
       facilitator_id: 'facilitator-1',
     });
+    expect(await screen.findByText('Your starter Workspace is ready')).toBeInTheDocument();
+    expect(screen.getByText(/Setup is done; this is the last screen of Setup and the first screen of the product/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /accept & open workspace/i })).toBeInTheDocument();
   });
 
   it('blocks users without workshop management permission from the setup form', () => {

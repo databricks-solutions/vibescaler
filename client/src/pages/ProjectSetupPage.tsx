@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/context/UserContext';
 import { isProjectSetupApiError, useProjectSetupState, useStartProjectSetup, useUpdateProjectSetup } from '@/hooks/useProjectSetupApi';
+import type { ProjectSetupProgress } from '@/client';
 
 type FieldErrors = Partial<Record<'name' | 'agentDescription' | 'traceTable', string>>;
 
@@ -42,6 +43,7 @@ export function ProjectSetupPage() {
   const [agentDescription, setAgentDescription] = useState(DEFAULT_AGENT_DESCRIPTION);
   const [traceTable, setTraceTable] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [handoffProgress, setHandoffProgress] = useState<ProjectSetupProgress | null>(null);
 
   const canManageSetup = user?.role === UserRole.FACILITATOR || permissions?.can_manage_workshop === true;
   const facilitatorIdentity = user?.id ?? '';
@@ -77,11 +79,26 @@ export function ProjectSetupPage() {
       trace_uc_table_path: traceTable.trim(),
     };
     if (hasServerProject) {
-      await updateSetup.mutateAsync(payload);
+      const state = await updateSetup.mutateAsync(payload);
+      setHandoffProgress({
+        project_id: state.project_id || 'project',
+        setup_job_id: state.setup_job_id || 'setup-ready',
+        status: (state.setup_status || 'completed') as ProjectSetupProgress['status'],
+        current_step: 'handoff',
+        message: null,
+        queue_job_id: null,
+        delegated_run_ids: [],
+        details: {},
+      });
     } else {
-      await startSetup.mutateAsync(payload);
+      const progress = await startSetup.mutateAsync(payload);
+      setHandoffProgress({
+        ...progress,
+        queue_job_id: null,
+        delegated_run_ids: [],
+        details: {},
+      });
     }
-    navigate('/', { replace: true });
   };
 
   if (!canManageSetup) {
@@ -96,6 +113,18 @@ export function ProjectSetupPage() {
           </CardHeader>
         </Card>
       </main>
+    );
+  }
+
+  if (handoffProgress) {
+    return (
+      <SetupHandoff
+        projectName={name.trim() || 'Untitled project'}
+        traceTable={traceTable.trim()}
+        progress={handoffProgress}
+        onBack={() => setHandoffProgress(null)}
+        onAccept={() => navigate('/', { replace: true })}
+      />
     );
   }
 
@@ -266,6 +295,146 @@ export function ProjectSetupPage() {
         </section>
       </form>
     </main>
+  );
+}
+
+function SetupHandoff({
+  projectName,
+  traceTable,
+  progress,
+  onBack,
+  onAccept,
+}: {
+  projectName: string;
+  traceTable: string;
+  progress: ProjectSetupProgress;
+  onBack: () => void;
+  onAccept: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="border-b px-6 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-semibold">Setup</h1>
+              <Badge variant="secondary">prerequisite · not a CUJ</Badge>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Connects the trace source, names the system, invites people, and drains into a starter Workspace.
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onAccept}>
+            Skip & explore empty Workspace
+          </Button>
+        </div>
+      </div>
+
+      <div className="border-b bg-muted/30 px-6 py-4">
+        <ol className="grid gap-2 md:grid-cols-5">
+          {['Project', 'System', 'Trace source', 'Participants', 'Handoff'].map((step, index) => (
+            <li key={step} className="rounded-md border bg-background px-3 py-2">
+              <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Step {index + 1}
+              </div>
+              <div className="mt-1 text-sm font-medium">{step}</div>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <section className="mx-auto max-w-6xl px-6 py-8">
+        <div className="mb-6 flex items-center gap-2">
+          <Badge>handoff</Badge>
+          <span className="text-xs text-muted-foreground">
+            Setup is done; this is the last screen of Setup and the first screen of the product.
+          </span>
+        </div>
+        <h2 className="font-serif text-3xl font-medium tracking-tight">Your starter Workspace is ready</h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+          We drafted a first Sprint, a starter Rubric, and a starter Review Feed for {projectName}. Nothing here
+          is permanent; it is draft/default state for the Developer to edit, accept, or replace.
+        </p>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
+          <HandoffCard eyebrow="Sprint #1 · proposed" title="Establish baseline rubric">
+            <p className="text-sm text-muted-foreground">
+              5-day Sprint with default Evaluation Goals for human agreement, judge-human agreement, and confidence.
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              You can shorten this to a workshop-length Sprint at any time.
+            </p>
+          </HandoffCard>
+          <HandoffCard eyebrow="starter Rubric · draft" title="Rubric review required">
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+              <li>Factual accuracy</li>
+              <li>Safety / risk handling</li>
+              <li>Tone for audience</li>
+            </ul>
+          </HandoffCard>
+          <HandoffCard eyebrow="starter Review Feed · draft" title="12 proposed traces">
+            <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+              <HandoffRow label="diversity sample" value="6" />
+              <HandoffRow label="likely edge cases" value="4" />
+              <HandoffRow label="random audit" value="2" />
+            </div>
+          </HandoffCard>
+        </div>
+
+        <Card className="mt-5">
+          <CardHeader>
+            <CardTitle className="text-base">What changes when you accept</CardTitle>
+            <CardDescription>
+              Handoff artifacts become visible in Workspace, Review Feed, and Grading as editable starting points.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
+            <HandoffRow label="Project" value={projectName} />
+            <HandoffRow label="Trace source" value={traceTable || 'Connected trace source'} />
+            <HandoffRow label="Setup job" value={`${progress.setup_job_id} · ${progress.status}`} />
+            <HandoffRow label="Rubric gate" value="#132 must approve before SME-routed Review Feed work is ready" />
+          </CardContent>
+        </Card>
+
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <Button type="button" variant="outline" onClick={onBack}>
+            Back · adjust
+          </Button>
+          <Button type="button" onClick={onAccept}>
+            Accept & open Workspace
+          </Button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function HandoffCard({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{eyebrow}</div>
+        <CardTitle className="text-lg">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function HandoffRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono text-xs text-foreground">{value}</span>
+    </div>
   );
 }
 

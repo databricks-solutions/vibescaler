@@ -38,7 +38,7 @@ const userContextMock = vi.mocked(useUser);
 const setupStatusMock = vi.mocked(useProjectSetupStatus);
 
 describe('FacilitatorRootWorkspace', () => {
-  it('renders setup controls, invite participants, and dashboard together for facilitator', () => {
+  it('renders the first active Sprint handoff defaults for a completed setup', () => {
     userContextMock.mockReturnValue({
       user: { id: 'facilitator-1', role: UserRole.FACILITATOR },
       permissions: null,
@@ -66,6 +66,11 @@ describe('FacilitatorRootWorkspace', () => {
 
     render(<FacilitatorRootWorkspace />);
 
+    expect(screen.getByText('Workspace Activity Monitor')).toBeInTheDocument();
+    expect(screen.getByText('Sprint #1 · proposed')).toBeInTheDocument();
+    expect(screen.getByText('Starter Rubric')).toBeInTheDocument();
+    expect(screen.getByText('Starter Review Feed')).toBeInTheDocument();
+    expect(screen.getByText(/Rubric review required/i)).toBeInTheDocument();
     expect(screen.getByText('Invite Participants')).toBeInTheDocument();
     expect(screen.getByText('Facilitator Dashboard')).toBeInTheDocument();
     expect(screen.getByText('intake-controls-module')).toBeInTheDocument();

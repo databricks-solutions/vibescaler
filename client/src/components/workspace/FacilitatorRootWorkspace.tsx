@@ -6,6 +6,8 @@ import { IntakePage } from '@/pages/IntakePage';
 import { FacilitatorDashboard } from '@/components/FacilitatorDashboard';
 import { FacilitatorUserManager } from '@/components/FacilitatorUserManager';
 import { useUser } from '@/context/UserContext';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { isProjectSetupApiError, isSetupBlockingStatus, useProjectSetupStatus } from '@/hooks/useProjectSetupApi';
 import { SetupProgressCard } from './SetupProgressCard';
@@ -72,6 +74,63 @@ export function FacilitatorRootWorkspace() {
   return (
     <div className="space-y-8 p-6">
       <section>
+        <Card className="border-indigo-200 bg-indigo-50/30">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">Workspace Activity Monitor</Badge>
+                  <Badge variant="outline">Sprint #1 · proposed</Badge>
+                </div>
+                <CardTitle>Establish baseline rubric</CardTitle>
+                <CardDescription className="mt-2 max-w-2xl">
+                  The first active Sprint is goal context for Review Feed, Grading, and confidence-building work.
+                  It is not a phase or project lifecycle state.
+                </CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate('/project/setup')}>
+                Edit Project Settings
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-3">
+            <StarterArtifactCard
+              eyebrow="Grading"
+              title="Starter Rubric"
+              description="Draft Criteria seeded from the System Under Review context."
+            >
+              <Badge variant="destructive">Rubric review required</Badge>
+              <p className="text-xs text-muted-foreground">
+                #132 must be satisfied before Rubric-dependent Review Feed work is SME-ready.
+              </p>
+            </StarterArtifactCard>
+            <StarterArtifactCard
+              eyebrow="Review Feed"
+              title="Starter Review Feed"
+              description="A proposed working set the Developer can inspect before SME Reviewers begin."
+            >
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <span className="rounded-md border bg-background p-2">6 diverse</span>
+                <span className="rounded-md border bg-background p-2">4 edge</span>
+                <span className="rounded-md border bg-background p-2">2 audit</span>
+              </div>
+            </StarterArtifactCard>
+            <StarterArtifactCard
+              eyebrow="Evaluation Goals"
+              title="Default Sprint Goals"
+              description="Defaults keep the Sprint editable while giving the Developer an immediate starting point."
+            >
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">human agreement</Badge>
+                <Badge variant="outline">judge-human agreement</Badge>
+                <Badge variant="outline">confidence</Badge>
+              </div>
+            </StarterArtifactCard>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section>
         <Card>
           <CardContent className="pt-6">
             <IntakePage />
@@ -107,5 +166,28 @@ export function FacilitatorRootWorkspace() {
         </Card>
       </section>
     </div>
+  );
+}
+
+function StarterArtifactCard({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="bg-background">
+      <CardHeader>
+        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{eyebrow}</div>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">{children}</CardContent>
+    </Card>
   );
 }
