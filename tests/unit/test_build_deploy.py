@@ -290,6 +290,16 @@ class TestLakebaseMigrationSchemaSetup:
         assert "connection.rollback()" in content
         assert "SET search_path" in content
 
+    def test_migration_version_table_is_created_wide_enough(self):
+        """migrations/env.py creates alembic_version with room for long revision IDs."""
+        env_py = PROJECT_ROOT / "migrations" / "env.py"
+        content = env_py.read_text()
+
+        assert "CREATE TABLE IF NOT EXISTS" in content
+        assert "alembic_version" in content
+        assert "VARCHAR(128)" in content
+        assert "version_num_width" in content
+
 
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
 @pytest.mark.req("Release workflow creates zip artifact")
