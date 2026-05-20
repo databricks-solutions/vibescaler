@@ -2,11 +2,9 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { UserRole } from './UserRole';
-export type UserCreate = {
-    email: string;
+export type CurrentProjectSummary = {
+    id: string;
     name: string;
-    role: UserRole;
-    workshop_id?: (string | null);
+    setup_status?: (string | null);
 };
 

@@ -14,7 +14,11 @@ export class ApiMocker {
   ) {}
 
   async install(): Promise<void> {
-    await this.page.route('**/users/**', async (route) => {
+    await this.page.route('**/api/auth/**', async (route) => {
+      await this.handleAuthRoute(route);
+    });
+
+    await this.page.route('**/api/users/**', async (route) => {
       await this.handleUsersRoute(route);
     });
 
@@ -27,27 +31,54 @@ export class ApiMocker {
     });
   }
 
-  private async handleUsersRoute(route: Route): Promise<void> {
+  private async handleAuthRoute(route: Route): Promise<void> {
     const url = new URL(route.request().url());
     const method = route.request().method();
 
-    if (url.pathname === '/users/auth/login' && method === 'POST') {
+    if (url.pathname === '/api/auth/session' && method === 'GET') {
       await route.fulfill({
         json: {
           user: this.store.facilitator,
-          is_preconfigured_facilitator: true,
-          message: 'Facilitator login successful',
+          permissions: {
+            can_view_discovery: true,
+            can_create_findings: false,
+            can_view_all_findings: true,
+            can_create_rubric: true,
+            can_view_rubric: true,
+            can_annotate: false,
+            can_view_all_annotations: true,
+            can_view_results: true,
+            can_manage_workshop: true,
+            can_manage_project: true,
+            can_assign_annotations: true,
+          },
+          provider: 'local_dev',
+          provider_role: 'CAN_MANAGE',
+          project: this.store.projectSetup
+            ? {
+                id: this.store.projectSetup.project_id || 'project-1',
+                name: this.store.projectSetup.name,
+                setup_status: this.store.projectSetup.setup_status || 'completed',
+              }
+            : null,
         },
       });
       return;
     }
 
-    if (url.pathname === `/users/${this.store.facilitator.id}` && method === 'GET') {
+    await route.fulfill({ status: 404, json: { detail: 'Auth route not mocked' } });
+  }
+
+  private async handleUsersRoute(route: Route): Promise<void> {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+
+    if (url.pathname === `/api/users/${this.store.facilitator.id}` && method === 'GET') {
       await route.fulfill({ json: this.store.facilitator });
       return;
     }
 
-    if (url.pathname === `/users/${this.store.facilitator.id}/permissions` && method === 'GET') {
+    if (url.pathname === `/api/users/${this.store.facilitator.id}/permissions` && method === 'GET') {
       await route.fulfill({
         json: {
           can_view_discovery: true,
@@ -59,6 +90,7 @@ export class ApiMocker {
           can_view_all_annotations: true,
           can_view_results: true,
           can_manage_workshop: true,
+          can_manage_project: true,
           can_assign_annotations: true,
         },
       });
@@ -93,7 +125,7 @@ export class ApiMocker {
         name: body?.name ?? this.store.projectSetup.name,
         description: body?.description ?? this.store.projectSetup.description,
         agent_description: body?.agent_description ?? this.store.projectSetup.agent_description,
-        facilitator_id: body?.facilitator_id ?? this.store.projectSetup.facilitator_id,
+        facilitator_id: this.store.projectSetup.facilitator_id,
         trace_uc_table_path: body?.trace_uc_table_path ?? this.store.projectSetup.trace_uc_table_path,
       };
       await route.fulfill({ json: this.store.projectSetup });
