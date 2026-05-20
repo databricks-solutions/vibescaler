@@ -300,6 +300,23 @@ class TestLakebaseMigrationSchemaSetup:
         assert "VARCHAR(128)" in content
         assert "version_num_width" in content
 
+    def test_boolean_migration_defaults_are_postgres_safe(self):
+        """Boolean columns in migrations must not use SQLite-only integer defaults unconditionally."""
+        versions_dir = PROJECT_ROOT / "migrations" / "versions"
+        offenders: list[str] = []
+        for migration_file in versions_dir.glob("*.py"):
+            content = migration_file.read_text()
+            if "sa.Boolean()" not in content:
+                continue
+            if 'server_default=sa.text("0")' in content or "server_default=sa.text('0')" in content:
+                if "if _is_postgres()" not in content and "bind.dialect.name" not in content:
+                    offenders.append(migration_file.name)
+            if 'server_default=sa.text("1")' in content or "server_default=sa.text('1')" in content:
+                if "if _is_postgres()" not in content and "bind.dialect.name" not in content:
+                    offenders.append(migration_file.name)
+
+        assert offenders == []
+
 
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
 @pytest.mark.req("Release workflow creates zip artifact")
