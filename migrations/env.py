@@ -145,6 +145,12 @@ def run_migrations_online() -> None:
 
                 connection.execute(
                     _text(
+                        f'CREATE TABLE IF NOT EXISTS "{schema_name}".alembic_version '
+                        "(version_num VARCHAR(128) NOT NULL, CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
+                    )
+                )
+                connection.execute(
+                    _text(
                         f'ALTER TABLE IF EXISTS "{schema_name}".alembic_version '
                         f"ALTER COLUMN version_num TYPE VARCHAR(128)"
                     )

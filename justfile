@@ -18,6 +18,8 @@ set script-interpreter := ['uv', 'run', 'python']
 export PATH := "./{{client-dir}}/node_modules/.bin:" + env_var('PATH')
 client-dir := "client"
 server-dir := "server"
+db-pypi-index := "https://pypi-proxy.dev.databricks.com/simple"
+db-npm-registry := "https://npm-proxy.dev.databricks.com/"
 
 # Default target: show available recipes
 _default:
@@ -62,15 +64,39 @@ setup-prereqs:
 [group('setup')]
 setup-python:
   @echo "🐍 Creating Python virtual environment..."
-  @uv venv --python 3.11
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    echo "📦 Using Databricks PyPI proxy for uv"; \
+    UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv venv --python 3.11; \
+  else \
+    uv venv --python 3.11; \
+  fi
   @echo "📦 Installing Python dependencies..."
-  @uv pip install -r requirements.txt
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv pip install -r requirements.txt; \
+  else \
+    uv pip install -r requirements.txt; \
+  fi
   @echo "🧰 Installing dev tooling (includes alembic for migrations)..."
-  @uv pip install -e ".[dev]"
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv pip install -e ".[dev]"; \
+  else \
+    uv pip install -e ".[dev]"; \
+  fi
 
 setup-client:
   @echo "📦 Installing frontend dependencies..."
-  @npm -C client install
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    echo "📦 Using Databricks npm proxy"; \
+    npm -C client install --package-lock=false --registry="{{db-npm-registry}}"; \
+  else \
+    npm -C client install --package-lock=false; \
+  fi
+  @echo "🎭 Installing Playwright browsers..."
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    npm_config_registry="{{db-npm-registry}}" npm -C client exec playwright install chromium; \
+  else \
+    npm -C client exec playwright install chromium; \
+  fi
 
 # Interactive Databricks configuration + .env.local management
 configure:
@@ -237,7 +263,16 @@ ui:
 
 [group('dev')]
 ui-install:
-  npm -C {{client-dir}} install
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    npm -C {{client-dir}} install --package-lock=false --registry="{{db-npm-registry}}"; \
+  else \
+    npm -C {{client-dir}} install --package-lock=false; \
+  fi
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    npm_config_registry="{{db-npm-registry}}" npm -C {{client-dir}} exec playwright install chromium; \
+  else \
+    npm -C {{client-dir}} exec playwright install chromium; \
+  fi
 
 [group('dev')]
 ui-dev: openapi
@@ -251,7 +286,11 @@ ui-build:
   # Run npm install if node_modules is missing or package.json is newer
   if [ ! -d "{{client-dir}}/node_modules" ] || [ "{{client-dir}}/package.json" -nt "{{client-dir}}/node_modules" ]; then
     echo "📦 Installing frontend dependencies..."
-    npm -C {{client-dir}} install
+    if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+      npm -C {{client-dir}} install --package-lock=false --registry="{{db-npm-registry}}"
+    else
+      npm -C {{client-dir}} install --package-lock=false
+    fi
   fi
 
   npm -C {{client-dir}} run build
@@ -260,9 +299,17 @@ ui-build:
 [group('dev')]
 openapi:
   @echo "📜 Generating OpenAPI spec from FastAPI..."
-  @uv run python -m server.make_openapi --output /tmp/openapi.json
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv run --frozen python -m server.make_openapi --output /tmp/openapi.json; \
+  else \
+    uv run python -m server.make_openapi --output /tmp/openapi.json; \
+  fi
   @echo "🔧 Generating TypeScript client..."
-  @npx openapi-typescript-codegen --input /tmp/openapi.json --output {{client-dir}}/src/client --client fetch
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    npm_config_registry="{{db-npm-registry}}" npx --package-lock=false openapi-typescript-codegen --input /tmp/openapi.json --output {{client-dir}}/src/client --client fetch; \
+  else \
+    npx openapi-typescript-codegen --input /tmp/openapi.json --output {{client-dir}}/src/client --client fetch; \
+  fi
   @echo "✅ TypeScript client generated at {{client-dir}}/src/client"
 
 # Run pytest (writes JSON report to .test-results/ for token-efficient summaries)
@@ -271,7 +318,11 @@ test-server *args:
   #!/usr/bin/env bash
   set -euo pipefail
   mkdir -p .test-results
-  uv run pytest -q --json-report --json-report-file=.test-results/pytest.json {{args}}
+  if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+    UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv run --frozen pytest -q --json-report --json-report-file=.test-results/pytest.json {{args}}
+  else
+    uv run pytest -q --json-report --json-report-file=.test-results/pytest.json {{args}}
+  fi
 
 # Run integration tests (real DB, transaction-rollback isolation)
 [group('dev')]
@@ -279,7 +330,11 @@ test-integration *args:
   #!/usr/bin/env bash
   set -euo pipefail
   mkdir -p .test-results
-  uv run pytest tests/integration/ -q --json-report --json-report-file=.test-results/pytest-integration.json {{args}}
+  if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+    UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv run --frozen pytest tests/integration/ -q --json-report --json-report-file=.test-results/pytest-integration.json {{args}}
+  else
+    uv run pytest tests/integration/ -q --json-report --json-report-file=.test-results/pytest-integration.json {{args}}
+  fi
 
 # Run MLflow contract tests (mock shape & call-site verification)
 [group('dev')]
@@ -287,7 +342,11 @@ test-contract *args:
   #!/usr/bin/env bash
   set -euo pipefail
   mkdir -p .test-results
-  uv run pytest tests/contract/ -q --json-report --json-report-file=.test-results/pytest-contract.json {{args}}
+  if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+    UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv run --frozen pytest tests/contract/ -q --json-report --json-report-file=.test-results/pytest-contract.json {{args}}
+  else
+    uv run pytest tests/contract/ -q --json-report --json-report-file=.test-results/pytest-contract.json {{args}}
+  fi
 
 [group('dev')]
 ui-test: openapi
@@ -299,7 +358,11 @@ ui-test-unit *args:
   #!/usr/bin/env bash
   set -euo pipefail
   mkdir -p .test-results
-  VITEST_JSON_REPORT=1 npm -C {{client-dir}} run test:unit -- {{args}}
+  if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+    npm_config_registry="{{db-npm-registry}}" VITEST_JSON_REPORT=1 npm -C {{client-dir}} run test:unit -- {{args}}
+  else
+    VITEST_JSON_REPORT=1 npm -C {{client-dir}} run test:unit -- {{args}}
+  fi
 
 [group('dev')]
 ui-lint: openapi
@@ -466,7 +529,11 @@ db-revision message:
 
 [group('db')]
 db-bootstrap:
-  uv run python -m server.db_bootstrap bootstrap
+  @if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then \
+    UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv run --frozen python -m server.db_bootstrap bootstrap; \
+  else \
+    uv run python -m server.db_bootstrap bootstrap; \
+  fi
 
 [script]
 e2e-wait-ready api_port="8000" ui_port="3000" timeout_s="60":
@@ -614,6 +681,7 @@ e2e-servers db_path=".e2e-workshop.db" api_port="8000" ui_port="3000":
     API_LOG="/dev/stdout"
     UI_LOG="/dev/stdout"
   fi
+  MLFLOW_FEEDBACK_RECORDER_PATH="${E2E_MLFLOW_FEEDBACK_RECORDER_PATH:-$LOG_DIR/mlflow-feedback.jsonl}"
 
   # Ensure schema exists before starting the API (migrations are part of the workflow, not app startup)
   ENVIRONMENT=development DATABASE_URL="sqlite:///./${DB_PATH}" just db-bootstrap
@@ -627,11 +695,19 @@ e2e-servers db_path=".e2e-workshop.db" api_port="8000" ui_port="3000":
   fi
 
   # Start API (no reload for E2E)
-  (ENVIRONMENT=development DATABASE_URL="sqlite:///./${DB_PATH}" uv run uvicorn {{server-dir}}.app:app --host 127.0.0.1 --port "$API_PORT" > "$API_LOG" 2>&1) &
+  if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+    (ENVIRONMENT=development DATABASE_URL="sqlite:///./${DB_PATH}" E2E_MLFLOW_FEEDBACK_RECORDER_PATH="$MLFLOW_FEEDBACK_RECORDER_PATH" UV_DEFAULT_INDEX="{{db-pypi-index}}" UV_INDEX="{{db-pypi-index}}" uv run --frozen uvicorn {{server-dir}}.app:app --host 127.0.0.1 --port "$API_PORT" > "$API_LOG" 2>&1) &
+  else
+    (ENVIRONMENT=development DATABASE_URL="sqlite:///./${DB_PATH}" E2E_MLFLOW_FEEDBACK_RECORDER_PATH="$MLFLOW_FEEDBACK_RECORDER_PATH" uv run uvicorn {{server-dir}}.app:app --host 127.0.0.1 --port "$API_PORT" > "$API_LOG" 2>&1) &
+  fi
   api_pid=$!
 
   # Start UI (force port for determinism, proxy to correct API port)
-  (E2E_API_URL="http://127.0.0.1:${API_PORT}" npm -C {{client-dir}} run dev -- --host 127.0.0.1 --port "$UI_PORT" --strictPort > "$UI_LOG" 2>&1) &
+  if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+    (npm_config_registry="{{db-npm-registry}}" E2E_API_URL="http://127.0.0.1:${API_PORT}" npm -C {{client-dir}} run dev -- --host 127.0.0.1 --port "$UI_PORT" --strictPort > "$UI_LOG" 2>&1) &
+  else
+    (E2E_API_URL="http://127.0.0.1:${API_PORT}" npm -C {{client-dir}} run dev -- --host 127.0.0.1 --port "$UI_PORT" --strictPort > "$UI_LOG" 2>&1) &
+  fi
   ui_pid=$!
 
   cleanup() {
@@ -678,13 +754,25 @@ e2e-test mode="headless" workers="1" *args="":
 
   case "{{mode}}" in
     ui)
-      eval "npm -C {{client-dir}} run test -- $TEST_PATH --ui --workers={{workers}} $GREP_ARGS"
+      if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+        eval "npm_config_registry=\"{{db-npm-registry}}\" npm -C {{client-dir}} run test -- $TEST_PATH --ui --workers={{workers}} $GREP_ARGS"
+      else
+        eval "npm -C {{client-dir}} run test -- $TEST_PATH --ui --workers={{workers}} $GREP_ARGS"
+      fi
       ;;
     headed)
-      eval "npm -C {{client-dir}} run test -- $TEST_PATH --headed --workers={{workers}} $GREP_ARGS"
+      if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+        eval "npm_config_registry=\"{{db-npm-registry}}\" npm -C {{client-dir}} run test -- $TEST_PATH --headed --workers={{workers}} $GREP_ARGS"
+      else
+        eval "npm -C {{client-dir}} run test -- $TEST_PATH --headed --workers={{workers}} $GREP_ARGS"
+      fi
       ;;
     headless)
-      eval "npm -C {{client-dir}} run test -- $TEST_PATH --workers={{workers}} $GREP_ARGS"
+      if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+        eval "npm_config_registry=\"{{db-npm-registry}}\" npm -C {{client-dir}} run test -- $TEST_PATH --workers={{workers}} $GREP_ARGS"
+      else
+        eval "npm -C {{client-dir}} run test -- $TEST_PATH --workers={{workers}} $GREP_ARGS"
+      fi
       ;;
     *)
       echo "Unknown mode: {{mode}} (expected: headless|headed|ui)" >&2
@@ -756,13 +844,23 @@ e2e mode="headless" workers="1" *args:
   # Always start from a clean DB for isolation
   rm -f "$DB_PATH"
 
-  # Create a wrapper recipe call that properly interpolates the ports
-  # We use eval to dynamically call just with the correct keyword arguments
-  just e2e-servers "$DB_PATH" "$API_PORT" "$UI_PORT" &
+  # Start servers through a small wrapper so expected teardown after tests
+  # doesn't print `just`'s "Interrupted by SIGTERM" noise.
+  (
+    set +e
+    just e2e-servers "$DB_PATH" "$API_PORT" "$UI_PORT"
+    code=$?
+    if [ "$code" -eq 130 ] || [ "$code" -eq 143 ]; then
+      exit 0
+    fi
+    exit "$code"
+  ) &
   servers_pid=$!
 
   cleanup() {
-    kill "$servers_pid" 2>/dev/null || true
+    if kill -0 "$servers_pid" 2>/dev/null; then
+      kill -TERM "$servers_pid" 2>/dev/null || true
+    fi
     wait "$servers_pid" 2>/dev/null || true
   }
   trap cleanup INT TERM EXIT

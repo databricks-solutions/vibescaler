@@ -18,6 +18,12 @@ branch_labels = None
 depends_on = None
 
 
+def _is_postgres() -> bool:
+    """Check if the current database is PostgreSQL."""
+    bind = op.get_bind()
+    return bind.dialect.name == "postgresql"
+
+
 def upgrade() -> None:
     op.create_table(
         "participant_notes",
@@ -51,10 +57,12 @@ def upgrade() -> None:
         ["workshop_id", "user_id"],
     )
 
-    # Add facilitator toggle to workshops table
+    # Add facilitator toggle to workshops table. PostgreSQL requires boolean
+    # defaults to be boolean literals, not SQLite-style 0/1 integers.
+    bool_false_default = sa.text("FALSE") if _is_postgres() else sa.text("0")
     with op.batch_alter_table("workshops") as batch_op:
         batch_op.add_column(
-            sa.Column("show_participant_notes", sa.Boolean(), server_default=sa.text("0"), nullable=False)
+            sa.Column("show_participant_notes", sa.Boolean(), server_default=bool_false_default, nullable=False)
         )
 
 

@@ -1,5 +1,6 @@
 """Database service layer for workshop operations."""
 
+import json
 import logging
 import os
 import uuid
@@ -83,6 +84,15 @@ from server.utils.password import generate_default_password, hash_password, veri
 
 
 logger = logging.getLogger(__name__)
+
+
+def _write_e2e_mlflow_record(record: dict[str, Any]) -> None:
+  """Append an MLflow sync record for E2E tests when explicitly enabled."""
+  recorder_path = os.getenv("E2E_MLFLOW_FEEDBACK_RECORDER_PATH")
+  if not recorder_path:
+    return
+  with open(recorder_path, "a", encoding="utf-8") as f:
+    f.write(json.dumps(record, sort_keys=True) + "\n")
 
 
 def _retry_mlflow_operation(operation, max_retries: int = 3, base_delay: float = 1.0, description: str = "MLflow operation"):
@@ -2153,6 +2163,79 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     snake_case = re.sub(r'[^a-z0-9]+', '_', title.lower()).strip('_')
     return f"{snake_case}_judge" if snake_case else "workshop_judge"
 
+  def _record_e2e_mlflow_feedback_sync(self, workshop_id: str, annotation_db: AnnotationDB) -> Dict[str, Any]:
+    """Record MLflow feedback calls for E2E tests without hitting MLflow APIs."""
+    mlflow_trace_id = getattr(annotation_db.trace, "mlflow_trace_id", None)
+    if not mlflow_trace_id:
+      return {"logged": 0, "updated": 0, "skipped": 0, "error": "no mlflow_trace_id"}
+
+    rubric_db = self.db.query(RubricDB).filter(RubricDB.workshop_id == workshop_id).first()
+    question_titles_by_index = {}
+    if rubric_db and rubric_db.question:
+      QUESTION_DELIMITER_NEW = '|||QUESTION_SEPARATOR|||'
+      QUESTION_DELIMITER_LEGACY = '---'
+      questions = (
+        rubric_db.question.split(QUESTION_DELIMITER_NEW)
+        if QUESTION_DELIMITER_NEW in rubric_db.question
+        else rubric_db.question.split(QUESTION_DELIMITER_LEGACY)
+      )
+      for idx, q in enumerate(questions):
+        q = q.strip()
+        if not q:
+          continue
+        content_part = q.split('|||JUDGE_TYPE|||')[0] if '|||JUDGE_TYPE|||' in q else q
+        colon_idx = content_part.find(':')
+        question_titles_by_index[idx] = content_part[:colon_idx].strip() if colon_idx > 0 else content_part.strip()
+
+    current_user_id = annotation_db.user_id or workshop_id
+    rationale = annotation_db.comment.strip() if annotation_db.comment else None
+    for key, value in {"align": "true", "workshop_id": workshop_id}.items():
+      _write_e2e_mlflow_record(
+        {"event": "set_trace_tag", "trace_id": mlflow_trace_id, "key": key, "value": value, "source_id": current_user_id}
+      )
+
+    logged_count = 0
+    if annotation_db.ratings:
+      for question_id, rating_value in annotation_db.ratings.items():
+        if rating_value is None:
+          continue
+        try:
+          index = int(question_id.split('_')[-1])
+          if question_id.startswith('q_'):
+            index -= 1
+        except (ValueError, IndexError):
+          index = 0
+        question_title = question_titles_by_index.get(index, f"question_{index + 1}")
+        judge_name = self._derive_judge_name_from_title(question_title)
+        _write_e2e_mlflow_record(
+          {
+            "event": "log_feedback",
+            "trace_id": mlflow_trace_id,
+            "name": judge_name,
+            "value": rating_value,
+            "source_id": current_user_id,
+            "rationale": rationale if logged_count == 0 else None,
+          }
+        )
+        logged_count += 1
+    elif annotation_db.rating is not None:
+      workshop_db = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
+      judge_name = workshop_db.judge_name if workshop_db and workshop_db.judge_name else 'workshop_judge'
+      _write_e2e_mlflow_record(
+        {
+          "event": "log_feedback",
+          "trace_id": mlflow_trace_id,
+          "name": judge_name,
+          "value": annotation_db.rating,
+          "source_id": current_user_id,
+          "rationale": rationale,
+        }
+      )
+      logged_count = 1
+
+    logger.info("E2E MLflow feedback recorder captured %d feedback calls for trace %s", logged_count, mlflow_trace_id)
+    return {"logged": logged_count, "updated": 0, "skipped": 0, "error": None}
+
   def _sync_annotation_with_mlflow(self, workshop_id: str, annotation_db: AnnotationDB) -> dict:
     """Ensure MLflow trace carries SME tag + feedback once an annotation is captured.
 
@@ -2187,6 +2270,9 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       result['error'] = 'config missing'
       return result
 
+    if os.getenv("E2E_MLFLOW_FEEDBACK_RECORDER_PATH"):
+      return self._record_e2e_mlflow_feedback_sync(workshop_id, annotation_db)
+
     from server.services.databricks_service import resolve_databricks_token
 
     try:
@@ -2200,7 +2286,7 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
 
     try:
       import mlflow
-      from mlflow.entities import AssessmentSource, AssessmentSourceType
+      from mlflow.entities import AssessmentSource, AssessmentSourceType, Feedback
     except ImportError:
       logger.warning('MLflow is not available; cannot sync annotation feedback.')
       result['error'] = 'mlflow not available'
@@ -2271,9 +2357,12 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       source_id=annotation_db.user_id or workshop_id,
     )
 
-    # Check existing assessments on this trace to avoid duplicates and hitting the 50 limit
-    # Track by (name, source_id) tuple so different users can have assessments with the same name
-    existing_assessments = set()  # Set of (name, source_id) tuples
+    # Check existing assessments on this trace to detect duplicates / edits
+    # Map (name, source_id) -> (assessment_id, value) so we can compare values
+    # and call mlflow.update_assessment() when an SME edits their rating.
+    # assessment_id may be None for older SDK response shapes; in that case we
+    # can still skip same-value re-syncs but cannot safely update in place.
+    existing_assessments: dict = {}  # Dict[(name, source_id), (assessment_id | None, value)]
     current_user_id = annotation_db.user_id or workshop_id
     try:
       trace = mlflow.get_trace(mlflow_trace_id)
@@ -2284,8 +2373,14 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
             if hasattr(assessment.source, 'source_type') and assessment.source.source_type == AssessmentSourceType.HUMAN:
               if hasattr(assessment, 'name'):
                 source_id = getattr(assessment.source, 'source_id', None)
-                existing_assessments.add((assessment.name, source_id))
-      logger.info(f"📊 Trace {mlflow_trace_id[:12]}... has existing HUMAN assessments: {existing_assessments}")
+                assessment_id = getattr(assessment, 'assessment_id', None)
+                # Extract current value (defensive — support both old/new shapes)
+                existing_value = getattr(assessment, 'value', None)
+                feedback_obj = getattr(assessment, 'feedback', None)
+                if feedback_obj is not None:
+                  existing_value = getattr(feedback_obj, 'value', None)
+                existing_assessments[(assessment.name, source_id)] = (assessment_id, existing_value)
+      logger.info(f"📊 Trace {mlflow_trace_id[:12]}... has existing HUMAN assessments: {list(existing_assessments.keys())}")
       logger.info(f"📊 Current user: {current_user_id}")
     except Exception as e:
       logger.warning(f"Could not fetch existing assessments for trace {mlflow_trace_id}: {e}")
@@ -2297,6 +2392,8 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     if annotation_db.ratings:
       logged_count = 0
       skipped_count = 0
+      updated_count = 0
+      update_failed_count = 0
       for question_id, rating_value in annotation_db.ratings.items():
         if rating_value is None:
           logger.debug(f"Skipping question_id={question_id} (rating is None)")
@@ -2326,16 +2423,59 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
         judge_name = self._derive_judge_name_from_title(question_title)
         logger.info(f"📊 Question {question_id}: index={index} → title='{question_title}' → judge_name='{judge_name}'")
         
-        # Skip if THIS USER already has a HUMAN assessment with this judge name on this trace
-        # Different users can have their own assessments with the same judge name
-        if (judge_name, current_user_id) in existing_assessments:
-          logger.info(f"✓ Skipping {judge_name} for user {current_user_id} - already exists on trace {mlflow_trace_id[:12]}...")
-          skipped_count += 1
+        # Three-way branch:
+        #  (a) no existing assessment → log_feedback
+        #  (b) existing assessment, same value → skip (no-op re-sync)
+        #  (c) existing assessment, different value → update_assessment (SME edited)
+        rationale_for_this = rationale if (logged_count + updated_count) == 0 else None
+        existing_entry = existing_assessments.get((judge_name, current_user_id))
+
+        if existing_entry is not None:
+          existing_assessment_id, existing_value = existing_entry
+          if existing_value == rating_value:
+            # Case (b): identical re-sync — preserves "Duplicate feedback entries skipped" spec intent
+            logger.info(f"✓ Skipping {judge_name} for user {current_user_id} - same value ({rating_value}) already on trace {mlflow_trace_id[:12]}...")
+            skipped_count += 1
+            continue
+
+          if existing_assessment_id is None:
+            update_failed_count += 1
+            logger.warning(
+              f"⚠️ Cannot update existing {judge_name} assessment for user {current_user_id} "
+              f"on trace {mlflow_trace_id}; assessment_id missing, refusing to log duplicate"
+            )
+            continue
+
+          # Case (c): SME edit — update in place so MemAlign trains on the fresh value.
+          # name=None: Databricks MLflow treats assessment name as immutable. Passing a non-null name
+          # (even unchanged) triggers "assessmentName may not be updated". The store's update_assessment
+          # (databricks_rest_store.py:638) uses a field mask — None excludes name from the mask and
+          # leaves the existing name intact.
+          def _update_assessment(_tid=mlflow_trace_id, _aid=existing_assessment_id, _val=rating_value, _src=source, _rat=rationale_for_this):
+            new_feedback = Feedback(
+              name=None,
+              value=_val,
+              source=_src,
+              rationale=_rat,
+            )
+            mlflow.update_assessment(trace_id=_tid, assessment_id=_aid, assessment=new_feedback)
+            return True
+
+          api_result = _retry_mlflow_operation(
+            _update_assessment,
+            max_retries=3,
+            description=f"update_assessment({judge_name}) for trace {mlflow_trace_id[:12]}..."
+          )
+          if api_result:
+            updated_count += 1
+            logger.info(f"Updated MLflow feedback: {judge_name}: {existing_value} → {rating_value} for trace {mlflow_trace_id}")
+          else:
+            # Intentionally do NOT fall through to log_feedback — that would create a duplicate
+            update_failed_count += 1
+            logger.warning(f"⚠️ Failed to update existing {judge_name} assessment for user {current_user_id} on trace {mlflow_trace_id}; stale value remains")
           continue
-        
-        # Use retry logic for MLflow API call
-        rationale_for_this = rationale if logged_count == 0 else None
-        # Bind loop variables via default args to avoid closure issues
+
+        # Case (a): no existing — log new feedback
         def _log_feedback(_tid=mlflow_trace_id, _name=judge_name, _val=rating_value, _src=source, _rat=rationale_for_this):
           mlflow.log_feedback(
             trace_id=_tid,
@@ -2355,23 +2495,65 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
           logged_count += 1
           logger.info(f"Logged MLflow feedback: {judge_name}={rating_value} for trace {mlflow_trace_id}")
 
-      if logged_count > 0 or skipped_count > 0:
-        logger.info(f"MLflow sync for trace {mlflow_trace_id[:12]}...: logged={logged_count}, skipped={skipped_count}")
-        return {'logged': logged_count, 'skipped': skipped_count, 'error': None}
+      error = "update failed" if update_failed_count > 0 else None
+      logger.info(
+        f"MLflow sync for trace {mlflow_trace_id[:12]}...: "
+        f"logged={logged_count}, updated={updated_count}, skipped={skipped_count}, update_failed={update_failed_count}"
+      )
+      return {
+        'logged': logged_count,
+        'updated': updated_count,
+        'skipped': skipped_count,
+        'update_failed': update_failed_count,
+        'error': error,
+      }
 
     # Fallback: log legacy single rating if no ratings dict
     if annotation_db.rating is not None:
       # Get the workshop's judge_name as fallback
       workshop_db = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
       judge_name = workshop_db.judge_name if workshop_db and workshop_db.judge_name else 'workshop_judge'
-
-      # Skip if THIS USER already has this assessment
-      if (judge_name, current_user_id) in existing_assessments:
-        logger.info(f"✓ Skipping legacy {judge_name} for user {current_user_id} - already exists on trace {mlflow_trace_id[:12]}...")
-        return {'logged': 0, 'skipped': 1, 'error': None}
-
-      # Use retry logic for legacy rating
       rating_val = annotation_db.rating
+
+      # Three-way branch (same shape as the multi-question loop above)
+      existing_entry = existing_assessments.get((judge_name, current_user_id))
+      if existing_entry is not None:
+        existing_assessment_id, existing_value = existing_entry
+        if existing_value == rating_val:
+          # Same value — no-op re-sync
+          logger.info(f"✓ Skipping legacy {judge_name} for user {current_user_id} - same value ({rating_val}) already on trace {mlflow_trace_id[:12]}...")
+          return {'logged': 0, 'updated': 0, 'skipped': 1, 'error': None}
+
+        if existing_assessment_id is None:
+          logger.warning(
+            f"⚠️ Cannot update legacy {judge_name} assessment for user {current_user_id} "
+            f"on trace {mlflow_trace_id}; assessment_id missing, refusing to log duplicate"
+          )
+          return {'logged': 0, 'updated': 0, 'skipped': 0, 'update_failed': 1, 'error': 'update failed'}
+
+        # Value changed — update in place. See _update_assessment() above for rationale on name=None.
+        def _update_legacy_assessment(_tid=mlflow_trace_id, _aid=existing_assessment_id, _val=rating_val, _src=source, _rat=rationale):
+          new_feedback = Feedback(
+            name=None,
+            value=_val,
+            source=_src,
+            rationale=_rat,
+          )
+          mlflow.update_assessment(trace_id=_tid, assessment_id=_aid, assessment=new_feedback)
+          return True
+
+        api_result = _retry_mlflow_operation(
+          _update_legacy_assessment,
+          max_retries=3,
+          description=f"update_assessment(legacy {judge_name}) for trace {mlflow_trace_id[:12]}..."
+        )
+        if api_result:
+          logger.info(f"Updated MLflow legacy feedback: {judge_name}: {existing_value} → {rating_val} for trace {mlflow_trace_id}")
+          return {'logged': 0, 'updated': 1, 'skipped': 0, 'error': None}
+        logger.warning(f"⚠️ Failed to update legacy {judge_name} assessment for user {current_user_id} on trace {mlflow_trace_id}; stale value remains")
+        return {'logged': 0, 'updated': 0, 'skipped': 0, 'error': 'update failed'}
+
+      # No existing entry — log new
       def _log_legacy_feedback(_tid=mlflow_trace_id, _name=judge_name, _val=rating_val, _src=source, _rat=rationale):
         mlflow.log_feedback(
           trace_id=_tid,
@@ -2389,9 +2571,9 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       )
       if api_result:
         logger.info(f"Logged MLflow legacy feedback: {judge_name}={rating_val} for trace {mlflow_trace_id}")
-        return {'logged': 1, 'skipped': 0, 'error': None}
+        return {'logged': 1, 'updated': 0, 'skipped': 0, 'error': None}
 
-    return {'logged': 0, 'skipped': 0, 'error': 'no ratings to sync'}
+    return {'logged': 0, 'updated': 0, 'skipped': 0, 'error': 'no ratings to sync'}
 
   def resync_annotations_to_mlflow(self, workshop_id: str) -> Dict[str, Any]:
     """Re-sync all annotations to MLflow with judge names derived from rubric questions.
