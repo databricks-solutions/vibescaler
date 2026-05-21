@@ -7,7 +7,7 @@ import type { AnalyzeDiscoveryRequest } from '../models/AnalyzeDiscoveryRequest'
 import type { Annotation } from '../models/Annotation';
 import type { AnnotationCreate } from '../models/AnnotationCreate';
 import type { ApplyGroupsRequest } from '../models/ApplyGroupsRequest';
-import type { AuthResponse } from '../models/AuthResponse';
+import type { AuthSession } from '../models/AuthSession';
 import type { Body_call_chat_completion_databricks_chat_post } from '../models/Body_call_chat_completion_databricks_chat_post';
 import type { Body_call_serving_endpoint_databricks_call_post } from '../models/Body_call_serving_endpoint_databricks_call_post';
 import type { Body_upload_csv_and_log_to_mlflow_workshops__workshop_id__csv_upload_to_mlflow_post } from '../models/Body_upload_csv_and_log_to_mlflow_workshops__workshop_id__csv_upload_to_mlflow_post';
@@ -39,7 +39,6 @@ import type { DiscoveryQuestionsResponse } from '../models/DiscoveryQuestionsRes
 import type { DiscoverySettingsConfig } from '../models/DiscoverySettingsConfig';
 import type { DiscoverySummariesResponse } from '../models/DiscoverySummariesResponse';
 import type { DraftRubricItem } from '../models/DraftRubricItem';
-import type { FacilitatorConfigCreate } from '../models/FacilitatorConfigCreate';
 import type { GenerateFollowUpRequest } from '../models/GenerateFollowUpRequest';
 import type { IRRResult } from '../models/IRRResult';
 import type { JsonPathPreviewRequest } from '../models/JsonPathPreviewRequest';
@@ -81,8 +80,6 @@ import type { UpdateDraftRubricItemRequest } from '../models/UpdateDraftRubricIt
 import type { UpdateThresholdsRequest } from '../models/UpdateThresholdsRequest';
 import type { User } from '../models/User';
 import type { UserCreate } from '../models/UserCreate';
-import type { UserInvite } from '../models/UserInvite';
-import type { UserLogin } from '../models/UserLogin';
 import type { UserPermissions } from '../models/UserPermissions';
 import type { UserRole } from '../models/UserRole';
 import type { UserStatus } from '../models/UserStatus';
@@ -94,6 +91,17 @@ import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class ApiService {
+    /**
+     * Get Auth Session
+     * @returns AuthSession Successful Response
+     * @throws ApiError
+     */
+    public static getAuthSessionApiAuthSessionGet(): CancelablePromise<AuthSession> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/auth/session',
+        });
+    }
     /**
      * List Workshops
      * List all workshops, optionally filtered by facilitator or user.
@@ -3745,28 +3753,8 @@ export class ApiService {
         });
     }
     /**
-     * Login
-     * Authenticate a user with email and password.
-     * @param requestBody
-     * @returns AuthResponse Successful Response
-     * @throws ApiError
-     */
-    public static loginUsersAuthLoginPost(
-        requestBody: UserLogin,
-    ): CancelablePromise<AuthResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/users/auth/login',
-            body: requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: `Validation Error`,
-            },
-        });
-    }
-    /**
      * Create User
-     * Create a new user (no authentication required).
+     * Create a pending provider-authenticated user.
      * @param requestBody
      * @returns any Successful Response
      * @throws ApiError
@@ -3786,7 +3774,7 @@ export class ApiService {
     }
     /**
      * List Users
-     * List users, optionally filtered by workshop or role.
+     * List materialized app users, optionally filtered by workshop or role.
      * @param workshopId
      * @param role
      * @returns User Successful Response
@@ -3802,82 +3790,6 @@ export class ApiService {
             query: {
                 'workshop_id': workshopId,
                 'role': role,
-            },
-            errors: {
-                422: `Validation Error`,
-            },
-        });
-    }
-    /**
-     * List Facilitator Configs
-     * List all pre-configured facilitators (admin only).
-     * @returns any Successful Response
-     * @throws ApiError
-     */
-    public static listFacilitatorConfigsUsersAdminFacilitatorsGet(): CancelablePromise<any> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/users/admin/facilitators/',
-        });
-    }
-    /**
-     * Create Facilitator Config
-     * Create a pre-configured facilitator (admin only).
-     * @param requestBody
-     * @returns any Successful Response
-     * @throws ApiError
-     */
-    public static createFacilitatorConfigUsersAdminFacilitatorsPost(
-        requestBody: FacilitatorConfigCreate,
-    ): CancelablePromise<any> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/users/admin/facilitators/',
-            body: requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: `Validation Error`,
-            },
-        });
-    }
-    /**
-     * Create Invitation
-     * Create a new user invitation (facilitators only).
-     * @param requestBody
-     * @returns any Successful Response
-     * @throws ApiError
-     */
-    public static createInvitationUsersInvitationsPost(
-        requestBody: UserInvite,
-    ): CancelablePromise<any> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/users/invitations/',
-            body: requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: `Validation Error`,
-            },
-        });
-    }
-    /**
-     * List Invitations
-     * List invitations (facilitators only).
-     * @param workshopId
-     * @param status
-     * @returns any Successful Response
-     * @throws ApiError
-     */
-    public static listInvitationsUsersInvitationsGet(
-        workshopId?: (string | null),
-        status?: (string | null),
-    ): CancelablePromise<any> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/users/invitations/',
-            query: {
-                'workshop_id': workshopId,
-                'status': status,
             },
             errors: {
                 422: `Validation Error`,
@@ -3928,6 +3840,17 @@ export class ApiService {
             errors: {
                 422: `Validation Error`,
             },
+        });
+    }
+    /**
+     * Get Current User Profile
+     * @returns User Successful Response
+     * @throws ApiError
+     */
+    public static getCurrentUserProfileUsersMeGet(): CancelablePromise<User> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/users/me',
         });
     }
     /**

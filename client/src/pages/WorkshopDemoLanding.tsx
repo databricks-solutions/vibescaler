@@ -26,8 +26,6 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { AnnotationAssignmentManager } from '@/components/AnnotationAssignmentManager';
 import { FacilitatorDashboard } from '@/components/FacilitatorDashboard';
 import { FacilitatorUserManager } from '@/components/FacilitatorUserManager';
-import { UserLogin } from '@/components/UserLogin';
-import { ProductionLogin } from '@/components/ProductionLogin';
 import { WorkshopCreationPage } from '@/components/WorkshopCreationPage';
 import { RubricWaitingView } from '@/components/RubricWaitingView';
 import { RubricViewPage } from '@/components/RubricViewPage';
@@ -56,7 +54,7 @@ export function WorkshopDemoLanding() {
   // ========================================
   const { workshopId, setWorkshopId } = useWorkshopContext();
   const { currentPhase, completedPhases, setCurrentPhase, supportsPerTraceCriteria } = useWorkflowContext();
-  const { user, setUser } = useUser();
+  const { user, isLoading: isLoadingUser } = useUser();
   const { isFacilitator, isSME, canCreateRubric, canAnnotate, canViewResults, canViewRubric, canViewAllAnnotations } = useRoleCheck();
   const queryClient = useQueryClient();
   
@@ -167,7 +165,6 @@ export function WorkshopDemoLanding() {
         
         // Clear the invalid workshop ID and all related data
         localStorage.removeItem('workshop_id');
-        localStorage.removeItem('workshop_user');
         // Clear any other workshop-related data
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith('workshop_') || key.includes('trace') || key.includes('annotation')) {
@@ -320,10 +317,24 @@ export function WorkshopDemoLanding() {
   // ========================================
   // CONDITIONAL LOGIC AND EARLY RETURNS
   // ========================================
+  if (isLoadingUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
   
   // Early return for no user
   if (!user) {
-    return <ProductionLogin />;
+    return (
+      <Card className="m-6">
+        <CardHeader>
+          <CardTitle>Authentication required</CardTitle>
+          <CardDescription>Open this app through Databricks to continue.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   // Check if this is a temporary workshop ID for creation mode
@@ -334,7 +345,14 @@ export function WorkshopDemoLanding() {
     if (isFacilitator) {
       return <WorkshopCreationPage />;
     } else {
-      return <ProductionLogin />;
+      return (
+        <Card className="m-6">
+          <CardHeader>
+            <CardTitle>User workspace coming soon</CardTitle>
+            <CardDescription>Your onboarding, home, and feed workspace will appear here.</CardDescription>
+          </CardHeader>
+        </Card>
+      );
     }
   }
   

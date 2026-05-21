@@ -635,9 +635,8 @@ dev api_port="8000" ui_port="5173": openapi
   (uv run uvicorn {{server-dir}}.app:app --reload --port "$API_PORT" --log-level "${UVICORN_LOG_LEVEL:-info}") &
   api_pid=$!
 
-  # Start UI
-  # Note: Vite's port is controlled in client config; `UI_PORT` is informational unless wired into Vite args.
-  (npm -C {{client-dir}} run dev) &
+  # Start UI on the requested port and point the dev proxy at the matching API.
+  (E2E_API_URL="http://localhost:${API_PORT}" npm -C {{client-dir}} run dev -- --port "$UI_PORT") &
   ui_pid=$!
 
   cleanup() {

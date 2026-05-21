@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { RoleBasedWorkflow } from '@/components/RoleBasedWorkflow';
-import { ChevronDown, LogOut, Settings, User, PanelLeftClose } from 'lucide-react';
+import { ChevronDown, Settings, User, PanelLeftClose } from 'lucide-react';
 import appIcon from '../../assets/favicon-48x48.png';
 
 interface AppSidebarProps {
@@ -25,7 +25,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ onNavigate, showUserSwitching = false, collapsed = false, onToggleCollapse }: AppSidebarProps) {
-  const { user, setUser } = useUser();
+  const { user } = useUser();
   const { isFacilitator, isSME } = useRoleCheck();
 
   const getUserInitials = () => {
@@ -122,15 +122,7 @@ export function AppSidebar({ onNavigate, showUserSwitching = false, collapsed = 
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>
-            {showUserSwitching && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setUser(null)} className="text-gray-700 hover:text-gray-900">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Switch User</span>
-                </DropdownMenuItem>
-              </>
-            )}
+            {showUserSwitching && <DropdownMenuSeparator />}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

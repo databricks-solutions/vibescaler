@@ -35,6 +35,10 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      '/api': {
+        target: apiTarget,
+        changeOrigin: true,
+      },
       '/users': {
         target: apiTarget,
         changeOrigin: true,

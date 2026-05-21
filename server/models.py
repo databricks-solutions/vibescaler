@@ -58,14 +58,7 @@ class UserCreate(BaseModel):
     email: str
     name: str
     role: UserRole
-    workshop_id: str
-    password: str | None = None  # Optional for backward compatibility
-
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-    workshop_id: str | None = None  # Required for participants/SMEs to validate access
+    workshop_id: str | None = None
 
 
 class User(BaseModel):
@@ -77,7 +70,6 @@ class User(BaseModel):
     status: UserStatus = UserStatus.ACTIVE
     created_at: datetime = Field(default_factory=datetime.now)
     last_active: datetime | None = None
-    password_hash: str | None = None  # For internal use only
 
 
 class UserPermissions(BaseModel):
@@ -90,6 +82,7 @@ class UserPermissions(BaseModel):
     can_view_all_annotations: bool = False
     can_view_results: bool = True
     can_manage_workshop: bool = False
+    can_manage_project: bool = False
     can_assign_annotations: bool = False
 
     @classmethod
@@ -106,6 +99,7 @@ class UserPermissions(BaseModel):
                 can_view_all_annotations=True,  # Facilitators can see all annotations for monitoring
                 can_view_results=True,  # ONLY facilitators view IRR results
                 can_manage_workshop=True,
+                can_manage_project=True,
                 can_assign_annotations=True,
             )
         if role == UserRole.SME:
@@ -119,6 +113,7 @@ class UserPermissions(BaseModel):
                 can_view_all_annotations=False,  # SMEs can only see their own annotations
                 can_view_results=False,  # SMEs do NOT view IRR results
                 can_manage_workshop=False,
+                can_manage_project=False,
                 can_assign_annotations=False,
             )
         # PARTICIPANT
@@ -132,6 +127,7 @@ class UserPermissions(BaseModel):
             can_view_all_annotations=False,  # Participants can only see their own annotations
             can_view_results=False,  # Participants do NOT view IRR results
             can_manage_workshop=False,
+            can_manage_project=False,
             can_assign_annotations=False,
         )
 
@@ -615,52 +611,6 @@ class UserTraceOrder(BaseModel):
     annotation_traces: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
-
-
-# Authentication Models
-class FacilitatorConfig(BaseModel):
-    """Configuration for pre-configured facilitators."""
-
-    email: str
-    password_hash: str
-    name: str
-    description: str | None = None
-    created_at: datetime = Field(default_factory=datetime.now)
-
-
-class FacilitatorConfigCreate(BaseModel):
-    """Request model for creating facilitator configuration."""
-
-    email: str
-    password: str
-    name: str
-    description: str | None = None
-
-
-class AuthResponse(BaseModel):
-    """Response model for authentication."""
-
-    user: User
-    is_preconfigured_facilitator: bool = False
-    message: str
-
-
-class UserInvite(BaseModel):
-    """Model for user invitations."""
-
-    email: str
-    name: str
-    role: UserRole
-    workshop_id: str
-    invited_by: str
-    expires_at: datetime
-
-
-class UserInvitation(BaseModel):
-    """Model for user invitation responses."""
-
-    token: str
-    password: str
 
 
 # Databricks Model Serving Models

@@ -3,6 +3,7 @@
 
 from fastapi import APIRouter
 
+from server.features.auth.router import router as auth_router
 from server.routers.databricks import router as databricks_router
 from server.routers.dbsql_export import router as dbsql_export_router
 from server.routers.discovery import router as discovery_router
@@ -11,6 +12,7 @@ from server.routers.users import router as users_router
 from server.routers.workshops import router as workshops_router
 
 router = APIRouter()
+router.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 router.include_router(workshops_router, prefix="/workshops", tags=["workshops"])
 router.include_router(discovery_router, prefix="/workshops", tags=["discovery"])
 router.include_router(eval_mode_router, prefix="/workshops", tags=["eval-mode"])

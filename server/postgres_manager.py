@@ -92,20 +92,8 @@ _TABLE_DDL: list[str] = [
         role            VARCHAR NOT NULL,
         workshop_id     VARCHAR REFERENCES workshops(id),
         status          VARCHAR DEFAULT 'active',
-        password_hash   VARCHAR,
         created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_active     TIMESTAMP
-    )
-    """,
-    # -- facilitator_configs --
-    """
-    CREATE TABLE IF NOT EXISTS facilitator_configs (
-        id              VARCHAR PRIMARY KEY,
-        email           VARCHAR UNIQUE NOT NULL,
-        password_hash   VARCHAR NOT NULL,
-        name            VARCHAR NOT NULL,
-        description     TEXT,
-        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
     # -- workshop_participants --
