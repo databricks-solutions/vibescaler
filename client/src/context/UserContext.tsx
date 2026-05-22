@@ -57,10 +57,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 // Role-based access control helpers
 export const useRoleCheck = () => {
   const { user, permissions } = useUser();
-  
-  const isFacilitator = user?.role === UserRole.FACILITATOR;
-  const isSME = user?.role === UserRole.SME;
-  const isParticipant = user?.role === UserRole.PARTICIPANT;
+  const canManageProject = (permissions as (UserPermissions & { can_manage_project?: boolean }) | null)
+    ?.can_manage_project ?? false;
+  const isFacilitator = user?.role === UserRole.FACILITATOR || canManageProject;
+  const isSME = !isFacilitator && user?.role === UserRole.SME;
+  const isParticipant = !isFacilitator && user?.role === UserRole.PARTICIPANT;
   
   const canViewDiscovery = permissions?.can_view_discovery ?? false;
   const canCreateFindings = permissions?.can_create_findings ?? false;
@@ -70,9 +71,7 @@ export const useRoleCheck = () => {
   const canAnnotate = permissions?.can_annotate ?? false;
   const canViewAllAnnotations = permissions?.can_view_all_annotations ?? false;
   const canViewResults = permissions?.can_view_results ?? false;
-  const canManageWorkshop = permissions?.can_manage_workshop ?? false;
-  const canManageProject = (permissions as (UserPermissions & { can_manage_project?: boolean }) | null)
-    ?.can_manage_project ?? false;
+  const canManageWorkshop = (permissions?.can_manage_workshop ?? false) || canManageProject;
   const canAssignAnnotations = permissions?.can_assign_annotations ?? false;
 
   return {

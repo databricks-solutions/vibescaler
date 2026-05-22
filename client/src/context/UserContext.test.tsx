@@ -6,20 +6,36 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { UserProvider, useUser } from './UserContext';
+import { UserProvider, useRoleCheck, useUser } from './UserContext';
+import { useAuthSession } from '@/hooks/useAuthSession';
 
-// Mock the UsersService
 vi.mock('@/client', () => ({
-  UsersService: {
-    getUserUsersUserIdGet: vi.fn(),
-    getUserPermissionsUsersUserIdPermissionsGet: vi.fn(),
-    updateLastActiveUsersUsersUserIdLastActivePut: vi.fn(),
+  UserRole: {
+    FACILITATOR: 'facilitator',
+    SME: 'sme',
+    PARTICIPANT: 'participant',
   },
+}));
+
+vi.mock('@/hooks/useAuthSession', () => ({
+  useAuthSession: vi.fn(),
 }));
 
 function LoadingStateDisplay() {
   const { isLoading } = useUser();
   return <div data-testid="loading-state">{isLoading ? 'loading' : 'ready'}</div>;
+}
+
+function RoleCheckDisplay() {
+  const { isFacilitator, isSME, canManageWorkshop, canManageProject } = useRoleCheck();
+  return (
+    <div>
+      <div data-testid="is-facilitator">{String(isFacilitator)}</div>
+      <div data-testid="is-sme">{String(isSME)}</div>
+      <div data-testid="can-manage-workshop">{String(canManageWorkshop)}</div>
+      <div data-testid="can-manage-project">{String(canManageProject)}</div>
+    </div>
+  );
 }
 
 function createWrapper() {
@@ -37,6 +53,12 @@ describe('@spec:AUTHENTICATION_SPEC UserContext loading state', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    vi.mocked(useAuthSession).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useAuthSession>);
   });
 
   it('isLoading starts true and transitions to false after initialization', async () => {
@@ -54,5 +76,41 @@ describe('@spec:AUTHENTICATION_SPEC UserContext loading state', () => {
     await waitFor(() => {
       expect(screen.getByTestId('loading-state').textContent).toBe('ready');
     });
+  });
+
+  it('treats project managers as facilitators even when the persisted app role is SME', () => {
+    vi.mocked(useAuthSession).mockReturnValue({
+      data: {
+        user: {
+          id: 'manager-1',
+          email: 'manager@example.com',
+          name: 'Manager',
+          role: 'sme',
+          status: 'active',
+          created_at: new Date().toISOString(),
+        },
+        permissions: {
+          can_manage_project: true,
+          can_manage_workshop: false,
+        },
+        provider: 'databricks_apps',
+        provider_role: 'CAN_MANAGE',
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useAuthSession>);
+
+    const Wrapper = createWrapper();
+    render(
+      <Wrapper>
+        <RoleCheckDisplay />
+      </Wrapper>,
+    );
+
+    expect(screen.getByTestId('is-facilitator').textContent).toBe('true');
+    expect(screen.getByTestId('is-sme').textContent).toBe('false');
+    expect(screen.getByTestId('can-manage-workshop').textContent).toBe('true');
+    expect(screen.getByTestId('can-manage-project').textContent).toBe('true');
   });
 });
