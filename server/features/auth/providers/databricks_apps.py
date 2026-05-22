@@ -18,6 +18,19 @@ class _CachedRole:
     expires_at: float
 
 
+class _DelegatedAccessTokenCredentials:
+    """Use the Databricks Apps forwarded user OAuth token for one SDK client."""
+
+    def __init__(self, token: str):
+        self._headers = {"Authorization": f"Bearer {token}"}
+
+    def auth_type(self) -> str:
+        return "databricks_apps_delegated_oauth"
+
+    def __call__(self, _config):
+        return lambda: self._headers
+
+
 class DatabricksAppsIdentityProvider:
     provider_name = "databricks_apps"
 
@@ -50,6 +63,8 @@ class DatabricksAppsIdentityProvider:
 
     def _fetch_provider_role(self, request: Request, email: str) -> ProviderRole:
         if not self.app_name:
+            # Databricks Apps should supply a configured app name for permission lookup.
+            # If it is absent, fall back to the least-privileged app role for an authenticated user.
             return ProviderRole.CAN_USE
 
         delegated_token = request.headers.get("x-forwarded-access-token")
@@ -63,9 +78,10 @@ class DatabricksAppsIdentityProvider:
             raise RuntimeError("databricks-sdk is required for Databricks Apps role resolution") from exc
 
         try:
-            permissions = WorkspaceClient(host=os.getenv("DATABRICKS_HOST"), token=delegated_token).apps.get_permissions(
-                self.app_name
-            )
+            permissions = WorkspaceClient(
+                host=os.getenv("DATABRICKS_HOST"),
+                credentials_strategy=_DelegatedAccessTokenCredentials(delegated_token),
+            ).apps.get_permissions(self.app_name)
         except Exception as exc:
             logger.warning(
                 "Could not resolve Databricks Apps permissions for app %s with delegated user auth; "
@@ -75,8 +91,10 @@ class DatabricksAppsIdentityProvider:
             )
             return ProviderRole.CAN_USE
 
-        best_role = ProviderRole.CAN_USE
-        for acl in getattr(permissions, "access_control_list", None) or []:
+        access_control_list = getattr(permissions, "access_control_list", None) or []
+        best_role = ProviderRole.CAN_MANAGE
+
+        for acl in access_control_list:
             user_name = (getattr(acl, "user_name", None) or "").strip().lower()
             if user_name and user_name != email:
                 continue
