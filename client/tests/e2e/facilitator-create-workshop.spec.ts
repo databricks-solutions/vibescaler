@@ -1,29 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-const FACILITATOR_EMAIL = process.env.E2E_FACILITATOR_EMAIL ?? 'facilitator123@email.com';
-const FACILITATOR_PASSWORD = process.env.E2E_FACILITATOR_PASSWORD ?? 'facilitator123';
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000';
 
-test('facilitator can log in and create a workshop', {
+test('facilitator can create a workshop from provider session', {
   tag: ['@spec:AUTHENTICATION_SPEC', '@spec:DISCOVERY_TRACE_ASSIGNMENT_SPEC'],
 }, async ({ page, request }) => {
   await page.goto('/');
 
-  // Login (real backend auth via YAML facilitator in config/auth.yaml)
-  await expect(page.getByText('Workshop Portal')).toBeVisible();
-  await page.locator('#email').fill(FACILITATOR_EMAIL);
-  await page.locator('#password').fill(FACILITATOR_PASSWORD);
-
-  // Wait for workshop options to load, then click "Create New" to create a new workshop
-  await page.waitForTimeout(500);
-  const createNewButton = page.getByRole('button', { name: /Create New/i });
-  if (await createNewButton.isVisible().catch(() => false)) {
-    await createNewButton.click();
-  }
-
-  await page.locator('button[type="submit"]').click();
-
-  // Facilitator should land on workshop creation when no workshop is selected
+  // Local/provider auth should land facilitators on workshop creation when no workshop is selected.
   await expect(page.getByText(/Welcome, Facilitator/i)).toBeVisible();
 
   // Fill required Use Case Description before creating

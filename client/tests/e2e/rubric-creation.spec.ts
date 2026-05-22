@@ -3,10 +3,6 @@ import { test, expect } from '@playwright/test';
 // This repo doesn't include Node typings in the client TS config; keep `process.env` without adding deps.
 declare const process: { env: Record<string, string | undefined> };
 
-const FACILITATOR_EMAIL =
-  process.env.E2E_FACILITATOR_EMAIL ?? 'facilitator123@email.com';
-const FACILITATOR_PASSWORD =
-  process.env.E2E_FACILITATOR_PASSWORD ?? 'facilitator123';
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000';
 
 test('rubric creation: facilitator can advance from discovery and create a rubric question', {
@@ -18,22 +14,8 @@ test('rubric creation: facilitator can advance from discovery and create a rubri
 }) => {
   const runId = `${Date.now()}`;
 
-  // Facilitator login + workshop creation
+  // Facilitator provider session + workshop creation
   await page.goto('/');
-  await expect(page.getByText('Workshop Portal')).toBeVisible({ timeout: 10000 });
-  await page.locator('#email').fill(FACILITATOR_EMAIL);
-  await page.locator('#password').fill(FACILITATOR_PASSWORD);
-
-  // Wait for workshop options to load, then click "Create New" to create a new workshop
-  const loadingText = page.getByText(/Loading workshops/i);
-  await expect(loadingText).not.toBeVisible({ timeout: 10000 }).catch(() => {});
-  const createNewButton = page.getByRole('button', { name: /Create New/i });
-  if (await createNewButton.isVisible().catch(() => false)) {
-    await createNewButton.click();
-  }
-
-  await page.locator('button[type="submit"]').click();
-
   await expect(page.getByText(/Welcome, Facilitator/i)).toBeVisible({ timeout: 10000 });
 
   // Fill required Use Case Description before creating

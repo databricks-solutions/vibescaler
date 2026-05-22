@@ -6,6 +6,8 @@ This specification defines the authentication flow, permission management, and s
 
 ## Architecture Context
 
+V2 uses provider-resolved app identity. In production, Databricks Apps authenticates users before requests reach the application and forwards trusted identity headers to the backend. The SPA does not present an app-owned login screen and does not restore users from browser-stored app session state.
+
 The system has two distinct authentication concerns:
 
 1. **Workshop application auth** (this spec) — login, roles, permissions, sessions
@@ -31,6 +33,60 @@ The system has two distinct authentication concerns:
 - Databricks API auth handles backend-to-Databricks communication (MLflow traces, serving endpoints, volume access)
 - Workshop auth handles application-level permissions (what users can do within the app)
 - Workshop roles (participant, SME, facilitator) are app-specific concepts not in Databricks IAM
+
+## V2 Application Identity
+
+### Current Session
+
+`GET /api/auth/session` is the frontend source of truth for authentication and authorization state.
+
+- `200` means the backend resolved a trusted provider identity, materialized or updated the app user, resolved provider role, and returned role/capability permissions.
+- `401` means no valid provider identity was present. The frontend does not render a login form; Databricks Apps is expected to redirect unauthenticated production users to Databricks login before the SPA loads.
+- The frontend uses TanStack Query for the current-session query.
+- Browser localStorage must not store or restore app user session state.
+
+### IdentityProvider Boundary
+
+The backend owns an identity-provider boundary. Providers return provider facts; the auth session service maps those facts into app users and app permissions.
+
+Provider facts:
+
+```python
+ProviderIdentity {
+  provider: str
+  email: str
+  display_name: str | None
+}
+
+ProviderRole = "CAN_MANAGE" | "CAN_USE"
+```
+
+Provider requirements:
+
+- Missing provider identity is unauthenticated.
+- Databricks Apps identity comes from forwarded identity headers such as `X-Forwarded-Email`, `X-Forwarded-User`, and `X-Forwarded-Preferred-Username`.
+- Databricks Apps role comes from Databricks Apps permissions data, using the forwarded `X-Forwarded-Access-Token` with SDK Apps `get_permissions(app_name)` or an equivalent documented endpoint.
+- `DATABRICKS_APP_NAME` or `APP_NAME` must be set in Apps deployment so the backend knows which app's permissions to query.
+- If app name, delegated token, or permission lookup is unavailable, an authenticated Databricks Apps user falls back to `CAN_USE`.
+- Provider role lookup may use a short TTL cache so Databricks App permission changes appear after a normal session refresh without calling the provider permissions endpoint on every protected route.
+- `LocalDevIdentityProvider` implements the same session contract, defaults to `CAN_MANAGE`, and can be configured to return `CAN_USE` in tests.
+
+### Authorization Mapping
+
+- `CAN_MANAGE` grants `can_manage_project` and materializes the app user as a facilitator.
+- `CAN_USE` grants non-power-user app access and does not grant `can_manage_project`.
+- Existing non-facilitator app subroles such as `sme` and `participant` may remain in the user model; new `CAN_USE` users default to SME.
+- App user display data and status are persisted locally.
+
+### Removed Legacy Auth
+
+V2 removes app-owned password login:
+
+- No frontend login form.
+- No `/users/auth/login` endpoint.
+- No facilitator YAML password config.
+- No password hash persistence on users.
+- No browser-restored `workshop_user` session.
 
 ## Databricks API Authentication
 
@@ -148,26 +204,26 @@ Prior to this migration, the system had:
 
 All of this was replaced by the single `resolve_databricks_token()` function.
 
-### Future: Per-User Auth (On-Behalf-Of-User)
+### Future: Per-User Data Plane Auth
 
-Databricks Apps can forward the logged-in user's OAuth token via the `x-forwarded-access-token` HTTP header. This would allow per-user Unity Catalog enforcement (row-level filters, column masks). Not yet implemented — the app currently uses the service principal identity for all Databricks API calls.
+Databricks Apps forwards the logged-in user's OAuth token via the `x-forwarded-access-token` HTTP header. The current implementation uses that delegated token to resolve the user's Databricks Apps permission level. It does not yet use the delegated token for all MLflow, Unity Catalog, or model-serving data plane calls; those still use SDK-resolved service principal or local developer auth.
 
 ## Core Concepts
 
 ### User
 - A workshop participant, SME, or facilitator with a unique identity
 - Has associated permissions that control access to features
-- Session persisted in localStorage for cross-page continuity
+- Resolved from the configured identity provider and materialized as an app user
 
 ### Permission
 - Authorization flag controlling access to specific features
-- Loaded from backend after successful authentication
-- Defaults applied when backend is unavailable
+- Loaded from the current-session endpoint
+- V2 project actions use project capabilities such as `can_manage_project`
 
 ### Session
-- Client-side state representing authenticated user
-- Includes user data, permissions, and workshop context
-- Validated against backend on initialization
+- Backend-resolved state representing the authenticated app user for the current request
+- Includes user data, provider role, and permissions
+- Loaded through TanStack Query from `GET /api/auth/session`
 
 ## Permission Model
 
@@ -179,16 +235,17 @@ Databricks Apps can forward the logged-in user's OAuth token via the `x-forwarde
 | `can_view_rubric` | User can view rubric questions | `true` |
 | `can_create_rubric` | User can create/edit rubrics | `false` |
 | `can_manage_workshop` | User can manage workshop settings | `false` |
+| `can_manage_project` | User can manage V2 project setup and global project actions | `false` |
 | `can_assign_annotations` | User can assign traces to annotators | `false` |
 
 ### Permission Loading
 
 ```
 Permission Loading Flow:
-1. Attempt to load permissions from API
-2. On success: Apply loaded permissions
-3. On 404: Session expired, clear user state
-4. On other error: Apply default permissions (fallback)
+1. Attempt to load `GET /api/auth/session`
+2. On 200: Apply returned user and permissions
+3. On 401: Do not render app-owned login; show authentication-required state
+4. On other error: Surface session loading error
 ```
 
 ## Authentication Flow
@@ -198,43 +255,21 @@ Permission Loading Flow:
 ```
 App Initialization:
 1. Set isLoading = true
-2. Check localStorage for saved user
-3. If user found:
-   a. Validate user exists via API
-   b. If valid: Load user data
-   c. Load permissions (with fallback)
-   d. Set workshop context if available
-4. Set isLoading = false (ONLY after all above complete)
+2. Fetch `GET /api/auth/session`
+3. If the response is 200, render based on returned user and permissions
+4. If the response is 401, show an authentication-required state instead of a login form
+5. Set isLoading = false only after the session query resolves
 ```
 
 **Critical Requirement**: `isLoading` must remain `true` until ALL initialization steps complete, including permission loading.
 
 ### Login Flow
 
-```
-Login Flow:
-1. Clear previous errors
-2. Set isLoading = true
-3. Make login API call
-4. On success:
-   a. Store user in state
-   b. Load permissions (with fallback)
-   c. Store user in localStorage
-   d. Clear errors
-5. On failure: Set error message
-6. ALWAYS: Set isLoading = false
-```
+Login is owned by Databricks Apps or the configured trusted provider. The SPA has no app-owned JSON login mutation.
 
 ### Logout Flow
 
-```
-Logout Flow:
-1. Clear user state
-2. Clear permissions
-3. Clear localStorage
-4. Clear workshop context
-5. Redirect to login
-```
+Logout is owned by Databricks Apps or the configured trusted provider. The app may clear local workflow context, but it must not maintain a separate browser-restored auth session.
 
 ## Error Handling
 
@@ -247,29 +282,12 @@ Logout Flow:
 - All async operations complete before loading state changes
 - Components render only when `isLoading === false`
 
-### Fallback Permissions
+### Session Errors
 
-When permission loading fails (non-404 errors), apply default permissions:
+When current-session loading fails:
 
-```typescript
-const defaultPermissions = {
-  can_annotate: true,
-  can_view_rubric: true,
-  can_create_rubric: false,
-  can_manage_workshop: false,
-  can_assign_annotations: false,
-};
-```
-
-This ensures users can access basic features even when the permission API is unavailable.
-
-### Session Expiration
-
-When user validation returns 404:
-1. Clear stale user data from localStorage
-2. Clear permissions and state
-3. Display "session expired" message
-4. Allow fresh login
+- `401`: no trusted identity was present. The frontend shows an authentication-required state and relies on Databricks Apps/provider login.
+- Other errors: the frontend surfaces the session load failure; it must not fabricate a browser session or fall back to app-owned login.
 
 ## Data Model
 
@@ -279,7 +297,6 @@ When user validation returns 404:
 interface UserContextState {
   user: User | null;
   permissions: Permissions | null;
-  workshopId: string | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -305,6 +322,7 @@ interface Permissions {
   can_view_rubric: boolean;
   can_create_rubric: boolean;
   can_manage_workshop: boolean;
+  can_manage_project: boolean;
   can_assign_annotations: boolean;
 }
 ```
@@ -317,37 +335,40 @@ Key implementation points:
 
 1. **Loading State Management**
    - Initialize `isLoading = true`
-   - Set `false` only after ALL async operations complete
-   - Never set `false` mid-initialization
+   - Derive loading state from the `GET /api/auth/session` query
+   - Never render role-gated app content before the session query resolves
 
 2. **Permission Loading**
-   - Always await permission loading before proceeding
-   - Apply fallback on non-404 errors
-   - Log warnings for debugging
+   - Permissions come from the backend session response
+   - The frontend does not call a separate login mutation or restore `workshop_user`
 
 3. **Error Handling**
-   - Clear errors before new login attempts
-   - Set appropriate error messages
-   - Don't block UI on non-critical errors
+   - Show authentication-required state for missing provider identity
+   - Surface unexpected session errors
 
 ### API Endpoints
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/users/{id}` | GET | Validate user exists |
+| `/api/auth/session` | GET | Resolve current provider-authenticated session |
+| `/users/me` | GET | Return current materialized app user |
 | `/users/{id}/permissions` | GET | Load user permissions |
-| `/login` | POST | Authenticate user |
 
 ## Success Criteria
 
 ### Workshop Application Auth
-- [ ] No "permission denied" errors on normal login
-- [ ] No page refresh required after login
-- [ ] Slow network: Loading indicator shown until ready
-- [ ] Permission API failure: User can log in with defaults
-- [ ] 404 on validation: Session cleared, fresh login allowed
+- [ ] No app-owned login form exists in the frontend
+- [ ] No `/users/auth/login` endpoint exists
+- [ ] No facilitator YAML password config exists
+- [ ] No user password hash is persisted
+- [ ] Browser localStorage does not restore `workshop_user`
+- [ ] Current session loads through `GET /api/auth/session`
+- [ ] Databricks Apps identity headers authenticate the current session
+- [ ] Databricks Apps `CAN_MANAGE` grants `can_manage_project`
+- [ ] Databricks Apps `CAN_USE` denies `can_manage_project`
+- [ ] Local development defaults to `CAN_MANAGE` and can be configured to `CAN_USE`
+- [ ] Slow network: Loading indicator shown until session resolves
 - [ ] Rapid navigation: Components wait for `isLoading = false`
-- [ ] Error recovery: Errors cleared on new login attempt
 
 ### Databricks API Auth
 - [ ] All Databricks API calls use SDK-resolved tokens (no user-provided PATs)
@@ -376,42 +397,40 @@ Key implementation points:
 
 ## Testing Scenarios
 
-### Scenario 1: Normal Login
-- User logs in
-- Permissions load successfully
-- Access granted to appropriate features
+### Scenario 1: Databricks Apps Session
+- Request includes trusted Databricks Apps identity headers
+- Backend materializes or updates user
+- Backend resolves provider role using Apps permissions data
+- Frontend renders according to returned permissions
 
 ### Scenario 2: Slow Network
-- User logs in
+- Current-session endpoint is delayed
 - Loading indicator shown
 - No race condition errors
 - Access granted when complete
 
-### Scenario 3: Permission API Failure
-- User logs in successfully
-- Permission API returns 500
-- Default permissions applied
-- User can access basic features
+### Scenario 3: Missing Provider Identity
+- Session endpoint returns 401
+- Frontend does not show app-owned login
+- Authentication-required state is displayed
 
-### Scenario 4: Session Expired
-- User returns with stale session
-- Validation returns 404
-- Session cleared
-- "Session expired" shown
-- Fresh login works
+### Scenario 4: Local Development
+- No Databricks Apps headers are present
+- LocalDev provider returns configured identity
+- Default local provider role is `CAN_MANAGE`
+- `LOCAL_DEV_PROVIDER_ROLE=CAN_USE` returns non-power-user permissions
 
 ### Scenario 5: Rapid Navigation
-- User logs in
-- Immediately navigates
+- User opens app and navigates immediately
 - Components wait for loading
 - No permission errors
 
 ## Backwards Compatibility
 
-- All existing authentication flows work unchanged
-- No database changes required
-- No API changes needed
-- Graceful fallbacks for all error cases
+- This is a breaking auth migration: app-owned password login is intentionally removed.
+- Existing users can be materialized by email through provider identity.
+- Existing workshop roles for SME/participant can be preserved after materialization.
+- Database migrations remove legacy password-auth persistence.
 
 ## Implementation Log
 
@@ -420,3 +439,4 @@ Key implementation points:
 | 2026-04-10 | [SDK Auth Migration](../.claude/plans/2026-04-10-sdk-auth-migration.md) | complete | Replace PAT token auth with Databricks SDK unified auth |
 | 2026-04-11 | (inline) | complete | Fix Lakebase connection pool: switch to `do_connect` + `generate_database_credential()`, fix pool settings to match Databricks docs |
 | 2026-04-15 | [Remove databricks_host](../.claude/plans/2026-04-15-remove-databricks-host-app-yaml-resources.md) | in-progress | Remove user-configurable host, use app.yaml resources for MLflow experiment, fix MemAlign embedding model |
+| 2026-05-22 | (inline) | complete | Replace app-owned login with provider-resolved Databricks Apps identity and current-session loading |

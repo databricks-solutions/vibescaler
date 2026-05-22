@@ -840,8 +840,9 @@ e2e mode="headless" workers="1" *args:
 
   echo "Using ports: API=$API_PORT, UI=$UI_PORT"
 
-  # Always start from a clean DB for isolation
-  rm -f "$DB_PATH"
+  # Always start from a clean DB for isolation. SQLite sidecar files must be
+  # removed with the main DB or the next run can see stale WAL/SHM state.
+  rm -f "$DB_PATH" "$DB_PATH-shm" "$DB_PATH-wal" "$DB_PATH.bootstrap.lock"
 
   # Start servers through a small wrapper so expected teardown after tests
   # doesn't print `just`'s "Interrupted by SIGTERM" noise.

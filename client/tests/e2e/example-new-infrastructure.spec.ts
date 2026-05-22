@@ -110,7 +110,7 @@ test.describe.skip('TestScenario Infrastructure Examples', {
     const scenario = await TestScenario.create(page)
       .withWorkshop()
       .withFacilitator()
-      .withReal('/users/auth/login') // Real login endpoint
+      .withReal('/api/auth/session') // Real current-session endpoint
       // .withReal('WorkshopsService') // Would make all workshop calls real
       .build();
 

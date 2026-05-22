@@ -12,9 +12,9 @@ export type { User } from '../../src/client/models/User';
 export { UserRole } from '../../src/client/models/UserRole';
 export { UserStatus } from '../../src/client/models/UserStatus';
 export type { UserCreate } from '../../src/client/models/UserCreate';
-export type { UserLogin } from '../../src/client/models/UserLogin';
 export type { UserPermissions } from '../../src/client/models/UserPermissions';
-export type { AuthResponse } from '../../src/client/models/AuthResponse';
+export type { AuthSession } from '../../src/client/models/AuthSession';
+export { ProviderRole } from '../../src/client/models/ProviderRole';
 
 export type { Workshop } from '../../src/client/models/Workshop';
 export type { WorkshopCreate } from '../../src/client/models/WorkshopCreate';

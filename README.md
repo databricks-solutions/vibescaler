@@ -33,6 +33,27 @@ Download project-with-build.zip which includes pre-built frontend assets.
 
 ## 🚀 Local Development
 
+### Full Stack With `just`
+
+The easiest local workflow starts both the FastAPI backend and Vite frontend:
+
+```bash
+just dev
+```
+
+Local development uses `LocalDevIdentityProvider` when Databricks Apps identity headers are absent. By default this materializes a local facilitator with project-management access.
+
+Useful local auth overrides:
+
+```bash
+LOCAL_DEV_USER_EMAIL=you@example.com \
+LOCAL_DEV_USER_NAME="Your Name" \
+LOCAL_DEV_PROVIDER_ROLE=CAN_USE \
+just dev
+```
+
+Set `LOCAL_DEV_PROVIDER_ROLE=CAN_MANAGE` to test facilitator/project-manager access and `CAN_USE` to test non-manager access.
+
 ### Frontend Setup
 
 1. **Navigate to client directory:**
@@ -136,6 +157,20 @@ databricks current-user me  # Verify authentication
 databricks apps create human-eval-workshop
 ```
 
+### Databricks Apps Auth Setup
+
+The app does not include its own login screen. In Databricks Apps, users authenticate through Databricks and the backend resolves the current user from forwarded Apps headers.
+
+Required setup:
+
+- Set `DATABRICKS_APP_NAME` or `APP_NAME` to the Databricks App name. The backend uses this when calling Databricks Apps permissions APIs.
+- Grant users `CAN_USE` or `CAN_MANAGE` on the Databricks App.
+- Users with `CAN_MANAGE` are materialized as facilitators/project managers.
+- Users with `CAN_USE` are materialized as non-power users unless they already have a persisted SME/participant app role.
+- Add required Apps resources, including Lakebase database (`Can connect and create`) and MLflow experiment (`Can edit`) as appropriate.
+
+For Git-backed Apps, create/configure the app with a Git repository source and deploy from a branch, tag, or commit SHA. Do not use workspace sync for Git-backed deployments.
+
 ### 2. Build the Frontend
 
 ```bash
@@ -164,31 +199,6 @@ databricks apps deploy human-eval-workshop \
 
 Once deployed, the Databricks CLI will provide a URL to access your application.
 
-
-## ⚙️ Configuration
-
-### Authentication Configuration (`config/auth.yaml`)
-
-Configure facilitator accounts and security settings:
-
-```yaml
-facilitators:
-  - email: "facilitator@email.com"
-    password: "xxxxxxxxxx"
-    name: "Workshop Facilitator"
-    description: "Primary workshop facilitator"
-
-security:
-  default_user_password: "changeme123"
-  password_requirements:
-    min_length: 8
-    require_uppercase: true
-    require_lowercase: true
-    require_numbers: true
-  session:
-    token_expiry_hours: 24
-    refresh_token_expiry_days: 7
-```
 
 ## 📄 License
 

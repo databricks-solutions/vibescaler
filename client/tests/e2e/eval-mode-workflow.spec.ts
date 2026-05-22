@@ -1,22 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-const FACILITATOR_EMAIL = process.env.E2E_FACILITATOR_EMAIL ?? 'facilitator123@email.com';
-const FACILITATOR_PASSWORD = process.env.E2E_FACILITATOR_PASSWORD ?? 'facilitator123';
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000';
 
 test(
   'eval mode supports per-trace criteria and scoring',
   { tag: ['@spec:EVAL_MODE_SPEC'] },
   async ({ request }) => {
-    const loginResp = await request.post(`${API_URL}/users/auth/login`, {
-      data: {
-        email: FACILITATOR_EMAIL,
-        password: FACILITATOR_PASSWORD,
-      },
-    });
-    expect(loginResp.ok()).toBeTruthy();
-    const loginBody = await loginResp.json();
-    const facilitatorId = loginBody.user.id as string;
+    const sessionResp = await request.get(`${API_URL}/api/auth/session`);
+    expect(sessionResp.ok()).toBeTruthy();
+    const sessionBody = await sessionResp.json();
+    const facilitatorId = sessionBody.user.id as string;
 
     const createWorkshopResp = await request.post(`${API_URL}/workshops/`, {
       data: {

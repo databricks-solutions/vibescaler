@@ -13,7 +13,6 @@ export {
   FindingBuilder,
   AnnotationBuilder,
   buildPermissions,
-  buildAuthResponse,
   generateId,
   resetIdCounter,
 } from './response-builder';

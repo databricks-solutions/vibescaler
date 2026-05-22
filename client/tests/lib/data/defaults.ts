@@ -7,11 +7,10 @@
 import { WorkshopPhase, UserRole } from '../types';
 
 /**
- * Default facilitator credentials (matches config/auth.yaml in dev)
+ * Default facilitator identity for local/provider-authenticated tests.
  */
 export const DEFAULT_FACILITATOR = {
   email: 'facilitator123@email.com',
-  password: 'facilitator123',
   name: 'Test Facilitator',
 };
 

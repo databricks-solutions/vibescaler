@@ -8,18 +8,30 @@ test('bypass login and test new layout', async () => {
   
   const page = await browser.newPage();
   
-  // Set a mock user in localStorage before navigating
-  await page.addInitScript(() => {
-    const mockUser = {
-      id: 'test-facilitator-123',
-      email: 'facilitator@test.com',
-      name: 'Test Facilitator',
-      role: 'facilitator',
-      workshop_id: 'workshop1',
-      status: 'active',
-      created_at: new Date().toISOString()
-    };
-    localStorage.setItem('workshop_user', JSON.stringify(mockUser));
+  const mockUser = {
+    id: 'test-facilitator-123',
+    email: 'facilitator@test.com',
+    name: 'Test Facilitator',
+    role: 'facilitator',
+    workshop_id: 'workshop1',
+    status: 'active',
+    created_at: new Date().toISOString()
+  };
+
+  await page.route('**/api/auth/session', async route => {
+    await route.fulfill({
+      json: {
+        user: mockUser,
+        permissions: {
+          can_view_discovery: true,
+          can_create_rubric: true,
+          can_manage_workshop: true,
+          can_manage_project: true,
+        },
+        provider: 'e2e_mock',
+        provider_role: 'CAN_MANAGE',
+      },
+    });
   });
   
   await page.goto('http://localhost:3000');

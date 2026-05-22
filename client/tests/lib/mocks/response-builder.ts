@@ -13,7 +13,6 @@ import type {
   Annotation,
   DiscoveryFinding,
   UserPermissions,
-  AuthResponse,
 } from '../types';
 import { JudgeType, UserRole, UserStatus, WorkshopPhase, WorkshopStatus } from '../types';
 
@@ -28,8 +27,8 @@ export function generateId(): string {
   const timestamp = Date.now().toString(16).padStart(12, '0');
   const counter = idCounter.toString(16).padStart(4, '0');
   const random1 = Math.random().toString(16).slice(2, 10).padEnd(8, '0');
-  const random2 = Math.random().toString(16).slice(2, 10).padEnd(8, '0');
-  return `${timestamp.slice(0, 8)}-${timestamp.slice(8, 12)}-4${counter.slice(1, 4)}-${random1.slice(0, 4)}-${random1.slice(4, 8)}${random2.slice(0, 4)}`;
+  const random2 = Math.random().toString(16).slice(2, 14).padEnd(12, '0');
+  return `${timestamp.slice(0, 8)}-${timestamp.slice(8, 12)}-4${counter.slice(1, 4)}-${random1.slice(0, 4)}-${random1.slice(4, 8)}${random2.slice(0, 8)}`;
 }
 
 /**
@@ -416,6 +415,7 @@ export function buildPermissions(role: UserRole): UserPermissions {
       can_view_all_annotations: true,
       can_view_results: true,
       can_manage_workshop: true,
+      can_manage_project: true,
       can_assign_annotations: true,
     };
   } else if (role === UserRole.SME) {
@@ -429,6 +429,7 @@ export function buildPermissions(role: UserRole): UserPermissions {
       can_view_all_annotations: false,
       can_view_results: false,
       can_manage_workshop: false,
+      can_manage_project: false,
       can_assign_annotations: false,
     };
   } else {
@@ -443,21 +444,8 @@ export function buildPermissions(role: UserRole): UserPermissions {
       can_view_all_annotations: false,
       can_view_results: false,
       can_manage_workshop: false,
+      can_manage_project: false,
       can_assign_annotations: false,
     };
   }
-}
-
-/**
- * Build a mock AuthResponse
- */
-export function buildAuthResponse(
-  user: User,
-  isPreconfiguredFacilitator: boolean = false
-): AuthResponse {
-  return {
-    user,
-    is_preconfigured_facilitator: isPreconfiguredFacilitator,
-    message: 'Login successful',
-  };
 }

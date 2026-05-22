@@ -39,7 +39,7 @@ export type {
   Annotation,
   DiscoveryFinding,
   UserPermissions,
-  AuthResponse,
+  AuthSession,
   // Builder types
   WorkshopConfig,
   UserConfig,
@@ -66,7 +66,6 @@ export {
   FindingBuilder,
   AnnotationBuilder,
   buildPermissions,
-  buildAuthResponse,
   generateId,
   resetIdCounter,
 } from './mocks';

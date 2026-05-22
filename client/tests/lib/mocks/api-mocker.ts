@@ -14,13 +14,9 @@ import type {
   DiscoveryFinding,
   Annotation,
   UserPermissions,
-  AuthResponse,
 } from '../types';
-import { UserRole, WorkshopPhase } from '../types';
-import {
-  buildPermissions,
-  buildAuthResponse,
-} from './response-builder';
+import { ProviderRole, UserRole, WorkshopPhase } from '../types';
+import { buildPermissions } from './response-builder';
 
 /**
  * Route configuration for an endpoint
@@ -91,6 +87,15 @@ export interface MockDataStore {
   discoveryComplete: Map<string, boolean>;
   customLlmProvider?: CustomLLMProviderConfig;
   discoveryAnalyses: MockDiscoveryAnalysis[];
+}
+
+function getCookieValue(cookieHeader: string | null, name: string): string | null {
+  if (!cookieHeader) return null;
+  const entry = cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+  return entry ? decodeURIComponent(entry.slice(name.length + 1)) : null;
 }
 
 /**
@@ -203,21 +208,28 @@ export class ApiMocker {
   private setupRoutes(): void {
     // Users routes
     this.routes.push({
-      pattern: /\/users\/auth\/login$/,
-      post: async (route) => {
-        const body = route.request().postDataJSON();
-        const user = this.store.users.find((u) => u.email === body?.email);
-        if (user) {
-          const isFacilitator = user.role === UserRole.FACILITATOR;
-          await route.fulfill({
-            json: buildAuthResponse(user, isFacilitator),
-          });
-        } else {
-          await route.fulfill({
-            status: 401,
-            json: { detail: 'Invalid credentials' },
-          });
+      pattern: /\/api\/auth\/session$/,
+      get: async (route) => {
+        const currentUserId = getCookieValue(route.request().headers()['cookie'] ?? null, 'e2e_current_user_id');
+        const user =
+          this.store.users.find((u) => u.id === currentUserId) ||
+          this.store.users.find((u) => u.role === UserRole.FACILITATOR) ||
+          this.store.users[0];
+
+        if (!user) {
+          await route.fulfill({ status: 401, json: { detail: 'No mock user configured' } });
+          return;
         }
+
+        const providerRole = user.role === UserRole.FACILITATOR ? ProviderRole.CAN_MANAGE : ProviderRole.CAN_USE;
+        await route.fulfill({
+          json: {
+            user,
+            permissions: buildPermissions(user.role),
+            provider: 'e2e_mock',
+            provider_role: providerRole,
+          },
+        });
       },
     });
 

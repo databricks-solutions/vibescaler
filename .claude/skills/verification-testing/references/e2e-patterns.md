@@ -70,7 +70,7 @@ test('facilitator can create a rubric', async ({ page }) => {
 .build()
 
 // Selective real endpoints
-.withReal('/users/auth/login')
+.withReal('/api/auth/session')
 .withReal('WorkshopsService')
 
 // No mocking (full integration)

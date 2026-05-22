@@ -65,7 +65,7 @@ this.routes.push({
 ### Opting Into Real Calls
 
 ```typescript
-.withReal('/users/auth/login')   // Single endpoint
+.withReal('/api/auth/session')   // Single endpoint
 .withReal('WorkshopsService')    // All workshop routes
 .withRealApi()                   // No mocking at all
 ```

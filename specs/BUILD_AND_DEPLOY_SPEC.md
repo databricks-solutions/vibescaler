@@ -365,15 +365,41 @@ persistence by backing up to Unity Catalog Volumes.
 
 Databricks Apps automatically provides authentication to workspace resources via a dedicated **service principal**. The application uses Databricks SDK unified auth exclusively — no PAT tokens are accepted from users or stored.
 
+Databricks Apps also owns **user authentication** for the SPA. The application no longer presents a login form. Instead, the backend resolves the current app user from Databricks Apps forwarded identity headers and exposes `GET /api/auth/session` to the frontend.
+
 **Automatic Credentials** (injected by the platform):
 - `DATABRICKS_CLIENT_ID` - Service principal client ID
 - `DATABRICKS_CLIENT_SECRET` - Service principal client secret
+- `DATABRICKS_HOST` - Workspace URL
+- `x-forwarded-email`, `x-forwarded-user`, `x-forwarded-preferred-username` - Trusted user identity headers on incoming requests
+- `x-forwarded-access-token` - Delegated user token used by the backend to resolve Databricks Apps permissions
 
 **How it works**:
 - `resolve_databricks_token()` in `server/services/databricks_service.py` calls `WorkspaceClient().config.authenticate()` which auto-detects the injected credentials
 - MLflow uses the same SDK auth via `mlflow.set_tracking_uri('databricks')`
-- No token input fields exist in the UI — auth is fully automatic
+- `server/features/auth/providers/databricks_apps.py` reads the forwarded identity headers and calls `WorkspaceClient(..., token=x-forwarded-access-token).apps.get_permissions(app_name)` to map Databricks Apps permissions to app roles
+- Databricks Apps `CAN_MANAGE` maps to `can_manage_project=true` and facilitator access
+- Databricks Apps `CAN_USE` maps to non-power-user access
+- No token input fields or login forms exist in the UI — auth is fully automatic
 - See [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md) § Databricks API Authentication for the full contract
+
+**Required app environment**:
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABRICKS_APP_NAME` or `APP_NAME` | App name used when querying Databricks Apps permissions for the current user. Without this value, authenticated users default to `CAN_USE`. |
+| `DATABASE_ENV=postgres` | Use Lakebase instead of SQLite for Databricks Apps deployments. |
+| `MLFLOW_EXPERIMENT_ID` | MLflow experiment resource value from `app.yaml` / Apps resources. |
+
+**Local development identity**:
+
+When Databricks Apps headers are absent, `LocalDevIdentityProvider` is selected. Configure it with:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LOCAL_DEV_USER_EMAIL` | `local.facilitator@example.com` | Local materialized user email |
+| `LOCAL_DEV_USER_NAME` | `Local Facilitator` | Local display name |
+| `LOCAL_DEV_PROVIDER_ROLE` | `CAN_MANAGE` | Set to `CAN_USE` to test non-manager access |
 
 **Best Practices**:
 - Never hardcode personal access tokens (PATs) in code
@@ -384,17 +410,20 @@ Databricks Apps automatically provides authentication to workspace resources via
 **Resource Permissions**:
 | Resource Type | Common Permissions |
 |--------------|-------------------|
+| Lakebase Database | Can connect and create |
 | SQL Warehouse | CAN USE (queries), CAN MANAGE |
 | Unity Catalog Volume | Can read, Can read and write |
 | Secrets | Can read, Can write, Can manage |
 | Model Serving Endpoint | Can view, Can query, Can manage |
 | MLflow Experiments | Can read, Can edit, Can manage |
+| Databricks App | CAN USE, CAN MANAGE |
 
 **Configuring Resources**:
 1. In Databricks Apps UI, navigate to Configure step
 2. Click "+ Add resource" in App resources section
 3. Select resource type and set permissions for app service principal
 4. Assign a key and reference in `app.yaml` via `valueFrom`
+5. Grant users `CAN_USE` or `CAN_MANAGE` on the Databricks App. `CAN_MANAGE` users become project managers/facilitators in the application.
 
 Reference: [Databricks Apps Resources Documentation](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/resources)
 

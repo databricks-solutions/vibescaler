@@ -220,7 +220,7 @@ export class TestScenario {
    * Set the target phase for the workshop
    */
   inPhase(phase: WorkshopPhase): this {
-    this.state.targetPhase = phase;
+    this.state.targetPhase = phase === 'tuning' ? WorkshopPhase.JUDGE_TUNING : phase;
     return this;
   }
 
@@ -333,7 +333,7 @@ export class TestScenario {
    * Persist mock data to the real API database
    *
    * Creates data in dependency order:
-   * 1. Login facilitator
+   * 1. Resolve current facilitator session
    * 2. Create workshop
    * 3. Create non-facilitator users
    * 4. Upload traces and fetch real IDs
@@ -356,8 +356,8 @@ export class TestScenario {
       return;
     }
 
-    // Step 1: Login facilitator
-    await this.loginFacilitatorViaApi(page, store, apiUrl);
+    // Step 1: Resolve current facilitator session
+    await this.resolveCurrentSessionViaApi(page, store, apiUrl);
 
     // Step 2: Create workshop
     await this.createWorkshopViaApi(page, store, apiUrl);
@@ -414,9 +414,9 @@ export class TestScenario {
   }
 
   /**
-   * Step 1: Login facilitator and update store with real ID
+   * Step 1: Resolve current session and update store with real user data
    */
-  private async loginFacilitatorViaApi(
+  private async resolveCurrentSessionViaApi(
     page: Page,
     store: MockDataStore,
     apiUrl: string
@@ -426,25 +426,20 @@ export class TestScenario {
       throw new Error('No facilitator found in store');
     }
 
-    const loginResponse = await page.request.post(`${apiUrl}/users/auth/login`, {
-      data: {
-        email: facilitator.email,
-        password: DEFAULT_FACILITATOR.password,
-      },
-    });
+    const sessionResponse = await page.request.get(`${apiUrl}/api/auth/session`);
 
-    if (!loginResponse.ok()) {
+    if (!sessionResponse.ok()) {
       throw new Error(
-        `Failed to login facilitator: ${loginResponse.status()} ${await loginResponse.text()}`
+        `Failed to resolve current session: ${sessionResponse.status()} ${await sessionResponse.text()}`
       );
     }
 
-    // Update facilitator with real data from login response
-    const loginData = await loginResponse.json();
-    if (loginData.user?.id) {
+    // Update facilitator with real data from current-session response
+    const sessionData = await sessionResponse.json();
+    if (sessionData.user?.id) {
       const index = store.users.findIndex((u) => u.role === UserRole.FACILITATOR);
       if (index !== -1) {
-        store.users[index] = { ...store.users[index], id: loginData.user.id };
+        store.users[index] = { ...store.users[index], ...sessionData.user };
       }
     }
   }

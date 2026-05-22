@@ -113,7 +113,7 @@ Available phases: `intake`, `discovery`, `rubric`, `annotation`, `results`, `jud
 .build()
 
 // Make specific endpoints real
-.withReal('/users/auth/login')
+.withReal('/api/auth/session')
 .withReal('/workshops')
 
 // Make specific services real
@@ -134,8 +134,8 @@ When `.withRealApi()` is called, `.build()` persists data in dependency order:
 
 | Step | Builder Method | API Operation | Dependencies |
 |------|----------------|---------------|--------------|
-| 1 | `.withFacilitator()` | Login via `/users/auth/login` | Must exist in `auth.yaml` |
-| 2 | `.withWorkshop()` | `POST /workshops/` | Facilitator logged in |
+| 1 | `.withFacilitator()` | Resolve current session via `/api/auth/session` | Local/dev provider or Databricks Apps identity available |
+| 2 | `.withWorkshop()` | `POST /workshops/` | Facilitator/current session resolved |
 | 3 | `.withParticipants()`, `.withSMEs()`, `.withUser()` | `POST /users/` for each | Workshop exists |
 | 4 | `.withTraces()` | `POST /workshops/{id}/traces` then `GET /workshops/{id}/all-traces` | Workshop exists |
 | 5 | `.inPhase('discovery')` or later | `POST /workshops/{id}/begin-discovery` | Traces uploaded |
@@ -163,7 +163,7 @@ After `.build()` completes with `.withRealApi()`:
 - `scenario.workshop.id` - Real UUID from database
 - `scenario.traces[n].id` - Real UUIDs fetched after upload
 - `scenario.users.participant[n].id` - Real UUIDs from user creation
-- `scenario.facilitator.id` - Real UUID from login response
+- `scenario.facilitator.id` - Real UUID from current-session materialization
 - `scenario.findings[n].id` - Real UUIDs from finding creation
 - `scenario.annotations[n].id` - Real UUIDs from annotation creation
 
@@ -602,8 +602,8 @@ Replace the current flat implementation with an ordered pipeline:
 private async persistMockDataToRealApi(page: Page, store: MockDataStore): Promise<void> {
   const apiUrl = DEFAULT_API_URL;
 
-  // Step 1: Login facilitator (must exist in auth.yaml)
-  await this.loginFacilitatorViaApi(page, store, apiUrl);
+  // Step 1: Resolve current facilitator session
+  await this.resolveCurrentSessionViaApi(page, store, apiUrl);
 
   // Step 2: Create workshop
   await this.createWorkshopViaApi(page, store, apiUrl);
@@ -640,25 +640,22 @@ private async persistMockDataToRealApi(page: Page, store: MockDataStore): Promis
 
 #### Step 2: Implement Helper Methods
 
-**`loginFacilitatorViaApi()`** - Existing logic, extract to method:
+**`resolveCurrentSessionViaApi()`** - Resolve provider-authenticated user:
 ```typescript
-private async loginFacilitatorViaApi(page: Page, store: MockDataStore, apiUrl: string): Promise<void> {
-  const facilitator = store.users.find((u) => u.role === 'facilitator');
-  if (!facilitator) return;
-
-  const response = await page.request.post(`${apiUrl}/users/auth/login`, {
-    data: { email: facilitator.email, password: 'password' },
-  });
+private async resolveCurrentSessionViaApi(page: Page, store: MockDataStore, apiUrl: string): Promise<void> {
+  const response = await page.request.get(`${apiUrl}/api/auth/session`);
 
   if (!response.ok()) {
-    throw new Error(`Failed to login facilitator: ${response.status()}`);
+    throw new Error(`Failed to resolve current session: ${response.status()}`);
   }
 
-  // Update facilitator with real ID from response
-  const authResponse = await response.json();
-  if (authResponse.user) {
+  // Update facilitator/current user with real ID from response
+  const session = await response.json();
+  if (session.user) {
     const index = store.users.findIndex((u) => u.role === 'facilitator');
-    store.users[index] = { ...store.users[index], ...authResponse.user };
+    if (index >= 0) {
+      store.users[index] = { ...store.users[index], ...session.user };
+    }
   }
 }
 ```
@@ -879,7 +876,7 @@ export { advanceToPhase, beginDiscovery } from './workshop';
 
 | Step | Operation | Endpoint | Method |
 |------|-----------|----------|--------|
-| 1 | Login | `/users/auth/login` | POST |
+| 1 | Current session | `/api/auth/session` | GET |
 | 2 | Create workshop | `/workshops/` | POST |
 | 3 | Create user | `/users/` | POST |
 | 4a | Upload traces | `/workshops/{id}/traces` | POST |
