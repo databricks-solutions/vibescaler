@@ -11,6 +11,24 @@ import { Toaster } from 'sonner';
 interface DeploymentStatus {
   lakebase_configured: boolean;
   setup_required: boolean;
+  docs_url?: string;
+}
+
+/** Keep setup redirects on the browser's public origin (never an internal localhost URL). */
+export function sameOriginDocsUrl(docsUrl: string): string {
+  const fallbackPath = '/docs/lakebase-setup/';
+  try {
+    const path = docsUrl.startsWith('http://') || docsUrl.startsWith('https://')
+      ? new URL(docsUrl).pathname
+      : docsUrl.startsWith('/')
+        ? docsUrl
+        : `/${docsUrl}`;
+    const normalized =
+      path.endsWith('/') || path.includes('.') ? path : `${path}/`;
+    return `${window.location.origin}${normalized}`;
+  } catch {
+    return `${window.location.origin}${fallbackPath}`;
+  }
 }
 
 function WorkshopAppRoutes() {
@@ -73,7 +91,7 @@ function DeploymentGate() {
 
   React.useEffect(() => {
     if (status?.setup_required && !window.location.pathname.startsWith('/docs')) {
-      window.location.replace('/docs/lakebase-setup');
+      window.location.replace(sameOriginDocsUrl(status.docs_url ?? '/docs/lakebase-setup/'));
     }
   }, [status]);
 

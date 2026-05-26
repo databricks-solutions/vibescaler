@@ -7,6 +7,7 @@ import time
 from logging import StreamHandler
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from server.config import ServerConfig
 from server.db_bootstrap import maybe_bootstrap_db_on_startup
@@ -32,6 +34,62 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CLIENT_BUILD_DIR = PROJECT_ROOT / "client" / "build"
 DOCS_BUILD_DIR = PROJECT_ROOT / "docs" / "build"
+DOCS_SETUP_PATH = "/docs/lakebase-setup/"
+
+
+def _public_redirect_url(request: Request, location: str) -> str:
+    """Rewrite internal localhost redirects to the public app URL or a relative path.
+
+    Databricks Apps terminate TLS at the edge; the app process often sees requests as
+    localhost:8000. StaticFiles trailing-slash redirects then emit Location:
+    http://localhost:8000/... which escapes the public hostname in the browser.
+    """
+    if location.startswith("/") and not location.startswith("//"):
+        return location
+
+    parsed = urlparse(location)
+    if not parsed.scheme:
+        return location
+
+    internal_host = (parsed.hostname or "").lower()
+    if internal_host not in ("localhost", "127.0.0.1", "0.0.0.0"):
+        return location
+
+    forwarded_host = request.headers.get("x-forwarded-host")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    if forwarded_host:
+        public_host = forwarded_host.split(",")[0].strip()
+        return urlunparse(
+            (
+                forwarded_proto,
+                public_host,
+                parsed.path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment,
+            )
+        )
+
+    # Fall back to a relative path so the browser keeps the current public origin.
+    if parsed.path:
+        return parsed.path + (f"?{parsed.query}" if parsed.query else "")
+    return location
+
+
+class FixRedirectLocationMiddleware(BaseHTTPMiddleware):
+    """Ensure redirect Location headers never point the browser at localhost:8000."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if response.status_code not in (301, 302, 303, 307, 308):
+            return response
+        location = response.headers.get("location")
+        if not location:
+            return response
+        fixed = _public_redirect_url(request, location)
+        if fixed != location:
+            response.headers["location"] = fixed
+        return response
 
 
 def _configure_app_log_levels() -> None:
@@ -244,6 +302,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Trust X-Forwarded-* from Databricks Apps / reverse proxies so redirects and
+# absolute URLs use the public app hostname instead of localhost:8000.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+app.add_middleware(FixRedirectLocationMiddleware)
+
 # Add middleware in order (last added is first executed)
 app.add_middleware(DatabaseErrorMiddleware)
 app.add_middleware(ProcessTimeMiddleware)
@@ -317,7 +380,7 @@ async def deployment_status():
     return {
         "lakebase_configured": lakebase_configured,
         "setup_required": not lakebase_configured,
-        "docs_url": "/docs/lakebase-setup",
+        "docs_url": DOCS_SETUP_PATH,
         "docs_build_exists": DOCS_BUILD_DIR.exists(),
         "docs_build_dir": str(DOCS_BUILD_DIR),
         "client_build_exists": CLIENT_BUILD_DIR.exists(),
@@ -333,6 +396,11 @@ if DOCS_BUILD_DIR.exists():
     async def redirect_docs_root():
         """Redirect extensionless docs root to the Docusaurus index route."""
         return RedirectResponse(url="/docs/", status_code=307)
+
+    @app.get("/docs/lakebase-setup", include_in_schema=False)
+    async def redirect_lakebase_setup():
+        """Avoid StaticFiles emitting an absolute localhost trailing-slash redirect."""
+        return RedirectResponse(url=DOCS_SETUP_PATH, status_code=307)
 
     app.mount("/docs", StaticFiles(directory=str(DOCS_BUILD_DIR), html=True), name="docs")
 else:

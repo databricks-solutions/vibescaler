@@ -3,6 +3,9 @@
 Defines server hooks that run in the master process before workers fork.
 """
 
+# Honor X-Forwarded-* from Databricks Apps so Uvicorn/Starlette see the public URL.
+forwarded_allow_ips = "*"
+
 
 def on_starting(server):
     """Run database migrations once in the master process before workers fork.

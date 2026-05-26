@@ -59,6 +59,10 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
       },
+      '/docs': {
+        target: apiTarget,
+        changeOrigin: true,
+      },
       '/databricks': {
         target: apiTarget,
         changeOrigin: true,

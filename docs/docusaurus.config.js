@@ -95,7 +95,8 @@ const config = {
             label: 'Specs',
           },
           {
-            href: '/',
+            // pathname:// escapes baseUrl (/docs/) so this targets the app root on the same host.
+            to: 'pathname:///',
             label: 'Open App',
             position: 'right',
           },
