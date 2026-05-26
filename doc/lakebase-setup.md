@@ -6,9 +6,19 @@ slug: /lakebase-setup
 
 # Lakebase Setup
 
-This docs site is designed to be available even before Lakebase is configured.
-If the deployed Databricks App opens here automatically, finish the setup below
-and then restart or redeploy the app.
+:::important You were sent here because Lakebase is not configured yet
+
+This documentation site is **always available** at `/docs` — even when Lakebase is not set up — so you can complete configuration from the deployed app.
+
+**If the Databricks App opened this page automatically:**
+
+1. Complete every step in the sections below to attach Lakebase to the app.
+2. **Restart or redeploy the app** when you are done (required — the app only picks up the database connection after a new deploy/restart).
+3. Open the app root URL again. You should see the workshop UI instead of this setup guide.
+
+Until Lakebase is configured and the app has been restarted, the workshop experience at `/` will keep redirecting here.
+
+:::
 
 ## Why Lakebase Is Required
 
