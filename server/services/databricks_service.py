@@ -3,9 +3,11 @@
 This service handles calls to Databricks model serving endpoints using the OpenAI client.
 """
 
+import asyncio
 import hashlib
 import logging
 import os
+import time
 from typing import Any
 
 import httpx
@@ -18,6 +20,22 @@ logger = logging.getLogger(__name__)
 # Global client cache to reuse OpenAI clients across requests
 # Key: (workspace_url, token_hash) -> OpenAI client
 _client_cache = {}
+
+# Serving-endpoints TTL cache. The model list is workspace-global and changes
+# infrequently, but the frontend's React Query cache is keyed per workshop, so
+# without a server-side cache each workshop view triggers a fresh Databricks
+# REST call. We cache at the service layer so all callers (per-workshop and
+# global routes) share one workspace-level entry.
+# Key: (workspace_url, token_hash) -> (monotonic_timestamp, endpoints)
+_ENDPOINTS_CACHE_TTL_S = float(os.getenv("DATABRICKS_ENDPOINTS_CACHE_TTL_S", "300"))
+_endpoints_cache: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
+_endpoints_cache_locks: dict[tuple[str, str], asyncio.Lock] = {}
+_endpoints_cache_locks_guard = asyncio.Lock()
+
+
+def clear_serving_endpoints_cache() -> None:
+    """Clear the cached serving-endpoints list. Useful for manual invalidation and tests."""
+    _endpoints_cache.clear()
 
 
 def _get_token_hash(token: str) -> str:
@@ -267,13 +285,49 @@ class DatabricksService:
             raise HTTPException(status_code=500, detail=f"Error calling serving endpoint: {e!s}") from e
 
     async def list_serving_endpoints(self) -> list[dict[str, Any]]:
-        """List all available serving endpoints from the Databricks workspace.
+        """List available serving endpoints, cached per workspace with a TTL.
 
-        Calls the Databricks REST API to fetch real serving endpoints.
-
-        Returns:
-            List of serving endpoint information
+        The model list changes infrequently, so we cache at the service layer
+        keyed by (workspace_url, token_hash). A per-key asyncio.Lock dedupes
+        concurrent in-flight refreshes so a thundering herd of requests
+        triggers only one upstream Databricks call. TTL is configurable via
+        ``DATABRICKS_ENDPOINTS_CACHE_TTL_S`` (default 300s).
         """
+        cache_key = (self.workspace_url, _get_token_hash(self.token))
+        now = time.monotonic()
+
+        cached = _endpoints_cache.get(cache_key)
+        if cached and (now - cached[0]) < _ENDPOINTS_CACHE_TTL_S:
+            logger.debug(
+                "Serving endpoints cache hit workspace=%s age_s=%.1f count=%d",
+                self.workspace_url,
+                now - cached[0],
+                len(cached[1]),
+            )
+            return cached[1]
+
+        async with _endpoints_cache_locks_guard:
+            lock = _endpoints_cache_locks.setdefault(cache_key, asyncio.Lock())
+
+        async with lock:
+            # Re-check inside the lock — another coroutine may have refreshed.
+            cached = _endpoints_cache.get(cache_key)
+            now = time.monotonic()
+            if cached and (now - cached[0]) < _ENDPOINTS_CACHE_TTL_S:
+                return cached[1]
+
+            endpoints = await self._fetch_serving_endpoints()
+            _endpoints_cache[cache_key] = (time.monotonic(), endpoints)
+            logger.info(
+                "Refreshed serving endpoints cache workspace=%s count=%d ttl_s=%.0f",
+                self.workspace_url,
+                len(endpoints),
+                _ENDPOINTS_CACHE_TTL_S,
+            )
+            return endpoints
+
+    async def _fetch_serving_endpoints(self) -> list[dict[str, Any]]:
+        """Fetch the serving-endpoints list from the Databricks REST API (uncached)."""
         try:
             logger.info("Listing Databricks serving endpoints via REST API")
 

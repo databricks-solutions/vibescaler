@@ -399,6 +399,49 @@ class TestToolBasedAgent:
         assert "Focus on SQL queries and their results" in all_instructions
 
 
+@pytest.mark.spec("TRACE_SUMMARIZATION_SPEC")
+class TestModelProviderInterop:
+    """Cross-provider interop on Databricks model serving.
+
+    The Databricks OpenAI-compat shim rejects the `strict` field on tool
+    definitions ("tools.N.custom.strict: Extra inputs are not permitted")
+    regardless of which backing model (Claude 4.6/4.7, gpt-5, gpt-5-codex,
+    Gemini Flash 3.5) is selected. Pydantic-AI's default OpenAI profile emits
+    `strict` on tool and structured-output schemas; the service must override
+    that profile so all five supported models work through the shim.
+    """
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    def test_summary_agent_disables_strict_tool_definitions(self):
+        from pydantic_ai.profiles.openai import OpenAIModelProfile
+
+        service = TraceSummarizationService(
+            endpoint_url="https://test.databricks.com/serving-endpoints",
+            token="test-token",
+            model_name="databricks-claude-opus-4-7",
+        )
+
+        profile = OpenAIModelProfile.from_profile(service.summary_agent.model.profile)
+        assert profile.openai_supports_strict_tool_definition is False
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    def test_milestone_agent_disables_strict_tool_definitions(self):
+        from pydantic_ai.profiles.openai import OpenAIModelProfile
+
+        service = TraceSummarizationService(
+            endpoint_url="https://test.databricks.com/serving-endpoints",
+            token="test-token",
+            model_name="databricks-claude-opus-4-7",
+        )
+
+        profile = OpenAIModelProfile.from_profile(service.milestone_agent.model.profile)
+        assert profile.openai_supports_strict_tool_definition is False
+
+
 # --- Two-pass summarization ---
 
 

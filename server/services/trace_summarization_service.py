@@ -17,6 +17,7 @@ import httpx
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.profiles.openai import OpenAIModelProfile
 from pydantic_ai.providers.openai import OpenAIProvider
 
 logger = logging.getLogger(__name__)
@@ -345,7 +346,14 @@ class TraceSummarizationService:
         agent_run_timeout_s: float | None = None,
     ):
         provider = OpenAIProvider(base_url=endpoint_url, api_key=token)
-        model = OpenAIChatModel(model_name, provider=provider)
+        # Databricks model-serving's OpenAI-compat shim rejects the `strict`
+        # field on tool definitions ("tools.N.custom.strict: Extra inputs are
+        # not permitted") regardless of which backing model (Claude, gpt-5,
+        # Gemini) is selected. pydantic-ai's default OpenAI profile emits
+        # `strict: true|false` on tools and structured-output schemas, so we
+        # must disable it explicitly for cross-provider interop.
+        profile = OpenAIModelProfile(openai_supports_strict_tool_definition=False)
+        model = OpenAIChatModel(model_name, provider=provider, profile=profile)
 
         use_case_section = ""
         if use_case_description:

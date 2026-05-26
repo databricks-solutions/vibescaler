@@ -196,11 +196,37 @@ class DiscoverySummariesPayload(BaseModel):
     )
 
 
+_LITELLM_CONFIGURED = False
+
+
+def _configure_litellm_drop_params() -> None:
+    """Tell LiteLLM to drop provider-incompatible params instead of raising.
+
+    Without this, hardcoded sampling params (temperature=0.2/0.3) cause 400s on
+    reasoning models like gpt-5 (only temperature=1 supported) and on some
+    Gemini configurations. drop_params=True lets LiteLLM silently strip
+    unsupported params per-model so the same discovery/follow-up code path
+    works across Claude, gpt-5, gpt-5-codex, and Gemini Flash served by
+    Databricks. Idempotent; safe if litellm is not installed.
+    """
+    global _LITELLM_CONFIGURED
+    if _LITELLM_CONFIGURED:
+        return
+    try:
+        import litellm  # type: ignore
+
+        litellm.drop_params = True
+        _LITELLM_CONFIGURED = True
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.debug("Could not configure litellm.drop_params: %s", exc)
+
+
 def _import_dspy():
     # Local import so the rest of the server can still import if DSPy isn't available
     # in a minimal deployment environment.
     import dspy  # type: ignore
 
+    _configure_litellm_drop_params()
     return dspy
 
 
