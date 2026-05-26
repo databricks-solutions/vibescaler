@@ -1,3 +1,11 @@
+---
+id: README
+title: Specifications Index
+slug: /
+sidebar_position: 1
+sidebar_label: Specs Index
+---
+
 # Specifications Index
 
 This directory contains declarative specifications for the Human Evaluation Workshop system. Each spec defines the expected behavior, data models, and implementation requirements for a specific domain.
@@ -355,6 +363,7 @@ Issues where the spec documents intended behavior but the implementation diverge
 
 ## Related Documentation
 
-- [doc/CHANGELOG.md](../doc/CHANGELOG.md) - Version history
-- [doc/RELEASE_NOTES.md](../doc/RELEASE_NOTES.md) - Release documentation
-- [README.md](../README.md) - Project overview
+- [CHANGELOG](/CHANGELOG) — version history
+- [RELEASE_NOTES](/RELEASE_NOTES) — release documentation
+- [Facilitator Guide](/FACILITATOR_GUIDE) — deployment and workshop facilitation
+- [Lakebase Setup](/lakebase-setup) — Databricks Apps database setup

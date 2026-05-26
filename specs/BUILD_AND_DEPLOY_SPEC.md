@@ -1,3 +1,10 @@
+---
+id: BUILD_AND_DEPLOY_SPEC
+title: Build and Deploy Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Build and Deploy Specification
 
 ## Overview
@@ -304,6 +311,8 @@ project-with-build.zip
 ---
 
 ## Success Criteria
+
+<SpecCoverage spec="BUILD_AND_DEPLOY_SPEC" />
 
 ### Frontend Build
 - [ ] Production build completes without errors

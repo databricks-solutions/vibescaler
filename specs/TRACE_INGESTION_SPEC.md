@@ -1,3 +1,10 @@
+---
+id: TRACE_INGESTION_SPEC
+title: TRACE_INGESTION_SPEC
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # TRACE_INGESTION_SPEC
 
 ## Overview
@@ -104,6 +111,8 @@ def _extract_content_from_json(self, json_text: str, role_hint: str = "output") 
 ```
 
 ## Success Criteria
+
+<SpecCoverage spec="TRACE_INGESTION_SPEC" />
 
 ### Trace Identity
 - [ ] Traces are deduplicated by `(workshop_id, mlflow_trace_id)` — re-ingest updates, not duplicates

@@ -1,3 +1,10 @@
+---
+id: DISCOVERY_SPEC
+title: Discovery Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Discovery Phase Specification
 
 ## Overview
@@ -788,8 +795,13 @@ Discovery uses the same model selection as judge evaluation: **Databricks founda
 
 ## Success Criteria
 
+<SpecCoverage spec="DISCOVERY_SPEC" />
+
+
 ### Step 1: Feedback Collection (#81)
 - [ ] Facilitator can start Discovery phase with configurable trace limit
+
+
 - [ ] Participants view traces and provide GOOD/BAD + comment
 - [ ] Facilitator can select LLM model for follow-up question generation in Discovery dashboard
 - [ ] AI generates 3 follow-up questions per trace based on feedback

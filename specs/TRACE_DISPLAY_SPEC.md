@@ -1,3 +1,10 @@
+---
+id: TRACE_DISPLAY_SPEC
+title: Trace JSONPath Display Customization Spec
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Trace JSONPath Display Customization Spec
 
 ## Overview
@@ -327,6 +334,8 @@ jsonpath-plus  # Full-featured, ~15KB gzipped
 ---
 
 ## Success Criteria
+
+<SpecCoverage spec="TRACE_DISPLAY_SPEC" />
 
 ### Functional — JSONPath
 

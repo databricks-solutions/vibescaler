@@ -70,7 +70,7 @@ uv run uvicorn server.app:app --reload --port 8000
 
 ## 🔧 Configuration
 
-See the main [README.md](../README.md) for detailed configuration options including:
+See the [Facilitator Guide](/FACILITATOR_GUIDE) and [Lakebase Setup](/lakebase-setup) for detailed configuration, including:
 - Database setup
 - Databricks integration
 - Authentication configuration
@@ -78,13 +78,14 @@ See the main [README.md](../README.md) for detailed configuration options includ
 
 ## 📚 Documentation
 
-- [BUILD_GUIDE.md](BUILD_GUIDE.md) - Client build instructions
-- [COLOR_THEME_GUIDE.md](COLOR_THEME_GUIDE.md) - UI color theme guide
-- [AUTHENTICATION_FIX.md](AUTHENTICATION_FIX.md) - Authentication details
-- [ANNOTATION_EDITING_FIX.md](ANNOTATION_EDITING_FIX.md) - Annotation editing
-- [COMMENT_NEWLINE_HANDLING.md](COMMENT_NEWLINE_HANDLING.md) - Comment newline handling
-- [RUBRIC_FORMAT_UPDATE.md](RUBRIC_FORMAT_UPDATE.md) - Rubric format improvements
-- [TRACE_RANDOMIZATION.md](TRACE_RANDOMIZATION.md) - Randomization logic
+- [Specs Index](/specs/) — searchable specifications index
+- [Facilitator Guide](/FACILITATOR_GUIDE) — deployment and workshop facilitation
+- [BUILD_AND_DEPLOY_SPEC](/specs/BUILD_AND_DEPLOY_SPEC) — build, deploy, and migrations
+- [DESIGN_SYSTEM_SPEC](/specs/DESIGN_SYSTEM_SPEC) — UI theme and design tokens
+- [AUTHENTICATION_SPEC](/specs/AUTHENTICATION_SPEC) — authentication and sessions
+- [ANNOTATION_SPEC](/specs/ANNOTATION_SPEC) — annotation and feedback
+- [DATASETS_SPEC](/specs/DATASETS_SPEC) — trace datasets and randomization
+- [RUBRIC_SPEC](/specs/RUBRIC_SPEC) — rubric format and parsing
 
 ## 🐛 Known Issues
 
@@ -92,5 +93,5 @@ None at this time. Please report issues on GitHub.
 
 ## 📝 License
 
-See [LICENSE.md](../LICENSE.md) for details.
+See [LICENSE.md](https://github.com/databricks-solutions/project-0xfffff/blob/main/LICENSE.md) for details.
 

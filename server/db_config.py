@@ -213,9 +213,13 @@ def detect_database_backend() -> DatabaseBackend:
                 f"database={lakebase_config.database}, "
                 f"app_name={lakebase_config.app_name}"
             )
+            return DatabaseBackend.POSTGRESQL
         else:
-            logger.info("DATABASE_ENV=postgres (PG connection vars will be read at engine creation)")
-        return DatabaseBackend.POSTGRESQL
+            logger.warning(
+                "DATABASE_ENV=postgres but Lakebase environment variables are missing; "
+                "falling back to SQLite so setup docs can be served."
+            )
+            return DatabaseBackend.SQLITE
 
     logger.info(f"DATABASE_ENV={database_env}, using SQLite")
     return DatabaseBackend.SQLITE

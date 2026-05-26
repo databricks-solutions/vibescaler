@@ -1,3 +1,10 @@
+---
+id: JUDGE_EVALUATION_SPEC
+title: Judge Evaluation Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Judge Evaluation Specification
 
 ## Overview
@@ -573,6 +580,8 @@ Features:
 | MLflow | Full MLflow GenAI integration |
 
 ## Success Criteria
+
+<SpecCoverage spec="JUDGE_EVALUATION_SPEC" />
 
 ### Judge Evaluation
 - [ ] Likert judges return values 1-5

@@ -1,3 +1,10 @@
+---
+id: ANNOTATION_SPEC
+title: Annotation Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Annotation Specification
 
 ## Overview
@@ -318,6 +325,8 @@ The system supports both single-rating (legacy) and multi-rating (current) forma
 Load logic detects format and normalizes to current structure.
 
 ## Success Criteria
+
+<SpecCoverage spec="ANNOTATION_SPEC" />
 
 ### Core Annotation Behavior
 

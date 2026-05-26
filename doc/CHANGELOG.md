@@ -25,7 +25,7 @@
 - **Binary Judge Fix**: Fixed critical issue where MLflow was returning Likert-style values (e.g., 3.0) instead of binary 0/1 for binary judges
   - Prepended strong binary format instructions to judge prompts (models pay more attention to prompt start)
   - Changed `feedback_value_type` from `bool` to `float` for more reliable 0/1 parsing
-  - Added fallback threshold conversion: Likert values >=3 convert to PASS (1), <3 to FAIL (0)
+  - Added fallback threshold conversion: Likert values >=3 convert to PASS (1), &lt;3 to FAIL (0)
 - **Database Indentation Fix**: Fixed IndentationError in `server/database.py` that prevented server startup
 
 ### Improvements
