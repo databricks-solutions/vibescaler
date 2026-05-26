@@ -1,3 +1,10 @@
+---
+id: UI_COMPONENTS_SPEC
+title: UI Components Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # UI Components Specification
 
 ## Overview
@@ -335,6 +342,8 @@ const debouncedSearch = useDebouncedCallback(
 ---
 
 ## Success Criteria
+
+<SpecCoverage spec="UI_COMPONENTS_SPEC" />
 
 ### Pagination
 - [ ] Page navigation works correctly (first, prev, next, last)

@@ -1,3 +1,10 @@
+---
+id: RUBRIC_SPEC
+title: Rubric Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Rubric Specification
 
 ## Overview
@@ -353,6 +360,8 @@ Rubrics created before the delimiter change use `\n\n` as separator:
 3. **Graceful parsing**: Try new delimiter first, fall back to old
 
 ## Success Criteria
+
+<SpecCoverage spec="RUBRIC_SPEC" />
 
 ### Parsing & Serialization
 

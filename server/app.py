@@ -5,11 +5,12 @@ import os
 import sys
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -27,6 +28,9 @@ from server.sqlite_rescue import (
 )
 
 logger = logging.getLogger(__name__)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CLIENT_BUILD_DIR = PROJECT_ROOT / "client" / "build"
+DOCS_BUILD_DIR = PROJECT_ROOT / "docs" / "build"
 
 
 def _configure_app_log_levels() -> None:
@@ -226,6 +230,9 @@ app = FastAPI(
     title="Databricks App API",
     description="Modern FastAPI application template for Databricks Apps with React frontend",
     version="0.1.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
 
@@ -293,6 +300,50 @@ async def test():
     return {"message": "App is working!"}
 
 
+@app.get("/deployment/status")
+async def deployment_status():
+    """Return DB-independent deployment setup status for the frontend shell."""
+    from server.db_config import LakebaseConfig
+
+    lakebase_configured = LakebaseConfig.from_env() is not None
+    return {
+        "lakebase_configured": lakebase_configured,
+        "setup_required": not lakebase_configured,
+        "docs_url": "/docs/lakebase-setup",
+        "docs_build_exists": DOCS_BUILD_DIR.exists(),
+        "docs_build_dir": str(DOCS_BUILD_DIR),
+        "client_build_exists": CLIENT_BUILD_DIR.exists(),
+        "client_build_dir": str(CLIENT_BUILD_DIR),
+    }
+
+
+# Serve the Docusaurus docs site before the catch-all React mount.
+if DOCS_BUILD_DIR.exists():
+    logger.info("Mounting Docusaurus docs from %s", DOCS_BUILD_DIR)
+
+    @app.get("/docs", include_in_schema=False)
+    async def redirect_docs_root():
+        """Redirect extensionless docs root to the Docusaurus index route."""
+        return RedirectResponse(url="/docs/", status_code=307)
+
+    app.mount("/docs", StaticFiles(directory=str(DOCS_BUILD_DIR), html=True), name="docs")
+else:
+    logger.warning("Docusaurus docs build not found at %s", DOCS_BUILD_DIR)
+
+    @app.get("/docs", include_in_schema=False)
+    @app.get("/docs/{path:path}", include_in_schema=False)
+    async def docs_not_built(path: str = ""):
+        """Explain why the docs site is unavailable in an unbuilt local tree."""
+        return HTMLResponse(
+            "<h1>Judge Builder Workshop setup</h1>"
+            "<p>Build the Docusaurus site with <code>npm -C docs install && npm -C docs run build</code> "
+            "to view the full setup guide at <code>/docs</code>.</p>"
+        )
+
+
 # Serve static files from client build directory (must come after API routes)
-if os.path.exists("client/build"):
-    app.mount("/", StaticFiles(directory="client/build", html=True), name="static")
+if CLIENT_BUILD_DIR.exists():
+    logger.info("Mounting React client from %s", CLIENT_BUILD_DIR)
+    app.mount("/", StaticFiles(directory=str(CLIENT_BUILD_DIR), html=True), name="static")
+else:
+    logger.warning("React client build not found at %s", CLIENT_BUILD_DIR)

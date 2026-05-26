@@ -1,3 +1,10 @@
+---
+id: TRACE_SUMMARIZATION_SPEC
+title: TRACE_SUMMARIZATION_SPEC
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # TRACE_SUMMARIZATION_SPEC
 
 ## Overview
@@ -368,6 +375,8 @@ POST /workshops/{workshop_id}/ingest-mlflow-traces
 ```
 
 ## Success Criteria
+
+<SpecCoverage spec="TRACE_SUMMARIZATION_SPEC" />
 
 ### Configuration
 - [ ] Facilitator can enable/disable trace summarization per workshop

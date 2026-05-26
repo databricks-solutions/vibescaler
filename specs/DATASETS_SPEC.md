@@ -1,3 +1,10 @@
+---
+id: DATASETS_SPEC
+title: Datasets Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Datasets Specification
 
 ## Overview
@@ -282,6 +289,8 @@ Response: Traces in user's randomized order (or chronological if no user_id)
 ```
 
 ## Success Criteria
+
+<SpecCoverage spec="DATASETS_SPEC" />
 
 - [ ] Datasets can be created with arbitrary trace lists
 - [ ] Union operation combines traces from multiple datasets

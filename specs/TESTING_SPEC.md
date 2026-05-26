@@ -1,3 +1,10 @@
+---
+id: TESTING_SPEC
+title: Testing Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Testing Specification
 
 ## Overview
@@ -180,6 +187,8 @@ Tests use the **transaction-rollback** pattern:
 6. **Connection resilience** (Postgres-only) — Verify `pool_pre_ping` detects stale connections, `_reset_connection_pool()` disposes engine + refreshes OAuth token, `get_db()` retries on transient connection failures with exponential backoff and gives up after 3 attempts.
 
 ### Success Criteria
+
+<SpecCoverage spec="TESTING_SPEC" />
 
 - [ ] `tests/integration/conftest.py` provides real-DB fixtures with transaction rollback isolation
 - [ ] Integration tests run against SQLite (default) and Postgres (via testcontainers)

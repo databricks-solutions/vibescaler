@@ -17,7 +17,11 @@ set dotenv-load
 set script-interpreter := ['uv', 'run', 'python']
 export PATH := "./{{client-dir}}/node_modules/.bin:" + env_var('PATH')
 client-dir := "client"
+docs-dir := "docs"
+docs-port := "3100"
 server-dir := "server"
+databricks-npm-registry := "https://npm-proxy.dev.databricks.com/"
+public-npm-registry := "https://registry.npmjs.org/"
 
 # Default target: show available recipes
 _default:
@@ -70,7 +74,7 @@ setup-python:
 
 setup-client:
   @echo "📦 Installing frontend dependencies..."
-  @npm -C client install
+  @just npm-install {{client-dir}}
 
 # Interactive Databricks configuration + .env.local management
 configure:
@@ -235,9 +239,24 @@ test-connection:
 ui:
   @just ui-install
 
+# Install npm deps for a package directory.
+# USE_DATABRICKS_PACKAGE_PROXIES=1 → Databricks corp npm proxy (local dev on VPN).
+# Otherwise inherits your user/global npm registry (omit .npmrc registry pins).
+[group('dev')]
+npm-install dir *args:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
+    export NPM_CONFIG_REGISTRY="{{databricks-npm-registry}}"
+    echo "📦 npm install in {{dir}} (Databricks proxy: $NPM_CONFIG_REGISTRY)"
+  else
+    echo "📦 npm install in {{dir}} (registry: $(npm config get registry))"
+  fi
+  npm -C "{{dir}}" install {{args}}
+
 [group('dev')]
 ui-install:
-  npm -C {{client-dir}} install
+  @just npm-install {{client-dir}}
 
 [group('dev')]
 ui-dev: openapi
@@ -250,11 +269,69 @@ ui-build:
 
   # Run npm install if node_modules is missing or package.json is newer
   if [ ! -d "{{client-dir}}/node_modules" ] || [ "{{client-dir}}/package.json" -nt "{{client-dir}}/node_modules" ]; then
-    echo "📦 Installing frontend dependencies..."
-    npm -C {{client-dir}} install
+    just npm-install {{client-dir}}
   fi
 
   npm -C {{client-dir}} run build
+
+# Hot-reload dev server. Local search (Cmd+K) needs a production build — use `just docs-preview`.
+[group('dev')]
+docs:
+  @just docs-dev
+
+# Build + serve static site locally (search index works; no hot reload).
+[group('dev')]
+docs-preview:
+  @just docs-serve
+
+[group('dev')]
+docs-install:
+  @just npm-install {{docs-dir}}
+
+[group('dev')]
+docs-coverage:
+  mkdir -p {{docs-dir}}/static
+  python3 tools/spec_coverage_analyzer.py --json > {{docs-dir}}/static/spec-coverage.json
+
+# `docusaurus start` — fast reload; @easyops-cn/docusaurus-search-local index is build-only.
+[group('dev')]
+docs-dev:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  if [ ! -d "{{docs-dir}}/node_modules" ] || [ "{{docs-dir}}/package.json" -nt "{{docs-dir}}/node_modules" ]; then
+    just npm-install {{docs-dir}}
+  fi
+
+  mkdir -p {{docs-dir}}/static
+  python3 tools/spec_coverage_analyzer.py --json > {{docs-dir}}/static/spec-coverage.json
+  npm -C {{docs-dir}} run start -- --port {{docs-port}}
+
+[group('dev')]
+docs-build:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  if [ ! -d "{{docs-dir}}/node_modules" ] || [ "{{docs-dir}}/package.json" -nt "{{docs-dir}}/node_modules" ]; then
+    just npm-install {{docs-dir}}
+  fi
+
+  mkdir -p {{docs-dir}}/static
+  python3 tools/spec_coverage_analyzer.py --json > {{docs-dir}}/static/spec-coverage.json
+  npm -C {{docs-dir}} run build
+
+# `docusaurus build` + `docusaurus serve` — use this to verify Cmd+K search locally.
+[group('dev')]
+docs-serve:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  if [ ! -d "{{docs-dir}}/build" ]; then
+    just docs-build
+  fi
+
+  echo "📖 Docs preview at http://localhost:{{docs-port}}/docs/ (search index enabled)"
+  npm -C {{docs-dir}} run serve -- --port {{docs-port}}
 
 # Generate OpenAPI spec from FastAPI and TypeScript client
 [group('dev')]
@@ -529,9 +606,13 @@ deploy:
     --exclude ".git" \
     --exclude ".claude" \
     --exclude "node_modules" \
+    --exclude "package-lock.json" \
     --exclude "__pycache__" \
     --exclude "*.db" \
     --exclude ".venv" \
+    --exclude "docs/.docusaurus" \
+    --exclude "docs/build" \
+    --exclude "docs/package-lock.json" \
     --exclude ".e2e-*" \
     --exclude "htmlcov"
 

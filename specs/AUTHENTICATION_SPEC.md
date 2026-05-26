@@ -1,3 +1,10 @@
+---
+id: AUTHENTICATION_SPEC
+title: Authentication Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Authentication Specification
 
 ## Overview
@@ -339,6 +346,8 @@ Key implementation points:
 | `/login` | POST | Authenticate user |
 
 ## Success Criteria
+
+<SpecCoverage spec="AUTHENTICATION_SPEC" />
 
 ### Workshop Application Auth
 - [ ] No "permission denied" errors on normal login

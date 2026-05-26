@@ -1,3 +1,10 @@
+---
+id: EVAL_MODE_SPEC
+title: EVAL_MODE_SPEC
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # EVAL_MODE_SPEC
 
 ## Overview
@@ -376,6 +383,8 @@ GET    /workshops/{workshop_id}/eval-export
 | `server/services/discovery_service.py` | Update analysis prompts to use summaries/agent loops |
 
 ## Success Criteria
+
+<SpecCoverage spec="EVAL_MODE_SPEC" />
 
 ### Workshop Mode Selection
 - [ ] Workshop can be created with `mode: "eval"`
