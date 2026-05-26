@@ -301,21 +301,22 @@ class TestLakebaseMigrationSchemaSetup:
         assert "version_num_width" in content
 
     def test_boolean_migration_defaults_are_postgres_safe(self):
-        """Boolean columns in migrations must not use SQLite-only integer defaults unconditionally."""
+        """Boolean columns in migrations must use sa.true()/sa.false() for server defaults."""
         versions_dir = PROJECT_ROOT / "migrations" / "versions"
         offenders: list[str] = []
         for migration_file in versions_dir.glob("*.py"):
             content = migration_file.read_text()
             if "sa.Boolean()" not in content:
                 continue
+            # Reject any sa.text() used for boolean defaults — use sa.true()/sa.false() instead
             if 'server_default=sa.text("0")' in content or "server_default=sa.text('0')" in content:
-                if "if _is_postgres()" not in content and "bind.dialect.name" not in content:
-                    offenders.append(migration_file.name)
+                offenders.append(migration_file.name)
             if 'server_default=sa.text("1")' in content or "server_default=sa.text('1')" in content:
-                if "if _is_postgres()" not in content and "bind.dialect.name" not in content:
-                    offenders.append(migration_file.name)
+                offenders.append(migration_file.name)
 
-        assert offenders == []
+        assert offenders == [], (
+            f"Migrations using sa.text() for boolean defaults (use sa.true()/sa.false() instead): {offenders}"
+        )
 
 
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
