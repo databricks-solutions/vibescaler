@@ -106,6 +106,49 @@ def _looks_like_gemini(model_name: str) -> bool:
     return "gemini" in (model_name or "").lower()
 
 
+def _is_openai_reasoning_model(model_name: str) -> bool:
+    """Detect OpenAI reasoning-model endpoint names.
+
+    Reasoning models (gpt-5 / gpt-5.1 / gpt-5.5 / gpt-5-codex and the o-series
+    o1/o3/o4) reject ``temperature != 1`` with:
+        "Unsupported value: 'temperature' does not support X with this model.
+         Only the default (1) value is supported."
+    We can't drop the param like LiteLLM does for the DSPy path — the OpenAI
+    SDK has no equivalent — so we normalize the request here instead.
+    Databricks prefixes its endpoint names with ``databricks-``.
+    """
+    name = (model_name or "").lower()
+    return (
+        "gpt-5" in name
+        or "-o1" in name
+        or "-o3" in name
+        or "-o4" in name
+        or name.startswith("o1")
+        or name.startswith("o3")
+        or name.startswith("o4")
+    )
+
+
+def _normalize_request_for_reasoning_model(
+    endpoint_name: str, temperature: float
+) -> float:
+    """Return a temperature that the reasoning-model endpoint will accept.
+
+    For gpt-5 / o-series endpoints, force temperature=1.0 (the only value
+    they support). For all other endpoints, return the caller's value
+    unchanged. Logs when an override happens so the normalization is
+    auditable.
+    """
+    if _is_openai_reasoning_model(endpoint_name) and temperature != 1.0:
+        logger.info(
+            "Reasoning model %s only accepts temperature=1.0; overriding caller's %.2f",
+            endpoint_name,
+            temperature,
+        )
+        return 1.0
+    return temperature
+
+
 def _messages_to_genai_contents(messages: list[dict[str, Any]]) -> tuple[list[Any], str | None]:
     """Convert OpenAI chat messages to Gemini ``Content`` objects + an optional
     ``system_instruction``. ``role: system`` collapses into the latter."""
@@ -395,6 +438,8 @@ class DatabricksService:
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt},
             ]
+            # gpt-5 / o-series reject any temperature != 1
+            temperature = _normalize_request_for_reasoning_model(endpoint_name, temperature)
             request_params = {"messages": messages, "model": endpoint_name, "temperature": temperature}
 
             if max_tokens:
@@ -681,6 +726,8 @@ class DatabricksService:
                 ) from e
 
         try:
+            # gpt-5 / o-series reject any temperature != 1
+            temperature = _normalize_request_for_reasoning_model(endpoint_name, temperature)
             # Prepare the request parameters
             request_params = {"messages": messages, "model": endpoint_name, "temperature": temperature}
 

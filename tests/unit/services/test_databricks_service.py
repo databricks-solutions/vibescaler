@@ -494,3 +494,121 @@ def test_genai_response_to_chat_shape_extracts_text():
     assert result["choices"][0]["finish_reason"] == "stop"
     assert result["usage"]["prompt_tokens"] == 7
     assert result["usage"]["completion_tokens"] == 3
+
+
+# ---------------------------------------------------------------------------
+# OpenAI reasoning models (gpt-5 family, o-series) only accept temperature=1
+# ---------------------------------------------------------------------------
+#
+# Production hit 400 "'temperature' does not support 0.3 with this model" when
+# discovery_analysis_service called gpt-5.5 with the default 0.3. LiteLLM has
+# ``drop_params`` for this on the DSPy path; the OpenAI Python SDK has no
+# equivalent. We normalize at the call site instead — force temperature=1
+# whenever the endpoint is a reasoning model.
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "model_name",
+    [
+        "databricks-gpt-5",
+        "databricks-gpt-5-codex",
+        "databricks-gpt-5.1",
+        "databricks-gpt-5.5",
+        "databricks-o1-preview",
+        "databricks-o3-mini",
+        "o4-mini",
+    ],
+)
+def test_is_openai_reasoning_model_detects_gpt5_and_o_series(model_name):
+    from server.services.databricks_service import _is_openai_reasoning_model
+
+    assert _is_openai_reasoning_model(model_name), f"{model_name} should be detected as reasoning"
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "model_name",
+    [
+        "databricks-claude-opus-4-7",
+        "databricks-claude-sonnet-4",
+        "databricks-meta-llama-3-3-70b-instruct",
+        "databricks-gemini-3-5-flash",
+        "databricks-gpt-4o",
+    ],
+)
+def test_is_openai_reasoning_model_excludes_non_reasoning(model_name):
+    from server.services.databricks_service import _is_openai_reasoning_model
+
+    assert not _is_openai_reasoning_model(model_name), (
+        f"{model_name} should NOT be detected as a reasoning model"
+    )
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_normalize_request_for_reasoning_model_forces_temperature_1():
+    from server.services.databricks_service import _normalize_request_for_reasoning_model
+
+    assert _normalize_request_for_reasoning_model("databricks-gpt-5.5", 0.3) == 1.0
+    assert _normalize_request_for_reasoning_model("databricks-gpt-5.5", 1.0) == 1.0
+    # Non-reasoning models keep the caller's value
+    assert _normalize_request_for_reasoning_model("databricks-claude-opus-4-7", 0.3) == 0.3
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_call_chat_completion_forces_temperature_1_for_gpt5(monkeypatch):
+    """End-to-end: call_chat_completion called with temperature=0.3 against a
+    gpt-5 endpoint must send temperature=1.0 to the OpenAI client. Otherwise
+    discovery_analysis_service hits the prod 400 we just fixed."""
+    svc = DatabricksService.__new__(DatabricksService)
+    svc.workspace_url = "https://example.databricks.com"
+    svc.token = "test-token"
+
+    captured: dict[str, Any] = {}
+
+    def fake_create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content="ok",
+                        role="assistant",
+                        model_dump=lambda: {"role": "assistant", "content": "ok"},
+                    ),
+                    index=0,
+                    finish_reason="stop",
+                )
+            ],
+            model="databricks-gpt-5.5",
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+        )
+
+    svc.client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+
+    svc.call_chat_completion(
+        endpoint_name="databricks-gpt-5.5",
+        messages=[{"role": "user", "content": "hi"}],
+        temperature=0.3,
+    )
+    assert captured["temperature"] == 1.0, (
+        f"Expected forced temperature=1.0, got {captured['temperature']}"
+    )
