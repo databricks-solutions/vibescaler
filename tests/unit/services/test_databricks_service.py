@@ -294,11 +294,12 @@ def test_normalize_shim_content_ignores_non_text_parts():
     "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
 )
 @pytest.mark.unit
-def test_call_chat_completion_normalizes_gemini_content():
-    """End-to-end: when the OpenAI SDK returns a chat completion whose
-    message.content is the Gemini parts array, call_chat_completion must
-    return a result whose message.content is a plain string. Otherwise
-    discovery_analysis_service's parser breaks on Gemini."""
+def test_call_chat_completion_normalizes_array_content_on_shim_path():
+    """The OpenAI-compat shim has been observed to return ``message.content``
+    as an array of part dicts for certain backings. Even though Gemini now
+    bypasses this code path (it routes through the ai-gateway), the safety
+    net stays in place so any other model leaking array content gets
+    normalized to a string."""
     svc = DatabricksService.__new__(DatabricksService)
     svc.workspace_url = "https://example.databricks.com"
     svc.token = "test-token"
@@ -315,7 +316,7 @@ def test_call_chat_completion_normalizes_gemini_content():
     fake_usage = SimpleNamespace(prompt_tokens=10, completion_tokens=5, total_tokens=15)
     fake_response = SimpleNamespace(
         choices=[fake_choice],
-        model="databricks-gemini-3-5-flash",
+        model="databricks-claude-opus-4-7",
         usage=fake_usage,
     )
 
@@ -327,7 +328,169 @@ def test_call_chat_completion_normalizes_gemini_content():
     svc.client = fake_client
 
     result = svc.call_chat_completion(
-        endpoint_name="databricks-gemini-3-5-flash",
+        endpoint_name="databricks-claude-opus-4-7",
         messages=[{"role": "user", "content": "Give me 3 themes"}],
     )
     assert result["choices"][0]["message"]["content"] == "Themes: A, B, C"
+
+
+# ---------------------------------------------------------------------------
+# Gemini chat completion routes through the ai-gateway
+# ---------------------------------------------------------------------------
+#
+# Gemini chat completion through the OpenAI-compat shim is unreliable
+# (Vertex AI sometimes returns response shapes that the shim's translator
+# can't round-trip → 502 "invalid response from upstream"). We detect
+# Gemini endpoint names and route through the native ai-gateway/gemini
+# passthrough using google-genai. The adapter returns the chat-completions
+# dict shape so existing callers (discovery_analysis_service, etc.) don't
+# need to change.
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_call_chat_completion_routes_gemini_to_ai_gateway(monkeypatch):
+    """call_chat_completion must NOT touch the OpenAI client when the endpoint
+    is Gemini-family — it must dispatch to the ai-gateway helper. Otherwise
+    we re-introduce the shim 502s discovery analysis hit in production."""
+    svc = DatabricksService.__new__(DatabricksService)
+    svc.workspace_url = "https://example.databricks.com"
+    svc.token = "test-token"
+
+    # If anything reaches the OpenAI client it's a routing bug.
+    sentinel_client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(
+                create=lambda **_: pytest.fail("OpenAI client must not be used for Gemini")
+            )
+        )
+    )
+    svc.client = sentinel_client
+
+    captured: dict[str, Any] = {}
+
+    def fake_gateway(self, endpoint_name, messages, temperature=0.5, max_tokens=None, response_format=None):
+        captured["endpoint_name"] = endpoint_name
+        captured["messages"] = messages
+        captured["temperature"] = temperature
+        captured["max_tokens"] = max_tokens
+        return {
+            "choices": [
+                {"message": {"role": "assistant", "content": "OK"}, "index": 0, "finish_reason": "stop"}
+            ],
+            "model": endpoint_name,
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+
+    monkeypatch.setattr(DatabricksService, "_call_gemini_chat_via_ai_gateway", fake_gateway)
+
+    result = svc.call_chat_completion(
+        endpoint_name="databricks-gemini-3-5-flash",
+        messages=[{"role": "user", "content": "hi"}],
+        temperature=0.7,
+        max_tokens=1024,
+    )
+    assert captured["endpoint_name"] == "databricks-gemini-3-5-flash"
+    assert captured["temperature"] == 0.7
+    assert captured["max_tokens"] == 1024
+    assert result["choices"][0]["message"]["content"] == "OK"
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_call_chat_completion_non_gemini_uses_openai_client(monkeypatch):
+    """Non-Gemini endpoints continue to use the OpenAI-compat shim, since
+    Claude/gpt-5/Llama don't have the response-shape issues Gemini has."""
+    svc = DatabricksService.__new__(DatabricksService)
+    svc.workspace_url = "https://example.databricks.com"
+    svc.token = "test-token"
+
+    fake_message = SimpleNamespace(
+        content="hi",
+        role="assistant",
+        model_dump=lambda: {"role": "assistant", "content": "hi"},
+    )
+    fake_choice = SimpleNamespace(message=fake_message, index=0, finish_reason="stop")
+    fake_usage = SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2)
+    fake_response = SimpleNamespace(
+        choices=[fake_choice], model="databricks-claude-opus-4-7", usage=fake_usage
+    )
+    svc.client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=lambda **_: fake_response)
+        )
+    )
+
+    def fail_gateway(self, *a, **kw):
+        pytest.fail("Non-Gemini endpoint must not be routed to the ai-gateway helper")
+
+    monkeypatch.setattr(DatabricksService, "_call_gemini_chat_via_ai_gateway", fail_gateway)
+
+    result = svc.call_chat_completion(
+        endpoint_name="databricks-claude-opus-4-7",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+    assert result["choices"][0]["message"]["content"] == "hi"
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_messages_to_genai_contents_collapses_system_role():
+    """System messages collapse into ``system_instruction``; user/assistant
+    messages become Gemini ``Content`` items with role normalized to user/model."""
+    from server.services.databricks_service import _messages_to_genai_contents
+
+    contents, system = _messages_to_genai_contents(
+        [
+            {"role": "system", "content": "Be concise."},
+            {"role": "user", "content": "Hi."},
+            {"role": "assistant", "content": "Hello."},
+        ]
+    )
+    assert system == "Be concise."
+    assert len(contents) == 2
+    assert contents[0].role == "user"
+    assert contents[1].role == "model"
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_genai_response_to_chat_shape_extracts_text():
+    """The adapter must extract text from candidates[0].content.parts and
+    surface it as a single string under ``choices[0].message.content``."""
+    from server.services.databricks_service import _genai_response_to_chat_shape
+
+    fake_response = SimpleNamespace(
+        candidates=[
+            SimpleNamespace(
+                content=SimpleNamespace(
+                    parts=[
+                        SimpleNamespace(text="Hello, "),
+                        SimpleNamespace(text="world!"),
+                    ]
+                ),
+                finish_reason=SimpleNamespace(name="STOP"),
+            )
+        ],
+        usage_metadata=SimpleNamespace(
+            prompt_token_count=7, candidates_token_count=3, total_token_count=10
+        ),
+    )
+
+    result = _genai_response_to_chat_shape(fake_response, "databricks-gemini-3-5-flash")
+    assert result["choices"][0]["message"]["content"] == "Hello, world!"
+    assert result["choices"][0]["finish_reason"] == "stop"
+    assert result["usage"]["prompt_tokens"] == 7
+    assert result["usage"]["completion_tokens"] == 3

@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 # Key: (workspace_url, token_hash) -> OpenAI client
 _client_cache = {}
 
+# Lazy-built cache of ``google.genai.Client`` instances for the Gemini
+# ai-gateway path. Keyed by (workspace_url, token_hash). Constructed on
+# first Gemini call to avoid requiring ``google-genai`` in minimal deploys.
+_gemini_client_cache: dict[tuple[str, str], Any] = {}
+
 # Serving-endpoints TTL cache. The model list is workspace-global and changes
 # infrequently, but the frontend's React Query cache is keyed per workshop, so
 # without a server-side cache each workshop view triggers a fresh Databricks
@@ -94,6 +99,80 @@ def _normalize_shim_content(content: Any) -> Any:
             if text:
                 parts.append(text)
     return "".join(parts) if parts else content
+
+
+def _looks_like_gemini(model_name: str) -> bool:
+    """Detect Gemini-family endpoint names. Databricks names them ``databricks-gemini-*``."""
+    return "gemini" in (model_name or "").lower()
+
+
+def _messages_to_genai_contents(messages: list[dict[str, Any]]) -> tuple[list[Any], str | None]:
+    """Convert OpenAI chat messages to Gemini ``Content`` objects + an optional
+    ``system_instruction``. ``role: system`` collapses into the latter."""
+    from google.genai import types as genai_types
+
+    system_parts: list[str] = []
+    contents: list[Any] = []
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content", "")
+        if role == "system":
+            if isinstance(content, str) and content:
+                system_parts.append(content)
+            continue
+        # Gemini uses "model" instead of "assistant"
+        genai_role = "model" if role == "assistant" else "user"
+        if isinstance(content, str):
+            contents.append(
+                genai_types.Content(role=genai_role, parts=[genai_types.Part(text=content)])
+            )
+        elif isinstance(content, list):
+            # Pre-formatted parts (rare) — pass text through as best-effort.
+            text = "".join(
+                p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"
+            )
+            contents.append(
+                genai_types.Content(role=genai_role, parts=[genai_types.Part(text=text)])
+            )
+    system_instruction = "\n\n".join(system_parts) if system_parts else None
+    return contents, system_instruction
+
+
+def _genai_response_to_chat_shape(response: Any, model_name: str) -> dict[str, Any]:
+    """Adapt a google.genai ``GenerateContentResponse`` to the chat-completions
+    dict shape callers expect (``choices[0].message.content`` as a string)."""
+    text_parts: list[str] = []
+    finish_reason = "stop"
+    candidates = getattr(response, "candidates", None) or []
+    if candidates:
+        first = candidates[0]
+        for part in getattr(getattr(first, "content", None), "parts", None) or []:
+            t = getattr(part, "text", None)
+            if t:
+                text_parts.append(t)
+        fr = getattr(first, "finish_reason", None)
+        if fr is not None:
+            # google.genai returns an enum; surface its name for visibility.
+            finish_reason = str(getattr(fr, "name", fr) or finish_reason).lower()
+
+    usage = getattr(response, "usage_metadata", None)
+    usage_dict = {
+        "prompt_tokens": getattr(usage, "prompt_token_count", 0) if usage else 0,
+        "completion_tokens": getattr(usage, "candidates_token_count", 0) if usage else 0,
+        "total_tokens": getattr(usage, "total_token_count", 0) if usage else 0,
+    }
+
+    return {
+        "choices": [
+            {
+                "message": {"role": "assistant", "content": "".join(text_parts)},
+                "index": 0,
+                "finish_reason": finish_reason,
+            }
+        ],
+        "model": model_name,
+        "usage": usage_dict,
+    }
 
 
 def _get_token_hash(token: str) -> str:
@@ -491,6 +570,84 @@ class DatabricksService:
                 "message": "Failed to connect to Databricks workspace",
             }
 
+    def _get_gemini_client(self) -> Any:
+        """Lazily build (and cache) a ``google.genai.Client`` pointed at the
+        workspace's ai-gateway/gemini path.
+
+        Gemini chat completions through the OpenAI-compat shim are unreliable
+        — Vertex AI sometimes returns response shapes (safety blocks, empty
+        candidates, etc.) that the shim's JSON-to-OpenAI translator can't
+        round-trip, surfacing as 502 "invalid response from upstream". The
+        native passthrough returns Gemini's response shape directly, which
+        we can adapt cleanly.
+        """
+        cache_key = (self.workspace_url, _get_token_hash(self.token))
+        cached = _gemini_client_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        # Local imports so the module still loads if the google extras
+        # aren't installed in a minimal environment.
+        import httpx as _httpx
+        from google import genai
+        from google.genai import types as genai_types
+
+        gateway_url = f"{self.workspace_url.rstrip('/')}/ai-gateway/gemini"
+        # google-genai prefers aiohttp when installed; we use the sync
+        # interface here so this is mostly belt-and-suspenders, but passing
+        # an explicit httpx_client also makes future hook installation easy.
+        client = genai.Client(
+            api_key="databricks",  # ignored; auth is in headers
+            http_options=genai_types.HttpOptions(
+                base_url=gateway_url,
+                headers={"Authorization": f"Bearer {self.token}"},
+                httpx_client=_httpx.Client(),
+            ),
+        )
+        _gemini_client_cache[cache_key] = client
+        logger.info("Gemini ai-gateway client cached for workspace=%s", self.workspace_url)
+        return client
+
+    def _call_gemini_chat_via_ai_gateway(
+        self,
+        endpoint_name: str,
+        messages: list[dict[str, Any]],
+        temperature: float = 0.5,
+        max_tokens: int | None = None,
+        response_format: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Single-turn chat completion against Gemini via Databricks' native
+        ai-gateway/gemini passthrough. Returns the chat-completions dict shape
+        so callers (``discovery_analysis_service``, etc.) don't need to change.
+
+        ``response_format`` is currently ignored; Gemini structured output
+        uses ``response_schema`` on the request config, which doesn't map
+        cleanly to OpenAI's ``response_format`` here. Callers that need
+        structured output should use pydantic-ai's ``GoogleModel`` directly.
+        """
+        from google.genai import types as genai_types
+
+        client = self._get_gemini_client()
+        contents, system_instruction = _messages_to_genai_contents(messages)
+
+        config_kwargs: dict[str, Any] = {"temperature": temperature}
+        if max_tokens:
+            config_kwargs["max_output_tokens"] = max_tokens
+        if system_instruction:
+            config_kwargs["system_instruction"] = system_instruction
+
+        logger.info(
+            "Calling Gemini via ai-gateway endpoint=%s contents=%d",
+            endpoint_name,
+            len(contents),
+        )
+        response = client.models.generate_content(
+            model=endpoint_name,
+            contents=contents,
+            config=genai_types.GenerateContentConfig(**config_kwargs),
+        )
+        return _genai_response_to_chat_shape(response, endpoint_name)
+
     def call_chat_completion(
         self,
         endpoint_name: str,
@@ -499,18 +656,30 @@ class DatabricksService:
         max_tokens: int | None = None,
         model_parameters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Call a Databricks serving endpoint using chat completion format with OpenAI client.
+        """Call a Databricks serving endpoint using chat completion format.
 
-        Args:
-            endpoint_name: Name of the serving endpoint
-            messages: List of message dictionaries with 'role' and 'content'
-            temperature: Temperature for generation (0.0 to 1.0)
-            max_tokens: Maximum number of tokens to generate
-            model_parameters: Additional model parameters
-
-        Returns:
-            Dictionary containing the response from the model
+        For Gemini-family endpoints, routes through Databricks' native
+        ai-gateway/gemini passthrough (using google-genai). Other models
+        continue through the OpenAI-compat shim. The Gemini routing avoids
+        502s the shim returns when Vertex AI emits response shapes it can't
+        translate (safety blocks, empty candidates, etc.).
         """
+        if _looks_like_gemini(endpoint_name):
+            try:
+                return self._call_gemini_chat_via_ai_gateway(
+                    endpoint_name=endpoint_name,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            except Exception as e:
+                logger.error(f"Error calling Gemini ai-gateway endpoint {endpoint_name}: {e}")
+                logger.error("Full traceback:", exc_info=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error calling serving endpoint: {e!s}",
+                ) from e
+
         try:
             # Prepare the request parameters
             request_params = {"messages": messages, "model": endpoint_name, "temperature": temperature}

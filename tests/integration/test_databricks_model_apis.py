@@ -215,15 +215,13 @@ async def test_gemini_multi_turn_summarization_via_ai_gateway():
 @pytest.mark.req(
     "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
 )
-def test_gemini_chat_completion_returns_usable_content(databricks_service):
-    """Gemini via Chat Completions returns content as an array of parts dicts
-    (``[{type:"text", text:..., thoughtSignature:...}]``) and ``id: null``,
-    which trip OpenAI SDK 2.x's strict validators.
-
-    This test pins the behavior so a future Databricks shim fix is detected
-    immediately — if Gemini starts returning a plain-string content and a
-    real id, this test should be updated to require that shape and we can
-    delete any client-side normalization."""
+def test_gemini_chat_completion_returns_string_content(databricks_service):
+    """Discovery analysis and rubric generation both consume
+    ``response["choices"][0]["message"]["content"]`` as a ``str``. Now that
+    Gemini chat completions route through the native ai-gateway (the
+    OpenAI-compat shim was returning 502s on certain Vertex AI response
+    shapes), the content adapter must always produce a plain string.
+    Regression here would resurface the prod 502 we just fixed."""
     result = databricks_service.call_chat_completion(
         endpoint_name="databricks-gemini-3-5-flash",
         messages=[
@@ -234,16 +232,8 @@ def test_gemini_chat_completion_returns_usable_content(databricks_service):
         max_tokens=2000,
     )
     content = result["choices"][0]["message"]["content"]
-    # We accept either shape — the assertion just verifies we got something
-    # parseable. The migration that normalizes content is tested separately
-    # in unit tests.
-    assert content is not None
-    if isinstance(content, list):
-        joined = "".join(
-            part.get("text", "")
-            for part in content
-            if isinstance(part, dict) and part.get("type") == "text"
-        )
-        assert joined.strip(), "Gemini parts contained no text"
-    else:
-        assert isinstance(content, str) and content.strip(), "Gemini returned empty content"
+    assert isinstance(content, str), (
+        f"Gemini chat completion must return a string after ai-gateway adapter, "
+        f"got {type(content).__name__}"
+    )
+    assert content.strip(), "Gemini returned empty content"
