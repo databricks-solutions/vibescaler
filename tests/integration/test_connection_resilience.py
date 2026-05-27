@@ -171,3 +171,35 @@ class TestGetDbRetry:
             with pytest.raises(ValueError):
                 next(gen)
             assert call_count == 1  # No retry
+
+
+@pytest.mark.spec("AUTHENTICATION_SPEC")
+class TestStreamingEndpointsDoNotHoldSessions:
+    """Streaming/SSE endpoints must not bind a DB Session via FastAPI
+    dependency injection — doing so holds one pool connection per
+    subscriber for the entire stream lifetime and saturates the pool.
+    See gh#163 (production cascade traced to /discovery-comments/stream).
+    """
+
+    def _signature_params(self, fn):
+        import inspect
+
+        return inspect.signature(fn).parameters
+
+    def test_stream_discovery_comments_has_no_db_dependency(self):
+        from server.routers.discovery import stream_discovery_comments
+
+        params = self._signature_params(stream_discovery_comments)
+        assert "db" not in params, (
+            "Streaming endpoint must not bind a Session via Depends(get_db) — "
+            "acquire SessionLocal() per poll iteration instead. See gh#163."
+        )
+
+    def test_stream_discovery_agent_run_has_no_db_dependency(self):
+        from server.routers.discovery import stream_discovery_agent_run
+
+        params = self._signature_params(stream_discovery_agent_run)
+        assert "db" not in params, (
+            "Streaming endpoint must not bind a Session via Depends(get_db) — "
+            "acquire SessionLocal() per poll iteration instead. See gh#163."
+        )
