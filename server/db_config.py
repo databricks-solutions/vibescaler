@@ -12,8 +12,10 @@ When using PostgreSQL, these environment variables configure the connection:
 - PGPORT: Port (default 5432)
 - PGSSLMODE: SSL mode (default 'require')
 - PGAPPNAME: Application name for connection tracking
-- ENDPOINT_NAME: Lakebase endpoint for credential generation
-  (format: projects/<id>/branches/<id>/endpoints/<id>)
+- ENDPOINT_NAME: Lakebase endpoint identifier for credential generation.
+  Supplied by the Databricks Apps platform via a `valueFrom: <resource-alias>`
+  binding in app.yaml (e.g. `valueFrom: postgres`).  Required for
+  DATABASE_ENV=postgres — engine creation fails loudly if it is unset.
 
 OAuth credentials for Lakebase are generated via the Databricks SDK
 ``WorkspaceClient().postgres.generate_database_credential()`` and injected
@@ -130,12 +132,13 @@ class LakebaseCredentialManager:
             self._workspace_client = WorkspaceClient()
         return self._workspace_client
 
-    def get_password(self, endpoint_name: str | None = None) -> str:
-        """Get a database credential, refreshing if near expiry.
+    def get_password(self, endpoint_name: str) -> str:
+        """Get a Lakebase database credential, refreshing if near expiry.
 
         Args:
-            endpoint_name: Lakebase endpoint name for generate_database_credential().
-                If None, falls back to workspace OAuth token.
+            endpoint_name: Lakebase endpoint resource identifier supplied by
+                Databricks Apps via `valueFrom: postgres` (or equivalent
+                resource alias) in app.yaml.
         """
         now = time.time()
 
@@ -145,36 +148,25 @@ class LakebaseCredentialManager:
         client = self._get_workspace_client()
 
         try:
-            if endpoint_name:
-                cred = client.postgres.generate_database_credential(endpoint=endpoint_name)
-                token = cred.token
-                if not token:
-                    raise RuntimeError(
-                        "generate_database_credential returned empty token "
-                        f"(endpoint={endpoint_name})"
-                    )
-                self._token = token
-                # expire_time is a google.protobuf.Timestamp (absolute UTC),
-                # not a Duration — use .seconds directly as the epoch expiry.
-                try:
-                    self._token_expiry = cred.expire_time.seconds
-                except (AttributeError, TypeError):
-                    self._token_expiry = now + 3600
-                logger.info(
-                    "Refreshed Lakebase credential via generate_database_credential "
-                    "(expires in %.0fs)",
-                    self._token_expiry - now,
+            cred = client.postgres.generate_database_credential(endpoint=endpoint_name)
+            token = cred.token
+            if not token:
+                raise RuntimeError(
+                    "generate_database_credential returned empty token "
+                    f"(endpoint={endpoint_name})"
                 )
-            else:
-                oauth = client.config.oauth_token()
-                token = oauth.access_token
-                if not token:
-                    raise RuntimeError("oauth_token() returned empty access_token")
-                self._token = token
+            self._token = token
+            # expire_time is a google.protobuf.Timestamp (absolute UTC),
+            # not a Duration — use .seconds directly as the epoch expiry.
+            try:
+                self._token_expiry = cred.expire_time.seconds
+            except (AttributeError, TypeError):
                 self._token_expiry = now + 3600
-                logger.info(
-                    "Refreshed Lakebase credential via workspace OAuth token (no ENDPOINT_NAME)"
-                )
+            logger.info(
+                "Refreshed Lakebase credential via generate_database_credential "
+                "(expires in %.0fs)",
+                self._token_expiry - now,
+            )
         except Exception as e:
             logger.error("Failed to refresh Lakebase credential: %s", e)
             if self._token is None:
@@ -288,13 +280,19 @@ def create_engine_for_backend(backend: DatabaseBackend) -> Engine:
 
     credential_manager = get_credential_manager()
     endpoint_name = os.getenv("ENDPOINT_NAME")
-    if endpoint_name:
-        logger.info("ENDPOINT_NAME=%s — will use generate_database_credential()", endpoint_name)
-    else:
-        logger.warning(
-            "ENDPOINT_NAME not set — falling back to workspace OAuth token. "
-            "Set ENDPOINT_NAME for Lakebase Autoscaling deployments."
+    if not endpoint_name:
+        # ENDPOINT_NAME is supplied by the Databricks Apps platform via a
+        # `valueFrom: <resource-alias>` binding in app.yaml (typically
+        # `valueFrom: postgres`). It is required for Lakebase Autoscaling
+        # because `generate_database_credential(endpoint=...)` cannot succeed
+        # without it. Fail loudly at engine creation rather than degrading
+        # to a different credential type silently.
+        raise RuntimeError(
+            "ENDPOINT_NAME is required for DATABASE_ENV=postgres but is not set. "
+            "Bind the Lakebase resource in app.yaml: "
+            "`- name: ENDPOINT_NAME / valueFrom: <resource-alias>`."
         )
+    logger.info("ENDPOINT_NAME=%s — will use generate_database_credential()", endpoint_name)
 
     schema_name = get_lakebase_schema_name(config)
 
@@ -313,8 +311,8 @@ def create_engine_for_backend(backend: DatabaseBackend) -> Engine:
         pool_size=5,
         max_overflow=5,  # Cap at 10/worker, 20 total with 2 gunicorn workers
         pool_timeout=30,
-        pool_recycle=2700,  # 45 min — recycle well before token expiry
-        pool_pre_ping=True,  # Detect stale/expired connections before use
+        pool_recycle=3600,  # 1h — match OAuth token lifetime per spec
+        pool_pre_ping=False,  # Conflicts with do_connect token injection
         echo=False,
     )
 

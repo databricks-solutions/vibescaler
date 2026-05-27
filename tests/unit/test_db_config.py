@@ -104,16 +104,6 @@ class TestLakebaseCredentialManager:
             endpoint="projects/p1/branches/b1/endpoints/e1"
         )
 
-    def test_get_password_falls_back_to_oauth_when_no_endpoint(self):
-        mgr = LakebaseCredentialManager()
-        mock_client = MagicMock()
-        mock_client.config.oauth_token.return_value = MagicMock(access_token="oauth_tok")
-        mgr._workspace_client = mock_client
-
-        password = mgr.get_password(None)
-        assert password == "oauth_tok"
-        mock_client.config.oauth_token.assert_called_once()
-
     def test_get_password_uses_cache(self):
         mgr = LakebaseCredentialManager()
         mock_client = MagicMock()
@@ -317,11 +307,27 @@ class TestCreateEngineForBackend:
         monkeypatch.setenv("PGPORT", "5432")
         monkeypatch.setenv("PGSSLMODE", "require")
         monkeypatch.setenv("PGAPPNAME", "test-app")
+        monkeypatch.setenv("ENDPOINT_NAME", "postgres-resource-alias")
 
         engine = create_engine_for_backend(DatabaseBackend.POSTGRESQL)
         assert engine is not None
         assert "postgresql" in str(engine.url)
         engine.dispose()
+
+    @pytest.mark.spec("AUTHENTICATION_SPEC")
+    def test_postgresql_engine_raises_without_endpoint_name(self, monkeypatch):
+        """ENDPOINT_NAME must be wired via app.yaml `valueFrom: <alias>` —
+        engine creation fails loudly rather than silently falling back to
+        a workspace OAuth token, which is not the documented credential
+        type for Lakebase Autoscaling.
+        """
+        monkeypatch.setenv("PGHOST", "db.example.com")
+        monkeypatch.setenv("PGDATABASE", "testdb")
+        monkeypatch.setenv("PGUSER", "svc-user")
+        monkeypatch.delenv("ENDPOINT_NAME", raising=False)
+
+        with pytest.raises(RuntimeError, match="ENDPOINT_NAME is required"):
+            create_engine_for_backend(DatabaseBackend.POSTGRESQL)
 
 
 # ---------------------------------------------------------------------------
