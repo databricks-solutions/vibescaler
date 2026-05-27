@@ -1,10 +1,15 @@
+import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 import server.services.databricks_service as databricks_module
 from server.services.databricks_service import (
     DatabricksService,
+    _fix_databricks_shim_response,
+    _normalize_shim_content,
     clear_serving_endpoints_cache,
     get_databricks_host,
     get_experiment_id,
@@ -178,3 +183,151 @@ async def test_serving_endpoints_cache_dedupes_concurrent_requests(reset_endpoin
     assert all(r == [{"name": "endpoint-1", "state": "READY"}] for r in results)
     # No assertion on call_count here because slow_fetch isn't a Mock, but the
     # event/release pattern guarantees only one path ran the fetch body.
+
+
+# ---------------------------------------------------------------------------
+# Gemini-on-Databricks Chat Completions shim quirks
+# ---------------------------------------------------------------------------
+#
+# OpenAI's Responses API is gpt-only by design, so we stay on Chat Completions
+# for all cross-provider calls. The Databricks shim leaks two Gemini-native
+# quirks through Chat Completions that callers can't reasonably handle:
+#  1. ``id: null`` on the response object (OpenAI SDK 2.x's Pydantic
+#     validator rejects null id).
+#  2. ``content`` as an array of part dicts
+#     ``[{"type": "text", "text": "...", "thoughtSignature": "..."}]``
+#     instead of a plain string, breaking parsers that read
+#     ``response.choices[0].message.content`` as ``str``.
+# We patch both client-side so callers (discovery_analysis_service,
+# rubric_generation_service, etc.) work uniformly across providers.
+
+
+def _make_response(body: dict, content_type: str = "application/json") -> httpx.Response:
+    raw = json.dumps(body).encode()
+    return httpx.Response(
+        status_code=200,
+        headers={"content-type": content_type, "content-length": str(len(raw))},
+        content=raw,
+    )
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_fix_databricks_shim_response_replaces_null_id():
+    resp = _make_response({"id": None, "choices": [{"index": 0, "message": {}}]})
+    _fix_databricks_shim_response(resp)
+    parsed = json.loads(resp.content)
+    assert parsed["id"], "id must be filled in"
+    assert parsed["id"].startswith("databricks-shim-")
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_fix_databricks_shim_response_leaves_valid_id_alone():
+    """Other backing models (Claude, gpt-5) return real ids; the hook must
+    not overwrite them."""
+    resp = _make_response({"id": "chatcmpl-abc123", "choices": [{"index": 0, "message": {}}]})
+    _fix_databricks_shim_response(resp)
+    parsed = json.loads(resp.content)
+    assert parsed["id"] == "chatcmpl-abc123"
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_fix_databricks_shim_response_ignores_non_chat_payloads():
+    """The hook is installed on the shared OpenAI client, so it sees every
+    response. It must only mutate chat completion shapes (id+choices), not
+    arbitrary JSON like endpoint listings or error envelopes."""
+    resp = _make_response({"endpoints": [{"name": "foo"}]})
+    _fix_databricks_shim_response(resp)
+    parsed = json.loads(resp.content)
+    assert parsed == {"endpoints": [{"name": "foo"}]}
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_normalize_shim_content_joins_gemini_parts():
+    parts = [
+        {"type": "text", "text": "Hello, ", "thoughtSignature": "abc=="},
+        {"type": "text", "text": "world!", "thoughtSignature": "def=="},
+    ]
+    assert _normalize_shim_content(parts) == "Hello, world!"
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_normalize_shim_content_passes_string_through():
+    assert _normalize_shim_content("already a string") == "already a string"
+    assert _normalize_shim_content(None) is None
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_normalize_shim_content_ignores_non_text_parts():
+    parts = [
+        {"type": "text", "text": "Hello"},
+        {"type": "function_call", "name": "noop"},
+    ]
+    assert _normalize_shim_content(parts) == "Hello"
+
+
+@pytest.mark.spec("DISCOVERY_SPEC")
+@pytest.mark.req(
+    "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
+)
+@pytest.mark.unit
+def test_call_chat_completion_normalizes_gemini_content():
+    """End-to-end: when the OpenAI SDK returns a chat completion whose
+    message.content is the Gemini parts array, call_chat_completion must
+    return a result whose message.content is a plain string. Otherwise
+    discovery_analysis_service's parser breaks on Gemini."""
+    svc = DatabricksService.__new__(DatabricksService)
+    svc.workspace_url = "https://example.databricks.com"
+    svc.token = "test-token"
+
+    fake_message = SimpleNamespace(
+        content=[{"type": "text", "text": "Themes: A, B, C"}],
+        role="assistant",
+        model_dump=lambda: {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Themes: A, B, C"}],
+        },
+    )
+    fake_choice = SimpleNamespace(message=fake_message, index=0, finish_reason="stop")
+    fake_usage = SimpleNamespace(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+    fake_response = SimpleNamespace(
+        choices=[fake_choice],
+        model="databricks-gemini-3-5-flash",
+        usage=fake_usage,
+    )
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=lambda **_: fake_response)
+        )
+    )
+    svc.client = fake_client
+
+    result = svc.call_chat_completion(
+        endpoint_name="databricks-gemini-3-5-flash",
+        messages=[{"role": "user", "content": "Give me 3 themes"}],
+    )
+    assert result["choices"][0]["message"]["content"] == "Themes: A, B, C"

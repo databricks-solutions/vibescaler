@@ -5,9 +5,11 @@ This service handles calls to Databricks model serving endpoints using the OpenA
 
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import time
+import uuid
 from typing import Any
 
 import httpx
@@ -36,6 +38,62 @@ _endpoints_cache_locks_guard = asyncio.Lock()
 def clear_serving_endpoints_cache() -> None:
     """Clear the cached serving-endpoints list. Useful for manual invalidation and tests."""
     _endpoints_cache.clear()
+
+
+def _fix_databricks_shim_response(response: httpx.Response) -> None:
+    """Patch JSON responses from the Databricks OpenAI-compat shim that violate
+    the OpenAI chat completion contract.
+
+    Currently fixes:
+    - ``id: null`` on chat completions. Gemini-backed endpoints leave id null;
+      OpenAI SDK 2.x's Pydantic validator rejects this. Replaced with a
+      generated placeholder so downstream parsing succeeds.
+
+    Other backing models (Claude, gpt-5) return a non-null id and are untouched.
+    """
+    if "application/json" not in response.headers.get("content-type", ""):
+        return
+    try:
+        response.read()
+    except httpx.ResponseNotRead:
+        pass
+    except Exception:
+        return
+    try:
+        body = json.loads(response.content)
+    except Exception:
+        return
+    if not isinstance(body, dict) or "choices" not in body:
+        return
+    if body.get("id") in (None, ""):
+        body["id"] = f"databricks-shim-{uuid.uuid4().hex}"
+        new_body = json.dumps(body).encode()
+        response._content = new_body
+        response.headers["content-length"] = str(len(new_body))
+
+
+def _normalize_shim_content(content: Any) -> Any:
+    """Normalize the Databricks shim's Gemini content shape.
+
+    Gemini-backed endpoints return content as an array of part dicts:
+        ``[{"type": "text", "text": "...", "thoughtSignature": "..."}]``
+    instead of a plain string, which breaks parsers that expect
+    ``response.choices[0].message.content`` to be a ``str``.
+
+    Joins all text parts into a single string. Non-Gemini responses
+    (string content) pass through unchanged.
+    """
+    if not isinstance(content, list):
+        return content
+    parts: list[str] = []
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") == "text":
+            text = part.get("text")
+            if text:
+                parts.append(text)
+    return "".join(parts) if parts else content
 
 
 def _get_token_hash(token: str) -> str:
@@ -185,9 +243,16 @@ class DatabricksService:
             if cache_key in _client_cache:
                 self.client = _client_cache[cache_key]
             else:
+                # Install a response hook that normalizes Databricks shim quirks
+                # (e.g. Gemini-backed endpoints return id:null which OpenAI SDK
+                # 2.x's Pydantic validator rejects).
+                http_client = httpx.Client(
+                    event_hooks={"response": [_fix_databricks_shim_response]}
+                )
                 self.client = OpenAI(
                     api_key=self.token,
                     base_url=f"{self.workspace_url}/serving-endpoints",
+                    http_client=http_client,
                 )
                 _client_cache[cache_key] = self.client
         except Exception as e:
@@ -226,6 +291,10 @@ class DatabricksService:
                     "content": response.choices[0].message.content,
                     "role": response.choices[0].message.role,
                 }
+            # Gemini-backed endpoints return content as an array of part dicts;
+            # callers expect a plain string. Other backings pass through unchanged.
+            if "content" in message_dump:
+                message_dump["content"] = _normalize_shim_content(message_dump["content"])
             return {
                 "choices": [
                     {
@@ -467,6 +536,10 @@ class DatabricksService:
                     "content": response.choices[0].message.content,
                     "role": response.choices[0].message.role,
                 }
+            # Gemini-backed endpoints return content as an array of part dicts;
+            # callers expect a plain string. Other backings pass through unchanged.
+            if "content" in message_dump:
+                message_dump["content"] = _normalize_shim_content(message_dump["content"])
 
             result = {
                 "choices": [
