@@ -88,6 +88,20 @@ class TestLakebaseCredentialManager:
         assert mgr._token is None
         assert mgr._token_expiry == 0.0
 
+    @pytest.mark.spec("AUTHENTICATION_SPEC")
+    @pytest.mark.parametrize("bad_value", [None, ""])
+    def test_get_password_rejects_unset_or_empty_endpoint(self, bad_value):
+        """Misconfigured ENDPOINT_NAME bindings (empty string from a
+        `valueFrom:` that resolved against the wrong resource alias, or
+        unset entirely) must fail with an actionable error from the
+        credential manager itself, since callers in db_bootstrap and
+        postgres_manager bypass the engine-creation guard.
+        """
+        mgr = LakebaseCredentialManager()
+        mgr._workspace_client = MagicMock()
+        with pytest.raises(RuntimeError, match="ENDPOINT_NAME is required"):
+            mgr.get_password(bad_value)
+
     def test_get_password_with_endpoint_name(self):
         mgr = LakebaseCredentialManager()
         mock_client = MagicMock()

@@ -21,4 +21,4 @@ env:
   - name: MLFLOW_EXPERIMENT_ID
     valueFrom: experiment
   - name: ENDPOINT_NAME
-    valueFrom: postgres
+    valueFrom: database

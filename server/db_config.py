@@ -132,14 +132,24 @@ class LakebaseCredentialManager:
             self._workspace_client = WorkspaceClient()
         return self._workspace_client
 
-    def get_password(self, endpoint_name: str) -> str:
+    def get_password(self, endpoint_name: str | None) -> str:
         """Get a Lakebase database credential, refreshing if near expiry.
 
         Args:
             endpoint_name: Lakebase endpoint resource identifier supplied by
-                Databricks Apps via `valueFrom: postgres` (or equivalent
-                resource alias) in app.yaml.
+                Databricks Apps via `valueFrom: <resource-alias>` in
+                app.yaml (e.g. `valueFrom: database`).  An unset or empty
+                value indicates a deployment misconfiguration and raises
+                here so the failure surfaces with an actionable message
+                regardless of which caller hit the credential manager first.
         """
+        if not endpoint_name:
+            raise RuntimeError(
+                "ENDPOINT_NAME is required for DATABASE_ENV=postgres but is unset or empty. "
+                "Bind the Lakebase resource in app.yaml: "
+                "`- name: ENDPOINT_NAME / valueFrom: <resource-alias>`."
+            )
+
         now = time.time()
 
         if self._token is not None and now < (self._token_expiry - self._EXPIRY_BUFFER_SECONDS):
