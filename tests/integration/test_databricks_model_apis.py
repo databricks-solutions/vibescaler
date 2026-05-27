@@ -141,6 +141,76 @@ def test_responses_api_passthrough_support(databricks_service, model):
         pytest.xfail(f"{model}: Responses API is OpenAI-only by design (expected)")
 
 
+@pytest.mark.spec("TRACE_SUMMARIZATION_SPEC")
+@pytest.mark.req(
+    "Facilitator can select a model for summarization from available Databricks endpoints"
+)
+@pytest.mark.asyncio
+async def test_gemini_multi_turn_summarization_via_ai_gateway():
+    """End-to-end: multi-turn pydantic-ai agent summarization on Gemini
+    through the Databricks ai-gateway path. This exercises:
+
+    - ``TraceSummarizationService``'s Gemini routing decision.
+    - The forced httpx transport (google-genai would otherwise pick aiohttp
+      and bypass our request hook).
+    - The ``function_call.id`` strip hook (without it, the second turn
+      400s because Vertex AI's FunctionCall proto has no ``id`` field).
+    - Pydantic-AI's native ``thought_signature`` round-tripping in
+      ``GoogleModel``.
+
+    Skipped automatically when Databricks credentials aren't configured.
+    """
+    from databricks.sdk import WorkspaceClient
+
+    from server.services.trace_summarization_service import TraceSummarizationService
+
+    w = WorkspaceClient()
+    token = w.config.authenticate()["Authorization"].removeprefix("Bearer ")
+    host = w.config.host.rstrip("/")
+
+    svc = TraceSummarizationService(
+        endpoint_url=f"{host}/serving-endpoints",
+        token=token,
+        model_name="databricks-gemini-3-5-flash",
+        agent_run_timeout_s=60.0,
+    )
+
+    result = await svc.summarize_trace(
+        {
+            "spans": [
+                {
+                    "name": "root_agent",
+                    "span_type": "AGENT",
+                    "status": "OK",
+                    "inputs": {"task": "find top issuers by spend"},
+                    "outputs": {"answer": "ICA-1, ICA-2, ICA-3"},
+                    "start_time_ns": 0,
+                    "end_time_ns": 4_000_000_000,
+                    "parent_span_id": None,
+                },
+                {
+                    "name": "sql",
+                    "span_type": "TOOL",
+                    "status": "OK",
+                    "inputs": {"q": "SELECT * FROM issuers"},
+                    "outputs": {"rows": 240},
+                    "start_time_ns": 1_000_000_000,
+                    "end_time_ns": 3_000_000_000,
+                    "parent_span_id": "span-1",
+                },
+            ],
+            "execution_time_ms": 4000,
+            "status": "OK",
+            "tags": {},
+        },
+        trace_id="integration-gemini-multi-turn",
+    )
+
+    assert result is not None, "Gemini multi-turn summarization should not return None"
+    assert result.executive_summary, "Executive summary should be populated"
+    assert len(result.milestones) >= 1, "At least one milestone expected"
+
+
 @pytest.mark.spec("DISCOVERY_SPEC")
 @pytest.mark.req(
     "Facilitator can select LLM model for follow-up question generation in Discovery dashboard"
