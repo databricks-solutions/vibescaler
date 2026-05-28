@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import DisconnectionError, OperationalError
+from sqlalchemy.exc import TimeoutError as SATimeoutError
 
 pytestmark = [
     pytest.mark.integration,
@@ -50,7 +51,6 @@ class TestIsConnectionError:
         "ssl connection has been closed unexpectedly",
         "could not connect to server",
         "connection refused",
-        "connection timed out",
         "invalid authorization",
         "database is locked",
     ])
@@ -59,6 +59,24 @@ class TestIsConnectionError:
 
         exc = Exception(message)
         assert _is_connection_error(exc) is True
+
+    @pytest.mark.spec("AUTHENTICATION_SPEC")
+    def test_pool_exhaustion_timeout_is_not_connection_error(self):
+        """SQLAlchemy QueuePool TimeoutError must NOT be classified as a
+        transient connection error.  Treating saturation as such triggers
+        engine.dispose() during the retry path, which drops in-flight
+        connections held by other concurrent requests and amplifies the
+        outage.  See gh#163.
+        """
+        from server.database import _is_connection_error
+
+        exc = SATimeoutError(
+            "QueuePool limit of size 5 overflow 5 reached, "
+            "connection timed out, timeout 30.00",
+            None,
+            None,
+        )
+        assert _is_connection_error(exc) is False
 
 
 class TestResetConnectionPool:
@@ -153,3 +171,35 @@ class TestGetDbRetry:
             with pytest.raises(ValueError):
                 next(gen)
             assert call_count == 1  # No retry
+
+
+@pytest.mark.spec("AUTHENTICATION_SPEC")
+class TestStreamingEndpointsDoNotHoldSessions:
+    """Streaming/SSE endpoints must not bind a DB Session via FastAPI
+    dependency injection — doing so holds one pool connection per
+    subscriber for the entire stream lifetime and saturates the pool.
+    See gh#163 (production cascade traced to /discovery-comments/stream).
+    """
+
+    def _signature_params(self, fn):
+        import inspect
+
+        return inspect.signature(fn).parameters
+
+    def test_stream_discovery_comments_has_no_db_dependency(self):
+        from server.routers.discovery import stream_discovery_comments
+
+        params = self._signature_params(stream_discovery_comments)
+        assert "db" not in params, (
+            "Streaming endpoint must not bind a Session via Depends(get_db) — "
+            "acquire SessionLocal() per poll iteration instead. See gh#163."
+        )
+
+    def test_stream_discovery_agent_run_has_no_db_dependency(self):
+        from server.routers.discovery import stream_discovery_agent_run
+
+        params = self._signature_params(stream_discovery_agent_run)
+        assert "db" not in params, (
+            "Streaming endpoint must not bind a Session via Depends(get_db) — "
+            "acquire SessionLocal() per poll iteration instead. See gh#163."
+        )

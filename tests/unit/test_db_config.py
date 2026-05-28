@@ -88,6 +88,20 @@ class TestLakebaseCredentialManager:
         assert mgr._token is None
         assert mgr._token_expiry == 0.0
 
+    @pytest.mark.spec("AUTHENTICATION_SPEC")
+    @pytest.mark.parametrize("bad_value", [None, ""])
+    def test_get_password_rejects_unset_or_empty_endpoint(self, bad_value):
+        """Misconfigured ENDPOINT_NAME bindings (empty string from a
+        `valueFrom:` that resolved against the wrong resource alias, or
+        unset entirely) must fail with an actionable error from the
+        credential manager itself, since callers in db_bootstrap and
+        postgres_manager bypass the engine-creation guard.
+        """
+        mgr = LakebaseCredentialManager()
+        mgr._workspace_client = MagicMock()
+        with pytest.raises(RuntimeError, match="ENDPOINT_NAME is required"):
+            mgr.get_password(bad_value)
+
     def test_get_password_with_endpoint_name(self):
         mgr = LakebaseCredentialManager()
         mock_client = MagicMock()
@@ -103,16 +117,6 @@ class TestLakebaseCredentialManager:
         mock_client.postgres.generate_database_credential.assert_called_once_with(
             endpoint="projects/p1/branches/b1/endpoints/e1"
         )
-
-    def test_get_password_falls_back_to_oauth_when_no_endpoint(self):
-        mgr = LakebaseCredentialManager()
-        mock_client = MagicMock()
-        mock_client.config.oauth_token.return_value = MagicMock(access_token="oauth_tok")
-        mgr._workspace_client = mock_client
-
-        password = mgr.get_password(None)
-        assert password == "oauth_tok"
-        mock_client.config.oauth_token.assert_called_once()
 
     def test_get_password_uses_cache(self):
         mgr = LakebaseCredentialManager()
@@ -317,11 +321,27 @@ class TestCreateEngineForBackend:
         monkeypatch.setenv("PGPORT", "5432")
         monkeypatch.setenv("PGSSLMODE", "require")
         monkeypatch.setenv("PGAPPNAME", "test-app")
+        monkeypatch.setenv("ENDPOINT_NAME", "postgres-resource-alias")
 
         engine = create_engine_for_backend(DatabaseBackend.POSTGRESQL)
         assert engine is not None
         assert "postgresql" in str(engine.url)
         engine.dispose()
+
+    @pytest.mark.spec("AUTHENTICATION_SPEC")
+    def test_postgresql_engine_raises_without_endpoint_name(self, monkeypatch):
+        """ENDPOINT_NAME must be wired via app.yaml `valueFrom: <alias>` —
+        engine creation fails loudly rather than silently falling back to
+        a workspace OAuth token, which is not the documented credential
+        type for Lakebase Autoscaling.
+        """
+        monkeypatch.setenv("PGHOST", "db.example.com")
+        monkeypatch.setenv("PGDATABASE", "testdb")
+        monkeypatch.setenv("PGUSER", "svc-user")
+        monkeypatch.delenv("ENDPOINT_NAME", raising=False)
+
+        with pytest.raises(RuntimeError, match="ENDPOINT_NAME is required"):
+            create_engine_for_backend(DatabaseBackend.POSTGRESQL)
 
 
 # ---------------------------------------------------------------------------

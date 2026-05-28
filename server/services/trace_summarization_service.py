@@ -16,7 +16,9 @@ from typing import Any, Literal
 import httpx
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.profiles.openai import OpenAIModelProfile
 from pydantic_ai.providers.openai import OpenAIProvider
 
 logger = logging.getLogger(__name__)
@@ -323,6 +325,147 @@ def _make_pydantic_ai_tools() -> list:
     ]
 
 
+# --- Model construction ---
+
+
+def _looks_like_gemini(model_name: str) -> bool:
+    """Detect Gemini-family endpoint names. Databricks names them ``databricks-gemini-*``."""
+    return "gemini" in (model_name or "").lower()
+
+
+async def _strip_function_call_id_from_gemini_request(request: Any) -> None:
+    """Strip ``id`` from ``functionCall``/``functionResponse`` parts on outgoing
+    requests to Databricks' Gemini ai-gateway.
+
+    Vertex AI's ``FunctionCall`` proto defines only ``name`` and ``args`` — no
+    ``id`` field. The google-genai SDK adds ``id`` when echoing the model's
+    previous function call back in multi-turn conversations (per Google's
+    hosted Gemini API spec), and Databricks' ai-gateway/gemini path is a
+    pure passthrough that doesn't translate it away. The result is a 400
+    "Unknown name 'id' at 'contents[N].parts[*].function_call'" that breaks
+    multi-turn tool-using agents.
+
+    Installed as an httpx request hook via ``HttpOptions.async_client_args``.
+    """
+    if not request.content:
+        return
+    try:
+        body = json.loads(request.content)
+    except Exception:
+        return
+    contents = body.get("contents")
+    if not isinstance(contents, list):
+        return
+    mutated = False
+    for c in contents:
+        if not isinstance(c, dict):
+            continue
+        for part in c.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            for key in ("functionCall", "function_call", "functionResponse", "function_response"):
+                fc = part.get(key)
+                if isinstance(fc, dict) and "id" in fc:
+                    fc.pop("id", None)
+                    mutated = True
+    if mutated:
+        new_body = json.dumps(body).encode()
+        # httpx Request's wire transport reads from self.stream, NOT
+        # self._content. Updating only _content leaves the original body
+        # in the stream and triggers a "Too much data for declared
+        # Content-Length" error. Rebuild both.
+        from httpx._content import ByteStream
+
+        request.stream = ByteStream(new_body)
+        request._content = new_body
+        request.headers["content-length"] = str(len(new_body))
+
+
+def _build_gemini_model_via_ai_gateway(
+    *, workspace_url: str, token: str, model_name: str
+) -> Model:
+    """Build a pydantic-ai ``GoogleModel`` pointed at Databricks' native
+    Gemini passthrough (``/ai-gateway/gemini``).
+
+    The OpenAI-compat Chat Completions shim can't carry Gemini's
+    ``thought_signature`` between turns (OpenAI wire format has no slot
+    for it), so multi-turn tool-using agents on Gemini have to go through
+    this native path. pydantic-ai's ``GoogleModel`` already handles
+    ``thought_signature`` round-tripping correctly; we just need to
+    install an httpx request hook to strip ``function_call.id`` (see
+    ``_strip_function_call_id_from_gemini_request`` for why).
+    """
+    # Local imports so this module still loads if the google extras
+    # aren't installed in a minimal environment.
+    import httpx as _httpx
+    from google import genai
+    from google.genai import types as genai_types
+    from pydantic_ai.models.google import GoogleModel
+    from pydantic_ai.providers.google import GoogleProvider
+
+    gateway_url = f"{workspace_url.rstrip('/')}/ai-gateway/gemini"
+
+    # google-genai defaults to aiohttp when it's installed and no explicit
+    # httpx client is passed (see ``_api_client._use_aiohttp``). Passing
+    # ``httpx_async_client`` here forces the httpx transport so our
+    # request hook actually fires. Without this, the function_call.id
+    # strip is silently skipped and multi-turn calls 400.
+    httpx_async_client = _httpx.AsyncClient(
+        event_hooks={"request": [_strip_function_call_id_from_gemini_request]},
+    )
+
+    client = genai.Client(
+        # api_key is ignored on Databricks (Authorization header is used)
+        # but must be non-empty to satisfy the SDK's validator.
+        api_key="databricks",
+        http_options=genai_types.HttpOptions(
+            base_url=gateway_url,
+            headers={"Authorization": f"Bearer {token}"},
+            httpx_async_client=httpx_async_client,
+        ),
+    )
+    provider = GoogleProvider(client=client)
+    logger.info(
+        "Gemini summarization routing via native ai-gateway: %s (model=%s)",
+        gateway_url,
+        model_name,
+    )
+    return GoogleModel(model_name, provider=provider)
+
+
+def _build_openai_compat_model(
+    *, endpoint_url: str, token: str, model_name: str
+) -> Model:
+    """Build a pydantic-ai model against the Databricks OpenAI-compat shim
+    at ``/serving-endpoints``. Used for Claude, gpt-5, and other non-Gemini
+    foundation models. Disables strict tool definitions because the shim
+    rejects the ``strict`` field on tool functions.
+    """
+    provider = OpenAIProvider(base_url=endpoint_url, api_key=token)
+    profile = OpenAIModelProfile(openai_supports_strict_tool_definition=False)
+    return OpenAIChatModel(model_name, provider=provider, profile=profile)
+
+
+def _build_summarization_model(
+    *, endpoint_url: str, token: str, model_name: str
+) -> Model:
+    """Pick the right pydantic-ai model class for the configured backing model.
+
+    Gemini multi-turn tool calling requires ``thought_signature`` roundtripping
+    that the OpenAI-compat shim doesn't carry, so Gemini endpoints route
+    through the native ai-gateway/gemini path. Everything else stays on
+    OpenAI Chat Completions.
+    """
+    if _looks_like_gemini(model_name):
+        workspace_url = endpoint_url.split("/serving-endpoints", 1)[0]
+        return _build_gemini_model_via_ai_gateway(
+            workspace_url=workspace_url, token=token, model_name=model_name
+        )
+    return _build_openai_compat_model(
+        endpoint_url=endpoint_url, token=token, model_name=model_name
+    )
+
+
 # --- Service ---
 
 
@@ -344,8 +487,13 @@ class TraceSummarizationService:
         max_concurrency: int = 3,
         agent_run_timeout_s: float | None = None,
     ):
-        provider = OpenAIProvider(base_url=endpoint_url, api_key=token)
-        model = OpenAIChatModel(model_name, provider=provider)
+        # Pick the right pydantic-ai model for the configured backing model.
+        # Gemini multi-turn tool calling needs ``thought_signature`` roundtripping
+        # via the native ai-gateway/gemini path; everything else goes through
+        # the OpenAI-compat shim. See _build_summarization_model for details.
+        model = _build_summarization_model(
+            endpoint_url=endpoint_url, token=token, model_name=model_name
+        )
 
         use_case_section = ""
         if use_case_description:

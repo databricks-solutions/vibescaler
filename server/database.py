@@ -735,7 +735,12 @@ class DiscoveryAgentRunDB(Base):
     trace = relationship("TraceDB")
 
 
-# Common PostgreSQL serverless connection error markers
+# Common PostgreSQL serverless connection error markers.
+# NB: do not add substrings that also appear in pool-exhaustion messages
+# (e.g. "connection timed out" — SQLAlchemy's QueuePool TimeoutError message
+# contains that phrase, and treating saturation as a transient connection
+# error triggers engine.dispose() which drops in-flight connections held by
+# other concurrent requests, amplifying the outage.  See gh#163.
 _PG_CONNECTION_ERRORS = (
     "connection is closed",
     "server closed the connection unexpectedly",
@@ -744,16 +749,23 @@ _PG_CONNECTION_ERRORS = (
     "ssl connection has been closed unexpectedly",
     "could not connect to server",
     "connection refused",
-    "connection timed out",
     "invalid authorization",  # Lakebase: expired OAuth token
     "database is locked",  # SQLite
 )
 
 
 def _is_connection_error(exc: Exception) -> bool:
-    """Check if an exception is a transient connection error."""
-    from sqlalchemy.exc import DisconnectionError, OperationalError
+    """Check if an exception is a transient connection error.
 
+    Pool exhaustion (SQLAlchemy's TimeoutError) is intentionally excluded —
+    it is a saturation signal, not a connection-level fault, and the right
+    response is to surface a 503 rather than dispose the engine.
+    """
+    from sqlalchemy.exc import DisconnectionError, OperationalError
+    from sqlalchemy.exc import TimeoutError as SATimeoutError
+
+    if isinstance(exc, SATimeoutError):
+        return False
     if isinstance(exc, (DisconnectionError, OperationalError)):
         return True
     msg = str(exc).lower()
