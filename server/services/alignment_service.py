@@ -558,9 +558,6 @@ class AlignmentService:
                     mlflow_to_workshop_trace_map[trace.mlflow_trace_id] = trace.id
             yield f"Built MLflow-to-workshop trace mapping ({len(mlflow_to_workshop_trace_map)} traces)"
 
-        # SDK handles auth (service principal on Apps, CLI profile locally)
-        mlflow.set_tracking_uri("databricks")
-
         # Prepare the evaluation data
         human_feedback_map: dict[str, dict[str, Any]] = {}
 
@@ -1129,9 +1126,6 @@ class AlignmentService:
             return
 
         try:
-            # SDK handles auth (service principal on Apps, CLI profile locally)
-            mlflow.set_tracking_uri("databricks")
-
             # Enable MemAlign debug logging
             logging.getLogger("mlflow.genai.judges.optimizers.memalign").setLevel(logging.DEBUG)
 

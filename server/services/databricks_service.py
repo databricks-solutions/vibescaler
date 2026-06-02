@@ -235,6 +235,36 @@ def _normalize_databricks_host(host: str | None) -> str | None:
     return normalized
 
 
+def _get_workspace_client():
+    """Build a Databricks SDK client with a normalized host when available."""
+    from databricks.sdk import WorkspaceClient
+
+    host = _normalize_databricks_host(os.getenv("DATABRICKS_HOST"))
+    if host:
+        return WorkspaceClient(host=host)
+    return WorkspaceClient()
+
+
+def normalize_databricks_auth_env_once() -> None:
+    """Normalize Databricks auth env during worker startup.
+
+    Databricks Apps should already provide a fully-qualified ``DATABRICKS_HOST``.
+    This is a defensive local/dev normalization so SDK clients that construct
+    themselves from environment variables see a scheme-safe host.
+    """
+    host = _normalize_databricks_host(os.getenv("DATABRICKS_HOST"))
+    if host and host != os.getenv("DATABRICKS_HOST"):
+        os.environ["DATABRICKS_HOST"] = host
+
+
+def configure_databricks_mlflow_once() -> None:
+    """Configure MLflow Databricks tracking during worker startup."""
+    import mlflow
+
+    normalize_databricks_auth_env_once()
+    mlflow.set_tracking_uri("databricks")
+
+
 def normalize_experiment_id(experiment_id: str | None) -> str | None:
     """Normalize MLflow experiment IDs from env/form inputs.
 
@@ -261,9 +291,7 @@ def _get_sdk_token() -> str | None:
     Locally, the SDK uses CLI profile auth.
     """
     try:
-        from databricks.sdk import WorkspaceClient
-
-        w = WorkspaceClient()
+        w = _get_workspace_client()
         headers = w.config.authenticate()
         auth_header = headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
@@ -313,9 +341,7 @@ def get_databricks_host() -> str:
     if host:
         return host
     try:
-        from databricks.sdk import WorkspaceClient
-
-        w = WorkspaceClient()
+        w = _get_workspace_client()
         host = _normalize_databricks_host(w.config.host)
         if host:
             return host

@@ -279,10 +279,6 @@ class JudgeService:
         """Evaluate using real MLflow LLM judge."""
         # Initialize MLflow with proper experiment context
         try:
-            # Use same method as intake service - "databricks" URI with environment variables
-            # This leverages databricks-sdk for authentication which works reliably
-            mlflow.set_tracking_uri("databricks")
-
             # Use existing experiment from MLflow config instead of creating new ones
             # NOTE: Default experiment ID '0' often requires special permissions in Databricks
             if hasattr(mlflow_config, "experiment_id") and mlflow_config.experiment_id:

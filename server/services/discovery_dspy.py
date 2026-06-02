@@ -17,6 +17,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from server.services.databricks_service import _normalize_databricks_host
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -51,16 +53,6 @@ def _maybe_enable_mlflow_dspy_autolog() -> None:
 
         try:
             import mlflow
-
-            # If the user didn't explicitly set a tracking URI, default to Databricks for
-            # this dev-only experiment-id based tracing. This avoids accidentally creating
-            # a local SQLite-backed MLflow store (which would never write to a Databricks
-            # experiment id).
-            if not (os.getenv("MLFLOW_TRACKING_URI") or "").strip():
-                try:
-                    mlflow.set_tracking_uri("databricks")
-                except Exception as exc:
-                    logger.debug("Failed to set MLflow tracking URI to databricks: %s", exc)
 
             # Pin to the requested experiment id for these dev traces.
             # (If the tracking URI/credentials aren't configured, this will throw;
@@ -244,13 +236,14 @@ def _get_sdk_token(workspace_url: str | None = None) -> str | None:
         from databricks.sdk import WorkspaceClient
 
         # Try platform / default SDK credentials first (Databricks Apps + local CLI)
-        w = WorkspaceClient()
+        default_host = _normalize_databricks_host(os.getenv("DATABRICKS_HOST"))
+        w = WorkspaceClient(host=default_host) if default_host else WorkspaceClient()
         headers = w.config.authenticate()
         auth_header = headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             # If a workspace_url was given, verify the SDK host matches
-            sdk_host = (w.config.host or "").rstrip("/")
-            target_host = (workspace_url or "").rstrip("/")
+            sdk_host = _normalize_databricks_host(w.config.host)
+            target_host = _normalize_databricks_host(workspace_url)
             if target_host and sdk_host and sdk_host.lower() != target_host.lower():
                 # Host mismatch — retry with explicit host
                 logger.debug(
@@ -258,7 +251,7 @@ def _get_sdk_token(workspace_url: str | None = None) -> str | None:
                     sdk_host,
                     target_host,
                 )
-                w2 = WorkspaceClient(host=workspace_url)
+                w2 = WorkspaceClient(host=target_host)
                 headers2 = w2.config.authenticate()
                 auth2 = headers2.get("Authorization", "")
                 if auth2.startswith("Bearer "):

@@ -1,5 +1,10 @@
 import json
+import os
+import inspect
+import sys
+import types
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -14,6 +19,8 @@ from server.services.databricks_service import (
     get_databricks_host,
     get_experiment_id,
     normalize_experiment_id,
+    configure_databricks_mlflow_once,
+    normalize_databricks_auth_env_once,
 )
 
 
@@ -41,6 +48,61 @@ def test_get_databricks_host_adds_https_when_scheme_missing(monkeypatch):
 def test_get_databricks_host_preserves_existing_scheme(monkeypatch):
     monkeypatch.setenv("DATABRICKS_HOST", "https://dbc-example.cloud.databricks.com/")
     assert get_databricks_host() == "https://dbc-example.cloud.databricks.com"
+
+
+def test_sdk_token_uses_normalized_host_for_m2m_auth(monkeypatch):
+    created_hosts = []
+
+    class FakeWorkspaceClient:
+        def __init__(self, host=None):
+            created_hosts.append(host)
+            self.config = SimpleNamespace(
+                host=host,
+                authenticate=lambda: {"Authorization": "Bearer sdk-token"},
+            )
+
+    sdk_module = types.ModuleType("databricks.sdk")
+    sdk_module.WorkspaceClient = FakeWorkspaceClient
+    monkeypatch.setitem(sys.modules, "databricks", types.ModuleType("databricks"))
+    monkeypatch.setitem(sys.modules, "databricks.sdk", sdk_module)
+    monkeypatch.setenv("DATABRICKS_HOST", "adb-1234567890123456.7.azuredatabricks.net/")
+
+    assert databricks_module._get_sdk_token() == "sdk-token"
+    assert created_hosts == ["https://adb-1234567890123456.7.azuredatabricks.net"]
+
+
+def test_normalize_databricks_auth_env_once_normalizes_host_without_token(monkeypatch):
+    monkeypatch.delenv("DATABRICKS_TOKEN", raising=False)
+    monkeypatch.setenv("DATABRICKS_HOST", "dbc-example.cloud.databricks.com/")
+
+    normalize_databricks_auth_env_once()
+
+    assert "DATABRICKS_TOKEN" not in os.environ
+    assert os.environ["DATABRICKS_HOST"] == "https://dbc-example.cloud.databricks.com"
+
+
+def test_configure_databricks_mlflow_once_normalizes_host_before_mlflow(monkeypatch):
+    calls = []
+
+    class FakeMlflow:
+        @staticmethod
+        def set_tracking_uri(uri):
+            calls.append((uri, os.environ.get("DATABRICKS_HOST")))
+
+    monkeypatch.setitem(sys.modules, "mlflow", FakeMlflow)
+    monkeypatch.setenv("DATABRICKS_HOST", "adb-1234567890123456.7.azuredatabricks.net/")
+
+    configure_databricks_mlflow_once()
+
+    assert calls == [("databricks", "https://adb-1234567890123456.7.azuredatabricks.net")]
+
+
+def test_databricks_auth_env_normalized_from_app_lifespan():
+    import server.app as app_module
+
+    source = inspect.getsource(app_module.lifespan)
+
+    assert "configure_databricks_mlflow_once()" in source
 
 
 # ---------------------------------------------------------------------------

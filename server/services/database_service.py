@@ -2292,8 +2292,6 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       result['error'] = 'mlflow not available'
       return result
 
-    mlflow.set_tracking_uri('databricks')
-
     try:
       mlflow.set_experiment(experiment_id=config.experiment_id)
     except Exception as exc:
@@ -2721,8 +2719,6 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       logger.warning('MLflow is not available; cannot sync evaluation feedback.')
       return {'synced': 0, 'error': 'MLflow not available'}
 
-    mlflow.set_tracking_uri('databricks')
-
     try:
       mlflow.set_experiment(experiment_id=config.experiment_id)
     except Exception as exc:
@@ -2862,8 +2858,6 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     except ImportError:
       logger.warning('MLflow is not available; cannot tag traces.')
       return {'tagged': 0, 'failed': trace_ids, 'error': 'MLflow not available'}
-
-    mlflow.set_tracking_uri('databricks')
 
     try:
       mlflow.set_experiment(experiment_id=config.experiment_id)
