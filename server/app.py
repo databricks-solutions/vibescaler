@@ -21,6 +21,7 @@ from server.config import ServerConfig
 from server.db_bootstrap import maybe_bootstrap_db_on_startup
 from server.db_config import DatabaseBackend, detect_database_backend
 from server.routers import router
+from server.services.databricks_service import configure_databricks_mlflow_once
 from server.sqlite_rescue import (
     backup_to_volume,
     get_rescue_status,
@@ -119,6 +120,7 @@ async def lifespan(app: FastAPI):
     """Manage application lifespan with proper startup and shutdown."""
     print("🚀 Application startup - lifespan function called!")
     _configure_app_log_levels()
+    configure_databricks_mlflow_once()
 
     # Detect database backend
     db_backend = detect_database_backend()

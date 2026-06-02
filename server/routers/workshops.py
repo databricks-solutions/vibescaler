@@ -1856,8 +1856,6 @@ async def begin_annotation_phase(workshop_id: str, request: dict | None = None, 
                         try:
                             import mlflow as _mlflow
 
-                            _mlflow.set_tracking_uri("databricks")
-
                             filter_str = f"tags.eval = 'true' AND tags.workshop_id = '{workshop_id}'"
                             job.add_log(f"Polling MLflow for tagged traces: {filter_str}")
                             job.add_log(f"Experiment ID: {mlflow_config.experiment_id}")
@@ -3497,7 +3495,6 @@ async def upload_csv_and_log_to_mlflow(
     try:
         import mlflow
 
-        mlflow.set_tracking_uri("databricks")
         mlflow.set_experiment(experiment_id=exp_id)
 
         # Read file content

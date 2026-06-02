@@ -9,6 +9,10 @@ params per-model so the same code path works across Claude 4.6/4.7, the
 gpt-5 family, and Gemini Flash 3.5 when served via Databricks.
 """
 
+import sys
+import types
+from types import SimpleNamespace
+
 import pytest
 
 import server.services.discovery_dspy as dspy_module
@@ -80,3 +84,29 @@ def test_import_dspy_configures_litellm(reset_litellm_configured, monkeypatch):
         assert litellm.drop_params is True
     finally:
         litellm.drop_params = original
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+@pytest.mark.req("Judge tuning can use Databricks M2M OAuth credentials")
+@pytest.mark.unit
+def test_get_sdk_token_normalizes_env_host_for_m2m_token_url(monkeypatch):
+    """The Databricks SDK builds the M2M token URL from host; env hosts
+    without a scheme must be normalized before SDK auth runs."""
+    created_hosts = []
+
+    class FakeWorkspaceClient:
+        def __init__(self, host=None):
+            created_hosts.append(host)
+            self.config = SimpleNamespace(
+                host=host,
+                authenticate=lambda: {"Authorization": "Bearer judge-token"},
+            )
+
+    sdk_module = types.ModuleType("databricks.sdk")
+    sdk_module.WorkspaceClient = FakeWorkspaceClient
+    monkeypatch.setitem(sys.modules, "databricks", types.ModuleType("databricks"))
+    monkeypatch.setitem(sys.modules, "databricks.sdk", sdk_module)
+    monkeypatch.setenv("DATABRICKS_HOST", "dbc-example.cloud.databricks.com/")
+
+    assert dspy_module._get_sdk_token("https://dbc-example.cloud.databricks.com") == "judge-token"
+    assert created_hosts == ["https://dbc-example.cloud.databricks.com"]
