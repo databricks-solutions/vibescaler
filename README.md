@@ -4,11 +4,13 @@
 
 Anyone building an AI agent eventually hits the same question: is it actually doing a good job? The people who really know are the subject matter experts, the claims adjuster, the support lead, the clinician, but they can't read thousands of responses, and an off-the-shelf grader has no idea what "good" means for your business. VibeScaler is a Databricks App that closes that gap. It walks your experts through real examples of your agent to define what quality means for your use case, then aligns an LLM judge to their judgment so it scores new responses the way they would, automatically. Engineers get an evaluator they can trust and run continuously; SMEs get their standards encoded without writing code.
 
+_Last updated June 8, 2026. README revamped for the public v1.10 release: clearer overview, a how-it-works walkthrough, and a deploy-first quick start._
+
 ## How it works
 
 VibeScaler runs an evaluation workshop in four stages:
 
-1. **Discovery.** Before writing any rubric, participants investigate real examples to surface what high and low quality actually mean for their use case. Generic measures like correctness or groundedness get defined in terms of the team's own business knowledge. See [The Discovery Stage](doc/DISCOVERY.md).
+1. **Discovery.** Before writing any rubric, participants investigate real examples to surface what high and low quality actually mean for their use case. Generic measures like correctness or groundedness get defined in terms of the team's own business knowledge.
 2. **Annotation.** Multiple raters label real MLflow traces against the discovered criteria. The app measures inter-rater reliability so you can see where experts agree and where the definition of quality is still fuzzy.
 3. **Alignment.** VibeScaler aligns the LLM judge to the human labels with MLflow's `align()` (the `mlflow.genai` judge-alignment API behind `make_judge().align()`), so the judge scores the way your experts do. You get a quantitative agreement score between the judge and your experts, so judge quality becomes a number you can track instead of a vibe. MLflow reports alignment lifts judge-to-human agreement by 30 to 50% over an unaligned baseline.
 4. **Evaluate at scale.** Run the aligned judge across your traces in MLflow and keep iterating as the agent and the criteria evolve.
@@ -20,7 +22,6 @@ The judges you build are standard MLflow judges. You can run them directly with 
 For detailed documentation, see the [/doc](doc/) folder:
 
 - **[Facilitator Guide](doc/FACILITATOR_GUIDE.md)** - A comprehensive guide for facilitators to deploy, configure, and run a workshop.
-- **[The Discovery Stage](doc/DISCOVERY.md)** - Why discovery comes first, and how to facilitate it.
 - **[Release Notes](doc/RELEASE_NOTES.md)** - Latest release information and quick start.
 - **[Changelog](doc/CHANGELOG.md)** - Full version history.
 - **[All Documentation](doc/README.md)** - Complete documentation index.
