@@ -1,22 +1,38 @@
-# Workshop Annotation Platform
+# VibeScaler
 
-A collaborative platform for annotating and evaluating LLM traces with MLflow integration, discovery phases, and inter-rater reliability analysis.
+**Decide what a good answer from your AI agent looks like, then turn that into an automated grader that runs at scale.**
+
+Anyone building an AI agent eventually hits the same question: is it actually doing a good job? The people who really know are the subject matter experts, the claims adjuster, the support lead, the clinician, but they can't read thousands of responses, and an off-the-shelf grader has no idea what "good" means for your business. VibeScaler is a Databricks App that closes that gap. It walks your experts through real examples of your agent to define what quality means for your use case, then aligns an LLM judge to their judgment so it scores new responses the way they would, automatically. Engineers get an evaluator they can trust and run continuously; SMEs get their standards encoded without writing code.
+
+## How it works
+
+VibeScaler runs an evaluation workshop in four stages:
+
+1. **Discovery.** Before writing any rubric, participants investigate real examples to surface what high and low quality actually mean for their use case. Generic measures like correctness or groundedness get defined in terms of the team's own business knowledge. See [The Discovery Stage](doc/DISCOVERY.md).
+2. **Annotation.** Multiple raters label real MLflow traces against the discovered criteria. The app measures inter-rater reliability so you can see where experts agree and where the definition of quality is still fuzzy.
+3. **Alignment.** VibeScaler aligns the LLM judge to the human labels with MLflow's `align()` (the `mlflow.genai` judge-alignment API behind `make_judge().align()`), so the judge scores the way your experts do. You get a quantitative agreement score between the judge and your experts, so judge quality becomes a number you can track instead of a vibe. MLflow reports alignment lifts judge-to-human agreement by 30 to 50% over an unaligned baseline.
+4. **Evaluate at scale.** Run the aligned judge across your traces in MLflow and keep iterating as the agent and the criteria evolve.
+
+The judges you build are standard MLflow judges. You can run them directly with MLflow, in or out of this app.
 
 ## 📚 Documentation
 
 For detailed documentation, see the [/doc](doc/) folder:
 
-- **[Facilitator Guide](doc/FACILITATOR_GUIDE.md)** - A comprehensive guide for facilitators to deploy, configure, and run the workshop.
-- **[Release Notes](doc/RELEASE_NOTES.md)** - Latest release information and quick start
+- **[Facilitator Guide](doc/FACILITATOR_GUIDE.md)** - A comprehensive guide for facilitators to deploy, configure, and run a workshop.
+- **[The Discovery Stage](doc/DISCOVERY.md)** - Why discovery comes first, and how to facilitate it.
+- **[Release Notes](doc/RELEASE_NOTES.md)** - Latest release information and quick start.
+- **[Changelog](doc/CHANGELOG.md)** - Full version history.
+- **[All Documentation](doc/README.md)** - Complete documentation index.
 
 ## 🚀 Quick Start (Recommended)
 
-For production use, we recommend using the **latest stable release**:
+For production use, deploy the **latest stable release** to Databricks Apps:
 
-> 💡 **Tip:** View all releases at [Releases Page](https://github.com/databricks-solutions/project-0xfffff/releases)
+1. Grab `project-with-build.zip` from the [Releases page](https://github.com/databricks-solutions/project-0xfffff/releases). It includes pre-built frontend assets, so you don't need to build the client yourself.
+2. Follow [Deploying to Databricks Apps](#-deploying-to-databricks-apps) below.
 
-## Installation
-Download project-with-build.zip which includes pre-built frontend assets.
+To develop locally instead, jump to [Local Development](#-local-development).
 
 ## 📋 Prerequisites
 
@@ -28,8 +44,6 @@ Download project-with-build.zip which includes pre-built frontend assets.
 - **Strongly recommended: just**
    - [Installation](https://just.systems/man/en/packages.html)
    - It's possible to use without this, but the majority of useful scripts use just.
-
-
 
 ## 🚀 Local Development
 
@@ -119,7 +133,7 @@ just e2e-servers   # start API+UI against .e2e-workshop.db
 just e2e-test      # run tests (assumes servers are already running)
 ```
 
-## 🚢 Deploying to Databricks Apps Manually
+## 🚢 Deploying to Databricks Apps
 
 ### 0. Prerequisites
 
@@ -133,7 +147,7 @@ databricks current-user me  # Verify authentication
 ### 1. Create a Databricks App
 
 ```bash
-databricks apps create human-eval-workshop
+databricks apps create vibescaler
 ```
 
 ### 2. Build the Frontend
@@ -148,7 +162,7 @@ This creates an optimized production build in `client/build/`
 
 ```bash
 DATABRICKS_USERNAME=$(databricks current-user me | jq -r .userName)
-databricks sync . "/Workspace/Users/$DATABRICKS_USERNAME/human-eval-workshop"
+databricks sync . "/Workspace/Users/$DATABRICKS_USERNAME/vibescaler"
 ```
 
 Refer to the [Databricks Apps deploy documentation](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy?language=Databricks+CLI#deploy-the-app) for more info.
@@ -156,8 +170,8 @@ Refer to the [Databricks Apps deploy documentation](https://docs.databricks.com/
 ### 4. Deploy the App
 
 ```bash
-databricks apps deploy human-eval-workshop \
-  --source-code-path /Workspace/Users/$DATABRICKS_USERNAME/human-eval-workshop
+databricks apps deploy vibescaler \
+  --source-code-path /Workspace/Users/$DATABRICKS_USERNAME/vibescaler
 ```
 
 ### 5. Access Your App
@@ -190,6 +204,18 @@ security:
     refresh_token_expiry_days: 7
 ```
 
+## 🛠 Built on MLflow
+
+VibeScaler is an orchestration layer over open-source MLflow. It reads traces from your MLflow experiments, stores human annotations alongside them, and uses MLflow's GenAI evaluation primitives (judges and the alignment optimizer, which needs `mlflow[genai]>=3.9`) to turn expert labels into an aligned judge. Prompt optimization runs on DSPy. Because the output is a standard MLflow judge, nothing about your evals is locked into this app.
+
+## 🤝 Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up your environment, run the tests, and open a pull request. Bug reports and feature requests go in [Issues](https://github.com/databricks-solutions/project-0xfffff/issues).
+
+## 🔒 Security
+
+For security policies and how to report a vulnerability, see [SECURITY.md](SECURITY.md).
+
 ## 📄 License
 
-See LICENSE.MD file for details.
+See the [LICENSE.md](LICENSE.md) file for details.
