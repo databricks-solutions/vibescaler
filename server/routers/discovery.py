@@ -15,7 +15,7 @@ from pydantic_ai.ui.ag_ui import AGUIAdapter
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
-from server.database import get_db
+from server.database import SessionLocal, get_db
 from server.models import (
     DiscoveryAgentRun,
     DiscoveryComment,
@@ -746,16 +746,23 @@ async def get_discovery_agent_run(
 async def stream_discovery_agent_run(
     workshop_id: str,
     run_id: str,
-    db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    svc = DiscoveryService(db)
-
+    # Note: no `db: Session = Depends(get_db)` here.  A FastAPI dependency
+    # session would be held for the entire SSE connection lifetime, hoarding
+    # one pool connection per subscriber and saturating the pool.  Instead,
+    # acquire/release a session per poll iteration below.  See gh#163.
     def event_generator():
         sent_started = False
         last_len = 0
         sent_event_count = 0
         while True:
-            run = svc.get_discovery_agent_run(workshop_id, run_id)
+            db = SessionLocal()
+            try:
+                svc = DiscoveryService(db)
+                run = svc.get_discovery_agent_run(workshop_id, run_id)
+            finally:
+                db.close()
+
             if not sent_started:
                 sent_started = True
                 yield _sse_event("run_started", {"run_id": run.id, "status": run.status})
@@ -1191,21 +1198,29 @@ async def stream_discovery_comments(
     milestone_ref: str | None = None,
     user_id: str | None = None,
     request: Request = None,
-    db: Session = Depends(get_db),
 ) -> StreamingResponse:
-    svc = DiscoveryService(db)
+    # Note: no `db: Session = Depends(get_db)` here.  See companion comment
+    # on stream_discovery_agent_run — this stream is unbounded (runs for the
+    # whole panel session), so holding a Session via FastAPI dependency
+    # injection would permanently park a pool connection per subscriber.
     include_all = request is not None and "milestone_ref" not in request.query_params
 
     def event_generator():
         last_signature = ""
         while True:
-            comments = svc.list_discovery_comments(
-                workshop_id=workshop_id,
-                trace_id=trace_id,
-                milestone_ref=milestone_ref,
-                include_all=include_all,
-                user_id=user_id,
-            )
+            db = SessionLocal()
+            try:
+                svc = DiscoveryService(db)
+                comments = svc.list_discovery_comments(
+                    workshop_id=workshop_id,
+                    trace_id=trace_id,
+                    milestone_ref=milestone_ref,
+                    include_all=include_all,
+                    user_id=user_id,
+                )
+            finally:
+                db.close()
+
             signature = f"{len(comments)}:{comments[-1].updated_at if comments else ''}"
             if signature != last_signature:
                 last_signature = signature

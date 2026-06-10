@@ -60,7 +60,7 @@ def upgrade() -> None:
         ["workshop_id", "user_id"],
     )
 
-    # Add facilitator toggle to workshops table
+    # Add facilitator toggle to workshops table.
     with op.batch_alter_table("workshops") as batch_op:
         batch_op.add_column(
             sa.Column(

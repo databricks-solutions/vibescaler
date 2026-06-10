@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Play, Pause, Plus, Loader2, Sparkles, Settings2 } from 'lucide-react';
+import { Play, Pause, Plus, Loader2, Settings2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { GenerativeBlob, getHash } from '@/components/GenerativeBlob';
 import type { ModelOption } from '@/utils/modelMapping';
@@ -51,8 +51,8 @@ export const DiscoveryOverviewBar: React.FC<DiscoveryOverviewBarProps> = ({
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div className="bg-slate-50/80 border-b border-slate-100 px-6 py-3 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <GenerativeBlob 
-            hash={getHash('workspace')} 
+          <GenerativeBlob
+            hash={getHash('workspace')}
             sizeClassName="w-10 h-10"
           />
           <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
@@ -134,10 +134,10 @@ export const DiscoveryOverviewBar: React.FC<DiscoveryOverviewBarProps> = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button 
+          <Button
             variant="outline" 
             size="sm" 
-            className="h-9 text-xs font-semibold bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all" 
+            className="h-9 text-xs font-semibold bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all"
             disabled={!canManageDiscovery}
             onClick={onAddTraces}
           >
@@ -152,7 +152,7 @@ export const DiscoveryOverviewBar: React.FC<DiscoveryOverviewBarProps> = ({
               isPaused 
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent' 
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-            }`} 
+            }`}
             disabled={!canManageDiscovery}
             onClick={onPauseToggle}
           >

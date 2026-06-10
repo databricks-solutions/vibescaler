@@ -1,3 +1,10 @@
+---
+id: DISCOVERY_TRACE_ASSIGNMENT_SPEC
+title: Trace Assignment Specification (Discovery & Annotation Phases)
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Trace Assignment Specification (Discovery & Annotation Phases)
 
 ## Overview
@@ -362,6 +369,8 @@ def activate_new_dataset(workshop_id, phase, dataset_id):
 ```
 
 ## Success Criteria
+
+<SpecCoverage spec="DISCOVERY_TRACE_ASSIGNMENT_SPEC" />
 
 **Bug Fix 1 - Discovery Traces**:
 - [ ] Participants only see traces in current active discovery dataset

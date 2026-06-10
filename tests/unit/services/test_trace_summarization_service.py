@@ -399,6 +399,228 @@ class TestToolBasedAgent:
         assert "Focus on SQL queries and their results" in all_instructions
 
 
+@pytest.mark.spec("TRACE_SUMMARIZATION_SPEC")
+class TestModelProviderInterop:
+    """Cross-provider interop on Databricks model serving.
+
+    The Databricks OpenAI-compat shim rejects the `strict` field on tool
+    definitions ("tools.N.custom.strict: Extra inputs are not permitted")
+    regardless of which backing model (Claude 4.6/4.7, gpt-5, gpt-5-codex,
+    Gemini Flash 3.5) is selected. Pydantic-AI's default OpenAI profile emits
+    `strict` on tool and structured-output schemas; the service must override
+    that profile so all five supported models work through the shim.
+    """
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    def test_summary_agent_disables_strict_tool_definitions(self):
+        from pydantic_ai.profiles.openai import OpenAIModelProfile
+
+        service = TraceSummarizationService(
+            endpoint_url="https://test.databricks.com/serving-endpoints",
+            token="test-token",
+            model_name="databricks-claude-opus-4-7",
+        )
+
+        profile = OpenAIModelProfile.from_profile(service.summary_agent.model.profile)
+        assert profile.openai_supports_strict_tool_definition is False
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    def test_milestone_agent_disables_strict_tool_definitions(self):
+        from pydantic_ai.profiles.openai import OpenAIModelProfile
+
+        service = TraceSummarizationService(
+            endpoint_url="https://test.databricks.com/serving-endpoints",
+            token="test-token",
+            model_name="databricks-claude-opus-4-7",
+        )
+
+        profile = OpenAIModelProfile.from_profile(service.milestone_agent.model.profile)
+        assert profile.openai_supports_strict_tool_definition is False
+
+
+@pytest.mark.spec("TRACE_SUMMARIZATION_SPEC")
+class TestGeminiRouting:
+    """Trace summarization on Gemini cannot use the OpenAI-compat shim — the
+    OpenAI Chat Completions wire format has no slot for Gemini's
+    ``thought_signature``, so multi-turn tool-using agents break. The
+    service detects Gemini-family model names at construction time and
+    routes them through the native ai-gateway/gemini path
+    (``GoogleModel`` + ``google.genai.Client``), which round-trips
+    ``thought_signature`` correctly. Other models keep going through the
+    OpenAI shim.
+    """
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    def test_gemini_model_routes_through_ai_gateway(self):
+        from pydantic_ai.models.google import GoogleModel
+
+        from server.services.trace_summarization_service import _looks_like_gemini
+
+        assert _looks_like_gemini("databricks-gemini-3-5-flash")
+
+        service = TraceSummarizationService(
+            endpoint_url="https://test.databricks.com/serving-endpoints",
+            token="test-token",
+            model_name="databricks-gemini-3-5-flash",
+        )
+
+        # Multi-turn tool-using agents on Gemini need pydantic-ai's GoogleModel
+        # (which knows how to round-trip thought_signature); OpenAIChatModel
+        # against the shim would silently drop signatures and 400 on the second
+        # turn.
+        assert isinstance(service.summary_agent.model, GoogleModel)
+        assert isinstance(service.milestone_agent.model, GoogleModel)
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    def test_gemini_model_points_at_databricks_gateway(self):
+        service = TraceSummarizationService(
+            endpoint_url="https://test.databricks.com/serving-endpoints",
+            token="test-token",
+            model_name="databricks-gemini-3-5-flash",
+        )
+
+        # Verify the underlying google.genai client is pointed at the
+        # Databricks ai-gateway/gemini path (not Google's hosted Gemini API).
+        client = service.summary_agent.model.client
+        base_url = str(client._api_client._http_options.base_url)
+        assert base_url.startswith("https://test.databricks.com/ai-gateway/gemini"), (
+            f"Gemini client must hit Databricks ai-gateway, got base_url={base_url!r}"
+        )
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    def test_non_gemini_model_still_uses_openai_chat_model(self):
+        from pydantic_ai.models.openai import OpenAIChatModel
+
+        service = TraceSummarizationService(
+            endpoint_url="https://test.databricks.com/serving-endpoints",
+            token="test-token",
+            model_name="databricks-claude-opus-4-7",
+        )
+        assert isinstance(service.summary_agent.model, OpenAIChatModel)
+        assert isinstance(service.milestone_agent.model, OpenAIChatModel)
+
+
+@pytest.mark.spec("TRACE_SUMMARIZATION_SPEC")
+class TestGeminiFunctionCallIdStrip:
+    """Vertex AI's ``FunctionCall`` proto has no ``id`` field, but the
+    google-genai SDK includes one when echoing the model's previous
+    function call. Databricks' ai-gateway/gemini is a passthrough that
+    doesn't strip it, so multi-turn requests get 400'd. The httpx
+    request hook below removes ``id`` from outgoing function call/response
+    parts before they reach the gateway.
+    """
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    @pytest.mark.asyncio
+    async def test_strip_function_call_id_removes_id_from_function_call(self):
+        import json as _json
+        from types import SimpleNamespace
+
+        from server.services.trace_summarization_service import (
+            _strip_function_call_id_from_gemini_request,
+        )
+
+        body = {
+            "contents": [
+                {"role": "user", "parts": [{"text": "Hello"}]},
+                {
+                    "role": "model",
+                    "parts": [
+                        {"functionCall": {"id": "fc-123", "name": "lookup", "args": {"q": "x"}}}
+                    ],
+                },
+            ]
+        }
+        raw = _json.dumps(body).encode()
+        request = SimpleNamespace(
+            content=raw,
+            _content=raw,
+            headers={"content-length": str(len(raw))},
+        )
+
+        await _strip_function_call_id_from_gemini_request(request)
+
+        new_body = _json.loads(request._content)
+        function_call = new_body["contents"][1]["parts"][0]["functionCall"]
+        assert "id" not in function_call
+        assert function_call["name"] == "lookup"
+        assert function_call["args"] == {"q": "x"}
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    @pytest.mark.asyncio
+    async def test_strip_function_call_id_removes_id_from_function_response(self):
+        """Per the internal coding agent's note, the proxy ALSO trips on
+        ``id`` in ``functionResponse`` parts. Strip both."""
+        import json as _json
+        from types import SimpleNamespace
+
+        from server.services.trace_summarization_service import (
+            _strip_function_call_id_from_gemini_request,
+        )
+
+        body = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"functionResponse": {"id": "fc-123", "name": "lookup", "response": {"r": 1}}}
+                    ],
+                }
+            ]
+        }
+        raw = _json.dumps(body).encode()
+        request = SimpleNamespace(
+            content=raw,
+            _content=raw,
+            headers={"content-length": str(len(raw))},
+        )
+
+        await _strip_function_call_id_from_gemini_request(request)
+
+        new_body = _json.loads(request._content)
+        function_response = new_body["contents"][0]["parts"][0]["functionResponse"]
+        assert "id" not in function_response
+
+    @pytest.mark.req(
+        "Facilitator can select a model for summarization from available Databricks endpoints"
+    )
+    @pytest.mark.asyncio
+    async def test_strip_function_call_id_no_op_on_simple_text_request(self):
+        """The hook fires on every outgoing request. It must be a no-op when
+        there's no function_call/function_response part (first turn, etc.)."""
+        import json as _json
+        from types import SimpleNamespace
+
+        from server.services.trace_summarization_service import (
+            _strip_function_call_id_from_gemini_request,
+        )
+
+        body = {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]}
+        raw = _json.dumps(body).encode()
+        request = SimpleNamespace(
+            content=raw,
+            _content=raw,
+            headers={"content-length": str(len(raw))},
+        )
+
+        await _strip_function_call_id_from_gemini_request(request)
+        assert _json.loads(request._content) == body
+
+
 # --- Two-pass summarization ---
 
 

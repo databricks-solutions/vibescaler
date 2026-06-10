@@ -106,24 +106,115 @@ function AppRoutes() {
   );
 }
 
+interface DeploymentStatus {
+  lakebase_configured: boolean;
+  setup_required: boolean;
+  docs_url?: string;
+}
+
+/** Keep setup redirects on the browser's public origin (never an internal localhost URL). */
+export function sameOriginDocsUrl(docsUrl: string): string {
+  const fallbackPath = '/docs/lakebase-setup/';
+  try {
+    const path = docsUrl.startsWith('http://') || docsUrl.startsWith('https://')
+      ? new URL(docsUrl).pathname
+      : docsUrl.startsWith('/')
+        ? docsUrl
+        : `/${docsUrl}`;
+    const normalized =
+      path.endsWith('/') || path.includes('.') ? path : `${path}/`;
+    return `${window.location.origin}${normalized}`;
+  } catch {
+    return `${window.location.origin}${fallbackPath}`;
+  }
+}
+
+function GatedAppShell() {
+  return (
+    <UserProvider>
+      <WorkshopProvider>
+        <WorkflowProvider>
+          <AppRoutes />
+          <Toaster
+            position="top-right"
+            expand={true}
+            richColors={true}
+            closeButton={true}
+          />
+        </WorkflowProvider>
+      </WorkshopProvider>
+    </UserProvider>
+  );
+}
+
+function DeploymentGate() {
+  const [status, setStatus] = React.useState<DeploymentStatus | null>(null);
+  const [statusLoaded, setStatusLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadDeploymentStatus() {
+      try {
+        const response = await fetch('/deployment/status');
+        if (!response.ok) {
+          throw new Error(`Deployment status failed: ${response.status}`);
+        }
+        const nextStatus = await response.json();
+        if (!cancelled) {
+          setStatus(nextStatus);
+        }
+      } catch {
+        if (!cancelled) {
+          setStatus(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setStatusLoaded(true);
+        }
+      }
+    }
+
+    loadDeploymentStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (status?.setup_required && !window.location.pathname.startsWith('/docs')) {
+      window.location.replace(sameOriginDocsUrl(status.docs_url ?? '/docs/lakebase-setup/'));
+    }
+  }, [status]);
+
+  if (!statusLoaded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        Loading setup status...
+      </div>
+    );
+  }
+
+  if (status?.setup_required) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        Opening Lakebase setup docs...
+      </div>
+    );
+  }
+
+  return <GatedAppShell />;
+}
+
 function App() {
   return (
     <ErrorBoundary fallback={(props) => <RootErrorFallback {...props} />}>
-      <UserProvider>
-        <WorkshopProvider>
-          <WorkflowProvider>
-            <Router>
-              <AppRoutes />
-            </Router>
-            <Toaster
-              position="top-right"
-              expand={true}
-              richColors={true}
-              closeButton={true}
-            />
-          </WorkflowProvider>
-        </WorkshopProvider>
-      </UserProvider>
+      <Router>
+        <Routes>
+          <Route path="/*" element={<DeploymentGate />} />
+        </Routes>
+      </Router>
     </ErrorBoundary>
   );
 }

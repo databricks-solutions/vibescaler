@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from server.models import User, UserLogin, UserPermissions, UserRole, UserStatus
+from server.models import User, UserRole, UserStatus
 
 
 @pytest.mark.spec("AUTHENTICATION_SPEC")

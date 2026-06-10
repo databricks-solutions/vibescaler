@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 from collections.abc import Callable
@@ -18,6 +19,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai import messages as pai_messages
 from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.profiles.openai import OpenAIModelProfile
 from pydantic_ai.providers.openai import OpenAIProvider
 
 logger = logging.getLogger(__name__)
@@ -433,6 +435,147 @@ def _make_pydantic_ai_tools() -> list:
     ]
 
 
+# --- Model construction ---
+
+
+def _looks_like_gemini(model_name: str) -> bool:
+    """Detect Gemini-family endpoint names. Databricks names them ``databricks-gemini-*``."""
+    return "gemini" in (model_name or "").lower()
+
+
+async def _strip_function_call_id_from_gemini_request(request: Any) -> None:
+    """Strip ``id`` from ``functionCall``/``functionResponse`` parts on outgoing
+    requests to Databricks' Gemini ai-gateway.
+
+    Vertex AI's ``FunctionCall`` proto defines only ``name`` and ``args`` — no
+    ``id`` field. The google-genai SDK adds ``id`` when echoing the model's
+    previous function call back in multi-turn conversations (per Google's
+    hosted Gemini API spec), and Databricks' ai-gateway/gemini path is a
+    pure passthrough that doesn't translate it away. The result is a 400
+    "Unknown name 'id' at 'contents[N].parts[*].function_call'" that breaks
+    multi-turn tool-using agents.
+
+    Installed as an httpx request hook via ``HttpOptions.async_client_args``.
+    """
+    if not request.content:
+        return
+    try:
+        body = json.loads(request.content)
+    except Exception:
+        return
+    contents = body.get("contents")
+    if not isinstance(contents, list):
+        return
+    mutated = False
+    for c in contents:
+        if not isinstance(c, dict):
+            continue
+        for part in c.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            for key in ("functionCall", "function_call", "functionResponse", "function_response"):
+                fc = part.get(key)
+                if isinstance(fc, dict) and "id" in fc:
+                    fc.pop("id", None)
+                    mutated = True
+    if mutated:
+        new_body = json.dumps(body).encode()
+        # httpx Request's wire transport reads from self.stream, NOT
+        # self._content. Updating only _content leaves the original body
+        # in the stream and triggers a "Too much data for declared
+        # Content-Length" error. Rebuild both.
+        from httpx._content import ByteStream
+
+        request.stream = ByteStream(new_body)
+        request._content = new_body
+        request.headers["content-length"] = str(len(new_body))
+
+
+def _build_gemini_model_via_ai_gateway(
+    *, workspace_url: str, token: str, model_name: str
+) -> Model:
+    """Build a pydantic-ai ``GoogleModel`` pointed at Databricks' native
+    Gemini passthrough (``/ai-gateway/gemini``).
+
+    The OpenAI-compat Chat Completions shim can't carry Gemini's
+    ``thought_signature`` between turns (OpenAI wire format has no slot
+    for it), so multi-turn tool-using agents on Gemini have to go through
+    this native path. pydantic-ai's ``GoogleModel`` already handles
+    ``thought_signature`` round-tripping correctly; we just need to
+    install an httpx request hook to strip ``function_call.id`` (see
+    ``_strip_function_call_id_from_gemini_request`` for why).
+    """
+    # Local imports so this module still loads if the google extras
+    # aren't installed in a minimal environment.
+    import httpx as _httpx
+    from google import genai
+    from google.genai import types as genai_types
+    from pydantic_ai.models.google import GoogleModel
+    from pydantic_ai.providers.google import GoogleProvider
+
+    gateway_url = f"{workspace_url.rstrip('/')}/ai-gateway/gemini"
+
+    # google-genai defaults to aiohttp when it's installed and no explicit
+    # httpx client is passed (see ``_api_client._use_aiohttp``). Passing
+    # ``httpx_async_client`` here forces the httpx transport so our
+    # request hook actually fires. Without this, the function_call.id
+    # strip is silently skipped and multi-turn calls 400.
+    httpx_async_client = _httpx.AsyncClient(
+        event_hooks={"request": [_strip_function_call_id_from_gemini_request]},
+    )
+
+    client = genai.Client(
+        # api_key is ignored on Databricks (Authorization header is used)
+        # but must be non-empty to satisfy the SDK's validator.
+        api_key="databricks",
+        http_options=genai_types.HttpOptions(
+            base_url=gateway_url,
+            headers={"Authorization": f"Bearer {token}"},
+            httpx_async_client=httpx_async_client,
+        ),
+    )
+    provider = GoogleProvider(client=client)
+    logger.info(
+        "Gemini summarization routing via native ai-gateway: %s (model=%s)",
+        gateway_url,
+        model_name,
+    )
+    return GoogleModel(model_name, provider=provider)
+
+
+def _build_openai_compat_model(
+    *, endpoint_url: str, token: str, model_name: str
+) -> Model:
+    """Build a pydantic-ai model against the Databricks OpenAI-compat shim
+    at ``/serving-endpoints``. Used for Claude, gpt-5, and other non-Gemini
+    foundation models. Disables strict tool definitions because the shim
+    rejects the ``strict`` field on tool functions.
+    """
+    provider = OpenAIProvider(base_url=endpoint_url, api_key=token)
+    profile = OpenAIModelProfile(openai_supports_strict_tool_definition=False)
+    return OpenAIChatModel(model_name, provider=provider, profile=profile)
+
+
+def _build_summarization_model(
+    *, endpoint_url: str, token: str, model_name: str
+) -> Model:
+    """Pick the right pydantic-ai model class for the configured backing model.
+
+    Gemini multi-turn tool calling requires ``thought_signature`` roundtripping
+    that the OpenAI-compat shim doesn't carry, so Gemini endpoints route
+    through the native ai-gateway/gemini path. Everything else stays on
+    OpenAI Chat Completions.
+    """
+    if _looks_like_gemini(model_name):
+        workspace_url = endpoint_url.split("/serving-endpoints", 1)[0]
+        return _build_gemini_model_via_ai_gateway(
+            workspace_url=workspace_url, token=token, model_name=model_name
+        )
+    return _build_openai_compat_model(
+        endpoint_url=endpoint_url, token=token, model_name=model_name
+    )
+
+
 # --- Service ---
 
 
@@ -442,6 +585,7 @@ class TraceSummarizationService:
     # Retry settings for 429 rate limit errors
     MAX_429_RETRIES = 4
     INITIAL_BACKOFF_S = 2.0
+    DEFAULT_AGENT_RUN_TIMEOUT_S = 120.0
 
     def __init__(
         self,
@@ -451,9 +595,15 @@ class TraceSummarizationService:
         guidance: str | None = None,
         use_case_description: str | None = None,
         max_concurrency: int = 3,
+        agent_run_timeout_s: float | None = None,
     ):
-        provider = OpenAIProvider(base_url=endpoint_url, api_key=token)
-        model = OpenAIChatModel(model_name, provider=provider)
+        # Pick the right pydantic-ai model for the configured backing model.
+        # Gemini multi-turn tool calling needs ``thought_signature`` roundtripping
+        # via the native ai-gateway/gemini path; everything else goes through
+        # the OpenAI-compat shim. See _build_summarization_model for details.
+        model = _build_summarization_model(
+            endpoint_url=endpoint_url, token=token, model_name=model_name
+        )
 
         use_case_section = ""
         if use_case_description:
@@ -501,7 +651,20 @@ class TraceSummarizationService:
             retries=2,
         )
 
-        self.max_concurrency = max_concurrency
+        self.max_concurrency = int(os.getenv("TRACE_SUMMARIZATION_MAX_CONCURRENCY", str(max_concurrency)))
+        self.agent_run_timeout_s = float(
+            os.getenv(
+                "TRACE_SUMMARIZATION_AGENT_TIMEOUT_S",
+                str(agent_run_timeout_s or self.DEFAULT_AGENT_RUN_TIMEOUT_S),
+            )
+        )
+        self._trace_errors: dict[str, str] = {}
+        logger.info(
+            "Trace summarization service configured model=%s max_concurrency=%d agent_timeout_s=%.1f",
+            model_name,
+            self.max_concurrency,
+            self.agent_run_timeout_s,
+        )
 
     @classmethod
     def for_testing(
@@ -516,6 +679,8 @@ class TraceSummarizationService:
 
         instance = cls.__new__(cls)
         instance.max_concurrency = 5
+        instance.agent_run_timeout_s = cls.DEFAULT_AGENT_RUN_TIMEOUT_S
+        instance._trace_errors = {}
         instance._test_exec_result = exec_summary_result
         instance._test_milestone_result = milestone_result
         instance._test_raise_error = raise_error
@@ -591,6 +756,41 @@ class TraceSummarizationService:
                 raise
         raise RuntimeError("Unreachable retry loop exit")
 
+    async def _run_agent_step(self, step_name: str, coro_factory, trace_id: str | None, started_at: float):
+        """Run one agent step with a hard timeout and visible timing logs."""
+        step_started_at = time.perf_counter()
+        logger.info(
+            "Trace summarization %s starting trace_id=%s timeout_s=%.1f elapsed_s=%.2f",
+            step_name,
+            trace_id,
+            self.agent_run_timeout_s,
+            step_started_at - started_at,
+        )
+        try:
+            result = await asyncio.wait_for(
+                self._run_with_429_retry(coro_factory, trace_id=trace_id),
+                timeout=self.agent_run_timeout_s,
+            )
+            logger.info(
+                "Trace summarization %s complete trace_id=%s step_elapsed_s=%.2f elapsed_s=%.2f",
+                step_name,
+                trace_id,
+                time.perf_counter() - step_started_at,
+                time.perf_counter() - started_at,
+            )
+            return result
+        except TimeoutError:
+            logger.error(
+                "Trace summarization %s timed out trace_id=%s timeout_s=%.1f step_elapsed_s=%.2f elapsed_s=%.2f",
+                step_name,
+                trace_id,
+                self.agent_run_timeout_s,
+                time.perf_counter() - step_started_at,
+                time.perf_counter() - started_at,
+                exc_info=True,
+            )
+            raise
+
     async def summarize_trace(
         self,
         trace_context: dict,
@@ -615,6 +815,8 @@ class TraceSummarizationService:
 
         started_at = time.perf_counter()
         try:
+            if trace_id:
+                self._trace_errors.pop(trace_id, None)
             deps = TraceContext.from_dict(trace_context)
             tool_call_counter = 0
 
@@ -679,7 +881,8 @@ class TraceSummarizationService:
             _emit({"event": "run_started"})
 
             # Pass 1: Executive summary (agent uses tools to explore)
-            exec_result = await self._run_with_429_retry(
+            exec_result = await self._run_agent_step(
+                "pass1",
                 lambda: _run_agent_with_events(
                     phase="executive_summary",
                     prompt=(
@@ -688,7 +891,8 @@ class TraceSummarizationService:
                     ),
                     agent=self.summary_agent,
                 ),
-                trace_id=trace_id,
+                trace_id,
+                started_at,
             )
             if not exec_result:
                 return None
@@ -700,7 +904,8 @@ class TraceSummarizationService:
             )
 
             # Pass 2: Milestones with span data refs
-            milestone_result = await self._run_with_429_retry(
+            milestone_result = await self._run_agent_step(
+                "pass2",
                 lambda: _run_agent_with_events(
                     phase="milestones",
                     prompt=(
@@ -710,12 +915,8 @@ class TraceSummarizationService:
                     ),
                     agent=self.milestone_agent,
                 ),
-                trace_id=trace_id,
-            )
-            logger.debug(
-                "Trace summarization pass2 complete trace_id=%s elapsed_s=%.2f",
                 trace_id,
-                time.perf_counter() - started_at,
+                started_at,
             )
 
             # Post-processing: resolve refs to actual trace values
@@ -743,6 +944,8 @@ class TraceSummarizationService:
             _emit({"event": "run_failed", "error": "Cancelled"})
             raise
         except Exception as e:
+            if trace_id:
+                self._trace_errors[trace_id] = f"{type(e).__name__}: {e}"
             logger.error(
                 "Trace summarization failed trace_id=%s error_type=%s error=%s elapsed_s=%.2f",
                 trace_id,

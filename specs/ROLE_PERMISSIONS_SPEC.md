@@ -1,3 +1,10 @@
+---
+id: ROLE_PERMISSIONS_SPEC
+title: Role & Permissions Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Role & Permissions Specification
 
 ## Overview
@@ -177,6 +184,8 @@ GET /users/{user_id}/permissions -> UserPermissions
 Returns the permission set derived from the user's role. Called by the frontend after login to determine UI visibility.
 
 ## Success Criteria
+
+<SpecCoverage spec="ROLE_PERMISSIONS_SPEC" />
 
 ### Role-to-Permission Mapping
 

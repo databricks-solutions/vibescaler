@@ -1,3 +1,10 @@
+---
+id: CUSTOM_LLM_PROVIDER_SPEC
+title: Custom LLM Provider Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Custom LLM Provider Specification
 
 ## Overview
@@ -422,6 +429,8 @@ Note: HTTP (non-HTTPS) may be needed for local development. The UI should warn b
 Some users may use proxies that translate Anthropic API to OpenAI format. This should work as long as the proxy exposes an OpenAI-compatible `/chat/completions` endpoint.
 
 ## Success Criteria
+
+<SpecCoverage spec="CUSTOM_LLM_PROVIDER_SPEC" />
 
 ### Configuration
 - [ ] Users can configure custom LLM provider via UI

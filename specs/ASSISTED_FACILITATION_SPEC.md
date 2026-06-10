@@ -1,3 +1,10 @@
+---
+id: ASSISTED_FACILITATION_SPEC
+title: Assisted Facilitation Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Assisted Facilitation Specification
 
 ## Overview
@@ -252,6 +259,8 @@ class DraftRubricItem:
 ---
 
 ## Success Criteria
+
+<SpecCoverage spec="ASSISTED_FACILITATION_SPEC" />
 
 - [ ] Findings are classified in real-time as participants submit them
 - [ ] Facilitators see per-trace structured view with category breakdown

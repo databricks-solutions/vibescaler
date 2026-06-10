@@ -35,13 +35,8 @@ class MLflowIntakeService:
     self.db_service = db_service
 
   def configure_mlflow(self) -> None:
-    """Configure MLflow for Databricks.
-
-    Auth is handled by the Databricks SDK — service principal on Apps,
-    CLI profile locally.  DATABRICKS_HOST and auth credentials are
-    already in the environment.
-    """
-    mlflow.set_tracking_uri('databricks')
+    """MLflow is configured once during worker startup."""
+    return None
 
   def search_traces(self, config: MLflowIntakeConfig) -> List[MLflowTraceInfo]:
     """Search for traces in MLflow experiment with proper error handling."""

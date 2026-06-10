@@ -568,10 +568,11 @@ async def _run_summarization_background(
 
     started_at = time.perf_counter()
     logger.info(
-        "Summarization background job starting job_id=%s traces=%d model=%s",
+        "Summarization background job starting job_id=%s traces=%d model=%s endpoint_url=%s",
         job_id,
         len(batch),
         model_name,
+        endpoint_url,
     )
     try:
         token = resolve_databricks_token()
@@ -584,61 +585,64 @@ async def _run_summarization_background(
         )
 
         with SessionLocal() as bg_db:
-            bg_service = DatabaseService(bg_db)
-            bg_service.update_summarization_job_status(job_id, "running")
+            DatabaseService(bg_db).update_summarization_job_status(job_id, "running")
             logger.info("Summarization job status updated job_id=%s status=running", job_id)
 
-            def _on_progress(completed: int, total: int, failed: int) -> None:
+        def _on_progress(completed: int, total: int, failed: int) -> None:
+            logger.info(
+                "Summarization job progress job_id=%s completed=%d total=%d failed=%d",
+                job_id,
+                completed,
+                total,
+                failed,
+            )
+
+        def _on_trace_event(trace_id: str, event: dict[str, Any]) -> None:
+            event_name = str(event.get("event") or "event")
+            if event_name in {"tool_start", "tool_result", "run_failed"}:
                 logger.info(
-                    "Summarization job progress job_id=%s completed=%d total=%d failed=%d",
+                    "Summarization trace event job_id=%s trace_id=%s event=%s",
                     job_id,
-                    completed,
-                    total,
-                    failed,
+                    trace_id,
+                    event_name,
                 )
 
-            def _on_trace_event(trace_id: str, event: dict[str, Any]) -> None:
-                event_name = str(event.get("event") or "event")
-                if event_name in {"tool_start", "tool_result", "run_failed"}:
-                    logger.info(
-                        "Summarization trace event job_id=%s trace_id=%s event=%s",
-                        job_id,
-                        trace_id,
-                        event_name,
-                    )
+        results = await svc.summarize_batch(
+            batch,
+            on_progress=_on_progress,
+            on_trace_event=_on_trace_event,
+        )
 
-            results = await svc.summarize_batch(
-                batch,
-                on_progress=_on_progress,
-                on_trace_event=_on_trace_event,
-            )
-            for result in results:
-                trace_events = result.get("events") if isinstance(result.get("events"), list) else []
+        for result in results:
+            trace_events = result.get("events") if isinstance(result.get("events"), list) else []
+            with SessionLocal() as write_db:
+                write_svc = DatabaseService(write_db)
                 if result["summary"] is not None:
-                    bg_service.update_trace_summary(result["trace_id"], result["summary"])
-                    bg_service.add_summarization_job_completed(
+                    write_svc.update_trace_summary(result["trace_id"], result["summary"])
+                    write_svc.add_summarization_job_completed(
                         job_id,
                         result["trace_id"],
                         events=trace_events,
                     )
                 else:
-                    bg_service.add_summarization_job_failed(
+                    write_svc.add_summarization_job_failed(
                         job_id,
                         result["trace_id"],
                         result.get("error", "Unknown error"),
                         events=trace_events,
                     )
 
-            bg_service.update_summarization_job_status(job_id, "completed")
-            succeeded = len([r for r in results if r["summary"]])
-            failed = len([r for r in results if not r["summary"]])
-            logger.info(
-                "Summarization job completed job_id=%s succeeded=%d failed=%d elapsed_s=%.2f",
-                job_id,
-                succeeded,
-                failed,
-                time.perf_counter() - started_at,
-            )
+        with SessionLocal() as final_db:
+            DatabaseService(final_db).update_summarization_job_status(job_id, "completed")
+        succeeded = len([r for r in results if r["summary"]])
+        failed = len([r for r in results if not r["summary"]])
+        logger.info(
+            "Summarization job completed job_id=%s succeeded=%d failed=%d elapsed_s=%.2f",
+            job_id,
+            succeeded,
+            failed,
+            time.perf_counter() - started_at,
+        )
     except asyncio.CancelledError:
         logger.info(
             "Summarization job cancelled job_id=%s elapsed_s=%.2f",
@@ -705,6 +709,14 @@ async def resummarize_traces(
 
     # Create tracked job
     job = db_service.create_summarization_job(workshop_id=workshop_id, total=len(batch))
+    logger.info(
+        "Summarization job scheduled workshop_id=%s job_id=%s mode=%s traces=%d model=%s",
+        workshop_id,
+        job.id,
+        request.mode,
+        len(batch),
+        workshop.summarization_model,
+    )
 
     mlflow_config = db_service.get_mlflow_config(workshop_id)
     if not mlflow_config:
@@ -1877,8 +1889,6 @@ async def begin_annotation_phase(workshop_id: str, request: dict | None = None, 
                         try:
                             import mlflow as _mlflow
 
-                            _mlflow.set_tracking_uri("databricks")
-
                             filter_str = f"tags.eval = 'true' AND tags.workshop_id = '{workshop_id}'"
                             job.add_log(f"Polling MLflow for tagged traces: {filter_str}")
                             job.add_log(f"Experiment ID: {mlflow_config.experiment_id}")
@@ -3042,12 +3052,20 @@ async def ingest_mlflow_traces(workshop_id: str, ingest_request: dict, db: Sessi
                             endpoint_url=f"{ingest_url}/serving-endpoints",
                             model_name=workshop.summarization_model,
                             guidance=workshop.summarization_guidance,
+                            use_case_description=workshop.description,
                             batch=batch,
                         ),
                         job_id=summ_job.id,
                     )
+                    logger.info(
+                        "Summarization job scheduled after ingestion workshop_id=%s job_id=%s traces=%d model=%s",
+                        workshop_id,
+                        summ_job.id,
+                        len(batch),
+                        workshop.summarization_model,
+                    )
             except Exception as e:
-                logger.warning(f"Failed to start background summarization: {e}")
+                logger.warning("Failed to start background summarization", exc_info=True)
 
         return {
             "message": f"Successfully ingested {trace_count} traces from MLflow",
@@ -3319,7 +3337,6 @@ async def upload_csv_and_log_to_mlflow(
     try:
         import mlflow
 
-        mlflow.set_tracking_uri("databricks")
         mlflow.set_experiment(experiment_id=exp_id)
 
         # Read file content

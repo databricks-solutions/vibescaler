@@ -17,6 +17,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from server.services.databricks_service import _normalize_databricks_host
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -51,16 +53,6 @@ def _maybe_enable_mlflow_dspy_autolog() -> None:
 
         try:
             import mlflow
-
-            # If the user didn't explicitly set a tracking URI, default to Databricks for
-            # this dev-only experiment-id based tracing. This avoids accidentally creating
-            # a local SQLite-backed MLflow store (which would never write to a Databricks
-            # experiment id).
-            if not (os.getenv("MLFLOW_TRACKING_URI") or "").strip():
-                try:
-                    mlflow.set_tracking_uri("databricks")
-                except Exception as exc:
-                    logger.debug("Failed to set MLflow tracking URI to databricks: %s", exc)
 
             # Pin to the requested experiment id for these dev traces.
             # (If the tracking URI/credentials aren't configured, this will throw;
@@ -196,11 +188,37 @@ class DiscoverySummariesPayload(BaseModel):
     )
 
 
+_LITELLM_CONFIGURED = False
+
+
+def _configure_litellm_drop_params() -> None:
+    """Tell LiteLLM to drop provider-incompatible params instead of raising.
+
+    Without this, hardcoded sampling params (temperature=0.2/0.3) cause 400s on
+    reasoning models like gpt-5 (only temperature=1 supported) and on some
+    Gemini configurations. drop_params=True lets LiteLLM silently strip
+    unsupported params per-model so the same discovery/follow-up code path
+    works across Claude, gpt-5, gpt-5-codex, and Gemini Flash served by
+    Databricks. Idempotent; safe if litellm is not installed.
+    """
+    global _LITELLM_CONFIGURED
+    if _LITELLM_CONFIGURED:
+        return
+    try:
+        import litellm  # type: ignore
+
+        litellm.drop_params = True
+        _LITELLM_CONFIGURED = True
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.debug("Could not configure litellm.drop_params: %s", exc)
+
+
 def _import_dspy():
     # Local import so the rest of the server can still import if DSPy isn't available
     # in a minimal deployment environment.
     import dspy  # type: ignore
 
+    _configure_litellm_drop_params()
     return dspy
 
 
@@ -218,13 +236,14 @@ def _get_sdk_token(workspace_url: str | None = None) -> str | None:
         from databricks.sdk import WorkspaceClient
 
         # Try platform / default SDK credentials first (Databricks Apps + local CLI)
-        w = WorkspaceClient()
+        default_host = _normalize_databricks_host(os.getenv("DATABRICKS_HOST"))
+        w = WorkspaceClient(host=default_host) if default_host else WorkspaceClient()
         headers = w.config.authenticate()
         auth_header = headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             # If a workspace_url was given, verify the SDK host matches
-            sdk_host = (w.config.host or "").rstrip("/")
-            target_host = (workspace_url or "").rstrip("/")
+            sdk_host = _normalize_databricks_host(w.config.host)
+            target_host = _normalize_databricks_host(workspace_url)
             if target_host and sdk_host and sdk_host.lower() != target_host.lower():
                 # Host mismatch — retry with explicit host
                 logger.debug(
@@ -232,7 +251,7 @@ def _get_sdk_token(workspace_url: str | None = None) -> str | None:
                     sdk_host,
                     target_host,
                 )
-                w2 = WorkspaceClient(host=workspace_url)
+                w2 = WorkspaceClient(host=target_host)
                 headers2 = w2.config.authenticate()
                 auth2 = headers2.get("Authorization", "")
                 if auth2.startswith("Bearer "):

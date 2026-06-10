@@ -3,7 +3,6 @@ import { useUser, useRoleCheck } from '@/context/UserContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -13,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Settings, User, PanelLeftClose } from 'lucide-react';
+import { BookOpen, ChevronDown, Settings, User, PanelLeftClose } from 'lucide-react';
 import appIcon from '../../assets/favicon-48x48.png';
 
 interface AppSidebarProps {
@@ -69,6 +68,16 @@ export function AppSidebar({ onNavigate: _onNavigate, collapsed = false, onToggl
             <PanelLeftClose className="h-4 w-4" />
           </button>
         )}
+      </div>
+
+      <div className="px-3 py-3">
+        <a
+          href="/docs/"
+          className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-gray-200 hover:bg-white hover:text-gray-900 hover:shadow-sm"
+        >
+          <BookOpen className="h-4 w-4 shrink-0" />
+          Documentation
+        </a>
       </div>
 
       <Separator />
