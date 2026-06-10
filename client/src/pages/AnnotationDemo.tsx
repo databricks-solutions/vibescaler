@@ -156,6 +156,7 @@ export function AnnotationDemo() {
   const [comment, setComment] = useState<string>('');
   const [submittedAnnotations, setSubmittedAnnotations] = useState<Set<string>>(new Set());
   const [hasNavigatedManually, setHasNavigatedManually] = useState(false);
+  const [annotationComplete, setAnnotationComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const previousTraceId = useRef<string | null>(null);
@@ -366,6 +367,7 @@ export function AnnotationDemo() {
     setComment('');
     setCurrentTraceIndex(0);
     setHasNavigatedManually(false);
+    setAnnotationComplete(false);
     previousTraceId.current = null;
     hasInitialized.current = false;
   }, [currentUserId]);
@@ -846,14 +848,14 @@ export function AnnotationDemo() {
         if (hasRatings) {
           const success = await saveAnnotation(currentTraceId, false, ratingsToSave, freeformToSave, commentToSave);
           if (success) {
-            toast.success('All complete', { description: 'All traces annotated successfully!' });
+            setAnnotationComplete(true);
           } else {
             toast.error('Save failed', { description: 'Please try again.' });
           }
         } else {
           // No ratings but still mark as submitted to update progress
           setSubmittedAnnotations(prev => new Set([...prev, currentTraceId]));
-          toast.success('All complete', { description: 'All traces annotated successfully!' });
+          setAnnotationComplete(true);
         }
       } catch (error) {
         console.error('nextTrace: Error saving final annotation:', error);
@@ -1098,6 +1100,42 @@ export function AnnotationDemo() {
           <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
           <div className="text-lg font-medium text-gray-900 mb-2">No rubric available</div>
           <div className="text-sm text-gray-500">A rubric must be created before annotations can begin</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (annotationComplete) {
+    return (
+      <div
+        className="min-h-screen bg-gray-50 p-6 flex items-center justify-center"
+        data-testid="annotation-complete-screen"
+      >
+        <div className="text-center max-w-md space-y-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto">
+            <CheckCircle className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">All Annotations Complete!</h1>
+          <p className="text-sm text-gray-600">
+            You've rated all {traceData.length} assigned traces. The facilitator will review the
+            results and share next steps.
+          </p>
+          <Badge className="bg-green-100 text-green-800 px-3 py-1">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            {completedCount}/{traceData.length} traces annotated
+          </Badge>
+          <div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setHasNavigatedManually(true);
+                setAnnotationComplete(false);
+              }}
+              data-testid="review-annotations-button"
+            >
+              Review my annotations
+            </Button>
+          </div>
         </div>
       </div>
     );

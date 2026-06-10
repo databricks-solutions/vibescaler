@@ -468,3 +468,34 @@ class TestDatabaseConnectionConfig:
 
         with patch.dict(os.environ, {"LAKEBASE_SCHEMA_NAME": "Release Branch Schema!"}, clear=True):
             assert get_lakebase_schema_name() == "release_branch_schema"
+
+
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req("App serves setup docs and gates the UI until Lakebase is configured")
+class TestDeploymentStatusGate:
+    """The setup gate only applies to postgres targets; sqlite is fully operable."""
+
+    def _get_status(self):
+        import asyncio
+
+        from server.app import deployment_status
+
+        return asyncio.run(deployment_status())
+
+    def test_sqlite_backend_does_not_require_setup(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_ENV", raising=False)
+        for var in ("PGHOST", "PGDATABASE", "PGUSER", "PGAPPNAME", "ENDPOINT_NAME"):
+            monkeypatch.delenv(var, raising=False)
+
+        status = self._get_status()
+        assert status["lakebase_configured"] is False
+        assert status["setup_required"] is False
+
+    def test_postgres_target_without_lakebase_requires_setup(self, monkeypatch):
+        monkeypatch.setenv("DATABASE_ENV", "postgres")
+        for var in ("PGHOST", "PGDATABASE", "PGUSER", "PGAPPNAME", "ENDPOINT_NAME"):
+            monkeypatch.delenv(var, raising=False)
+
+        status = self._get_status()
+        assert status["lakebase_configured"] is False
+        assert status["setup_required"] is True

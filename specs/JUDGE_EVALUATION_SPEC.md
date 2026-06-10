@@ -391,7 +391,7 @@ aligned_judge = judge.align(traces, optimizer)
 
 ### Scale-Specific Behavior
 
-MemAlign works universally across all judge types (binary, likert, freeform) without requiring type-specific configuration. The optimizer automatically adapts to the feedback patterns.
+MemAlign works universally across all judge types (binary, likert) without requiring type-specific configuration. The optimizer automatically adapts to the feedback patterns.
 
 ### Feedback Aggregation
 

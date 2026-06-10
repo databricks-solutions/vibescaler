@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -354,9 +355,20 @@ export const DiscoveryFeedbackView: React.FC<Props> = ({
         {followupsEnabled && isAnswering && (
           <div className="space-y-3 border-t pt-3">
             <div className="bg-blue-50 rounded-lg p-3">
-              <p className="text-xs font-medium text-blue-600 mb-1">
-                Question {state === 'answering_q1' ? 1 : state === 'answering_q2' ? 2 : 3}
-              </p>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-blue-600">
+                  Question {state === 'answering_q1' ? 1 : state === 'answering_q2' ? 2 : 3}
+                </p>
+                {usingFallback && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-gray-100 font-normal text-gray-600 hover:bg-gray-100"
+                    title="A standard question is shown when a tailored one isn't available. Your answer is saved the same way."
+                  >
+                    Standard question
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-gray-800">{currentQuestion}</p>
             </div>
 

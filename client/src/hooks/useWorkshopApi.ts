@@ -671,10 +671,12 @@ export function useFacilitatorAnnotations(workshopId: string) {
   return useQuery({
     queryKey: QUERY_KEYS.annotations(workshopId, 'all_annotations'),
     queryFn: () => WorkshopsService.getAnnotationsWorkshopsWorkshopIdAnnotationsGet(
-      workshopId, 
+      workshopId,
       undefined  // No user filter - gets ALL annotations
     ),
     enabled: !!workshopId && isFacilitator, // Only for facilitators
+    refetchInterval: 15000, // Poll so facilitator stats update without a page refresh
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -690,6 +692,8 @@ export function useFacilitatorAnnotationsWithUserDetails(workshopId: string) {
       return response.json();
     },
     enabled: !!workshopId && isFacilitator, // Only for facilitators
+    refetchInterval: 15000, // Poll so facilitator stats update without a page refresh
+    refetchIntervalInBackground: false,
   });
 }
 

@@ -20,12 +20,17 @@ class TestOnStartingHook:
             on_starting(mock_server)
             mock_bootstrap.assert_called_once_with(full=True)
 
-    def test_on_starting_propagates_errors(self):
-        """If bootstrap_database raises, on_starting does not swallow the error."""
+    def test_on_starting_survives_bootstrap_failure(self):
+        """If bootstrap_database raises, startup continues (optimistic startup).
+
+        The app must still come up to serve /docs and the setup-status gate
+        while Lakebase is unconfigured or waking; the failure is logged.
+        """
         from gunicorn_conf import on_starting
 
         mock_server = MagicMock()
 
         with patch("server.db_bootstrap.bootstrap_database", side_effect=RuntimeError("migration failed")):
-            with pytest.raises(RuntimeError, match="migration failed"):
-                on_starting(mock_server)
+            on_starting(mock_server)
+
+        mock_server.log.exception.assert_called_once()

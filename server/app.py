@@ -376,12 +376,17 @@ async def test():
 @app.get("/deployment/status")
 async def deployment_status():
     """Return DB-independent deployment setup status for the frontend shell."""
-    from server.db_config import LakebaseConfig
+    from server.db_config import DatabaseBackend, LakebaseConfig, detect_database_backend
 
     lakebase_configured = LakebaseConfig.from_env() is not None
+    # Lakebase setup is only required when targeting postgres; sqlite
+    # deployments (local dev, E2E) are fully operable without it.
+    postgres_target = detect_database_backend() == DatabaseBackend.POSTGRESQL or (
+        os.getenv("DATABASE_ENV", "sqlite").lower() == "postgres"
+    )
     return {
         "lakebase_configured": lakebase_configured,
-        "setup_required": not lakebase_configured,
+        "setup_required": postgres_target and not lakebase_configured,
         "docs_url": DOCS_SETUP_PATH,
         "docs_build_exists": DOCS_BUILD_DIR.exists(),
         "docs_build_dir": str(DOCS_BUILD_DIR),

@@ -1212,6 +1212,61 @@ class AlignmentService:
                     model=judge_model_uri,
                 )
 
+            # MemAlignOptimizer.align() appends every trace it receives to the
+            # judge's episodic memory without trace-ID dedup, so re-aligning a
+            # reused judge with the same 'align'-tagged traces doubles its
+            # examples (10 -> 20 -> 30). Exclude traces already persisted in the
+            # registered judge's episodic memory before calling align().
+            already_aligned_ids: set[str] = set()
+            if reused_registered_judge:
+                persisted_ids = [
+                    str(tid) for tid in (getattr(judge, "_episodic_trace_ids", None) or [])
+                ]
+                deduped_ids = list(dict.fromkeys(persisted_ids))
+                if len(deduped_ids) < len(persisted_ids):
+                    judge._episodic_trace_ids = deduped_ids
+                    yield (
+                        f"Removed {len(persisted_ids) - len(deduped_ids)} duplicate trace IDs "
+                        f"from the judge's persisted episodic memory"
+                    )
+                already_aligned_ids = set(deduped_ids)
+
+            if already_aligned_ids:
+                new_traces = [
+                    trace
+                    for trace in mlflow_traces
+                    if getattr(trace.info, "trace_id", None) not in already_aligned_ids
+                ]
+                skipped_count = len(mlflow_traces) - len(new_traces)
+                if skipped_count:
+                    yield (
+                        f"Skipping {skipped_count} traces already in episodic memory "
+                        f"({len(already_aligned_ids)} examples persisted on registered judge)"
+                    )
+                mlflow_traces = new_traces
+
+            if reused_registered_judge and not mlflow_traces:
+                guideline_count = len(getattr(judge, "_semantic_memory", None) or [])
+                example_count = len(already_aligned_ids)
+                logger.info(
+                    "All 'align'-tagged traces already in episodic memory for judge '%s'; skipping align()",
+                    judge_name,
+                )
+                yield "All labeled traces are already in the judge's episodic memory — skipping re-alignment"
+                yield f"Semantic memory: {guideline_count} distilled guidelines"
+                yield f"Episodic memory: {example_count} examples (trace IDs persisted on registered judge)"
+                yield {
+                    "success": True,
+                    "judge_name": judge_name,
+                    "aligned_instructions": judge.instructions,
+                    "trace_count": 0,
+                    "mlflow_run_id": None,
+                    "registered_judge_name": judge_name,
+                    "guideline_count": guideline_count,
+                    "example_count": example_count,
+                }
+                return
+
             logger.info(
                 "Judge '%s' ready using model '%s' (type=%s, reused=%s)",
                 judge.name,

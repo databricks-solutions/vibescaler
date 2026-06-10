@@ -71,7 +71,7 @@ interface RubricQuestion {
   id: string;           // Generated UUID
   title: string;        // First line of question block
   description: string;  // Remaining lines of question block
-  judgeType: 'likert' | 'binary' | 'freeform';  // Per-question judge type
+  judgeType: 'likert' | 'binary';  // Per-question judge type (legacy 'freeform' parses as likert)
 }
 ```
 
@@ -91,7 +91,7 @@ Description for likert scale question
 
 **Parsing Logic**:
 1. Check for `[JUDGE_TYPE:xxx]` in title
-2. Extract judge type (binary, likert, freeform)
+2. Extract judge type (binary or likert; the legacy freeform type coerces to likert)
 3. Remove delimiter from title for display
 4. Default to 'likert' if not specified
 
@@ -130,7 +130,7 @@ interface RubricQuestion {
   id: string;
   title: string;
   description: string;
-  judgeType: 'likert' | 'binary' | 'freeform';
+  judgeType: 'likert' | 'binary';
 }
 
 function parseRubricQuestions(raw: string): RubricQuestion[] {
@@ -147,10 +147,12 @@ function parseRubricQuestions(raw: string): RubricQuestion[] {
       const description = lines.slice(1).join('\n').trim();
 
       // Parse judge type from title
-      let judgeType: 'likert' | 'binary' | 'freeform' = 'likert';
+      let judgeType: 'likert' | 'binary' = 'likert';
       const judgeTypeMatch = title.match(/\[JUDGE_TYPE:(\w+)\]/i);
       if (judgeTypeMatch) {
-        judgeType = judgeTypeMatch[1].toLowerCase() as any;
+        const parsed = judgeTypeMatch[1].toLowerCase();
+        // Legacy 'freeform' criteria are no longer creatable; render them as likert.
+        judgeType = parsed === 'binary' ? 'binary' : 'likert';
         title = title.replace(/\s*\[JUDGE_TYPE:\w+\]/i, '').trim();
       }
 
@@ -290,7 +292,7 @@ Only one rubric exists per workshop. Create and update are upsert — `POST` and
 - **Positive direction** (optional) — what a good response looks like
 - **Negative direction** (optional) — what a poor response looks like
 - **Examples** (optional) — concrete good/bad examples
-- **Evaluation type** — Likert, Binary, or Free-form (per-question)
+- **Evaluation type** — Likert or Binary (per-question). The legacy Free-form type is no longer creatable; existing free-form criteria render as Likert.
 
 The optional structured fields are serialized into the description text by the frontend.
 

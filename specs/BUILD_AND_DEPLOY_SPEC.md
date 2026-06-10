@@ -329,6 +329,7 @@ project-with-build.zip
 
 ### Deployment
 - [ ] Full deployment completes successfully
+- [ ] App serves setup docs and gates the UI until Lakebase is configured (postgres targets only; sqlite deployments are fully operable without setup)
 - [ ] Server starts and serves frontend
 - [ ] API endpoints respond correctly
 - [ ] Database connection established

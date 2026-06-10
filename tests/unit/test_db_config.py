@@ -202,13 +202,30 @@ class TestDetectDatabaseBackend:
 
     def test_returns_postgresql_when_database_env_is_postgres(self, monkeypatch):
         monkeypatch.setenv("DATABASE_ENV", "postgres")
-        # PG vars not required for detection, only for engine creation
-        monkeypatch.delenv("PGHOST", raising=False)
+        # Detection requires the Lakebase PG vars to be present; without
+        # them it deliberately falls back to SQLite (startup diagnostics).
+        monkeypatch.setenv("PGHOST", "db.example.com")
+        monkeypatch.setenv("PGDATABASE", "mydb")
+        monkeypatch.setenv("PGUSER", "svc-user")
         assert detect_database_backend() == DatabaseBackend.POSTGRESQL
 
     def test_returns_postgresql_case_insensitive(self, monkeypatch):
         monkeypatch.setenv("DATABASE_ENV", "Postgres")
+        monkeypatch.setenv("PGHOST", "db.example.com")
+        monkeypatch.setenv("PGDATABASE", "mydb")
+        monkeypatch.setenv("PGUSER", "svc-user")
         assert detect_database_backend() == DatabaseBackend.POSTGRESQL
+
+    def test_falls_back_to_sqlite_when_pg_vars_missing(self, monkeypatch):
+        """DATABASE_ENV=postgres without the Lakebase PG vars falls back to
+        SQLite so the app can still start and serve setup docs (startup
+        diagnostics fix), instead of crashing at engine creation.
+        """
+        monkeypatch.setenv("DATABASE_ENV", "postgres")
+        monkeypatch.delenv("PGHOST", raising=False)
+        monkeypatch.delenv("PGDATABASE", raising=False)
+        monkeypatch.delenv("PGUSER", raising=False)
+        assert detect_database_backend() == DatabaseBackend.SQLITE
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +250,9 @@ class TestGetDatabaseUrl:
 
     def test_postgresql_url_is_placeholder(self, monkeypatch):
         monkeypatch.setenv("DATABASE_ENV", "postgres")
+        monkeypatch.setenv("PGHOST", "db.example.com")
+        monkeypatch.setenv("PGDATABASE", "mydb")
+        monkeypatch.setenv("PGUSER", "svc-user")
 
         url = get_database_url()
         # PostgreSQL returns placeholder — do_connect handles auth
@@ -251,6 +271,8 @@ class TestGetSchemaName:
 
     def test_returns_schema_for_postgresql(self, monkeypatch):
         monkeypatch.setenv("DATABASE_ENV", "postgres")
+        monkeypatch.setenv("PGHOST", "db.example.com")
+        monkeypatch.setenv("PGDATABASE", "mydb")
         monkeypatch.setenv("PGAPPNAME", "my-app")
         monkeypatch.setenv("PGUSER", "svc-user")
 
@@ -260,6 +282,8 @@ class TestGetSchemaName:
 
     def test_schema_name_replaces_hyphens(self, monkeypatch):
         monkeypatch.setenv("DATABASE_ENV", "postgres")
+        monkeypatch.setenv("PGHOST", "db.example.com")
+        monkeypatch.setenv("PGDATABASE", "mydb")
         monkeypatch.setenv("PGUSER", "svc-principal-123")
         monkeypatch.setenv("PGAPPNAME", "human-eval-workshop")
 
