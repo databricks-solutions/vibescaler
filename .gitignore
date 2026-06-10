@@ -14,8 +14,10 @@ docs/package-lock.json
 docs/static/spec-coverage.json
 # Allow client/build for deployment (built files needed for Databricks Apps)
 client/build/*
-.claude/mlflow/claude_tracing.log
+# Match nested copies too (e.g. client/.claude/mlflow/claude_tracing.log)
+**/.claude/mlflow/claude_tracing.log
 .claude/worktrees/
+.claude/skills/*-workspace/
 .coverage
 coverage.xml
 # !client/build/README.md
