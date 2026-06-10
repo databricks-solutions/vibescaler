@@ -2,7 +2,7 @@ import React from 'react';
 import { UserRole } from '@/client';
 import { useUser } from '@/context/UserContext';
 import { FacilitatorRootWorkspace } from '@/components/workspace/FacilitatorRootWorkspace';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { WorkshopDemoLanding } from '@/pages/WorkshopDemoLanding';
 
 export function SprintWorkspacePage() {
   const { user, permissions } = useUser();
@@ -12,16 +12,7 @@ export function SprintWorkspacePage() {
     return <FacilitatorRootWorkspace />;
   }
 
-  return (
-    <div className="p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Workspace access</CardTitle>
-          <CardDescription>
-            This workspace root is currently focused on facilitator tools.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    </div>
-  );
+  // SME / participant flow: discovery, annotation, and results live in the
+  // phase-driven workshop experience.
+  return <WorkshopDemoLanding />;
 }

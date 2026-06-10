@@ -1,6 +1,6 @@
 # Spec Test Coverage Map
 
-**Generated**: 2026-06-09 21:53:04
+**Generated**: 2026-06-10 12:28:33
 
 This report shows test coverage for each specification's success criteria.
 
@@ -8,36 +8,36 @@ This report shows test coverage for each specification's success criteria.
 
 | Type | Count | Description |
 |------|-------|-------------|
-| Unit | 804 | pytest unit tests, Vitest tests |
+| Unit | 806 | pytest unit tests, Vitest tests |
 | Integration | 68 | pytest with real DB/API |
-| E2E (Mocked) | 11 | Playwright with mocked API |
-| E2E (Real) | 77 | Playwright with real API |
+| E2E (Mocked) | 3 | Playwright with mocked API |
+| E2E (Real) | 2 | Playwright with real API |
 
 ## Coverage Summary
 
 | Spec | Reqs | Covered | Cover% | Unit | Int | E2E-M | E2E-R | BE-only |
 |------|------|---------|--------|------|-----|-------|-------|---------|
-| [ANNOTATION_SPEC](#annotation-spec) | 21 | 8 | 38% | 53 | 0 | 0 | 7 | **6** |
-| [ASSISTED_FACILITATION_SPEC](#assisted-facilitation-spec) | 7 | 7 | 100% | 31 | 0 | 0 | 42 | 0 |
-| [AUTHENTICATION_SPEC](#authentication-spec) | 28 | 3 | 10% | 10 | 0 | 2 | 0 | **2** |
-| [BUILD_AND_DEPLOY_SPEC](#build-and-deploy-spec) | 16 | 13 | 81% | 64 | 0 | 0 | 0 | **13** |
+| [ANNOTATION_SPEC](#annotation-spec) | 21 | 8 | 38% | 53 | 0 | 0 | 2 | **6** |
+| [ASSISTED_FACILITATION_SPEC](#assisted-facilitation-spec) | 7 | 7 | 100% | 31 | 0 | 0 | 0 | **7** |
+| [AUTHENTICATION_SPEC](#authentication-spec) | 28 | 3 | 10% | 10 | 0 | 0 | 0 | **2** |
+| [BUILD_AND_DEPLOY_SPEC](#build-and-deploy-spec) | 16 | 13 | 81% | 66 | 0 | 0 | 0 | **13** |
 | [CUSTOM_LLM_PROVIDER_SPEC](#custom-llm-provider-spec) | 15 | 0 | 0% | 13 | 0 | 0 | 0 | 0 |
-| [DATASETS_SPEC](#datasets-spec) | 9 | 7 | 77% | 25 | 0 | 0 | 1 | **7** |
-| [DESIGN_SYSTEM_SPEC](#design-system-spec) | 7 | 0 | 0% | 4 | 0 | 1 | 0 | 0 |
-| [DISCOVERY_SPEC](#discovery-spec) | 72 | 61 | 84% | 207 | 5 | 4 | 1 | **40** |
-| [DISCOVERY_TRACE_ASSIGNMENT_SPEC](#discovery-trace-assignment-spec) | 13 | 12 | 92% | 20 | 0 | 1 | 1 | **11** |
-| [EVAL_MODE_SPEC](#eval-mode-spec) | 35 | 14 | 40% | 22 | 0 | 1 | 0 | **14** |
-| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 25 | 24 | 96% | 79 | 7 | 0 | 8 | **19** |
-| [PROJECT_SETUP_SPEC](#project-setup-spec) | 26 | 6 | 23% | 9 | 0 | 1 | 0 | **2** |
+| [DATASETS_SPEC](#datasets-spec) | 9 | 7 | 77% | 25 | 0 | 0 | 0 | **7** |
+| [DESIGN_SYSTEM_SPEC](#design-system-spec) | 7 | 0 | 0% | 4 | 0 | 0 | 0 | 0 |
+| [DISCOVERY_SPEC](#discovery-spec) | 72 | 61 | 84% | 207 | 5 | 0 | 0 | **41** |
+| [DISCOVERY_TRACE_ASSIGNMENT_SPEC](#discovery-trace-assignment-spec) | 13 | 12 | 92% | 20 | 0 | 0 | 0 | **11** |
+| [EVAL_MODE_SPEC](#eval-mode-spec) | 35 | 14 | 40% | 22 | 0 | 0 | 0 | **14** |
+| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 25 | 22 | 88% | 79 | 7 | 0 | 0 | **20** |
+| [PROJECT_SETUP_SPEC](#project-setup-spec) | 26 | 9 | 34% | 9 | 0 | 3 | 0 | **2** |
 | [ROLE_PERMISSIONS_SPEC](#role-permissions-spec) | 16 | 12 | 75% | 17 | 0 | 0 | 0 | **12** |
-| [RUBRIC_SPEC](#rubric-spec) | 25 | 25 | 100% | 67 | 0 | 1 | 6 | **15** |
+| [RUBRIC_SPEC](#rubric-spec) | 25 | 21 | 84% | 67 | 0 | 0 | 0 | **18** |
 | [TESTING_SPEC](#testing-spec) | 30 | 0 | 0% | 35 | 50 | 0 | 0 | 0 |
-| [TRACE_DISPLAY_SPEC](#trace-display-spec) | 18 | 18 | 100% | 70 | 0 | 0 | 7 | **11** |
+| [TRACE_DISPLAY_SPEC](#trace-display-spec) | 18 | 14 | 77% | 70 | 0 | 0 | 0 | **12** |
 | [TRACE_INGESTION_SPEC](#trace-ingestion-spec) | 16 | 0 | 0% | 16 | 0 | 0 | 0 | 0 |
 | [TRACE_SUMMARIZATION_SPEC](#trace-summarization-spec) | 64 | 21 | 32% | 58 | 6 | 0 | 0 | **21** |
-| [UI_COMPONENTS_SPEC](#ui-components-spec) | 16 | 0 | 0% | 4 | 0 | 0 | 4 | 0 |
+| [UI_COMPONENTS_SPEC](#ui-components-spec) | 16 | 0 | 0% | 4 | 0 | 0 | 0 | 0 |
 
-**Total**: 231/459 requirements covered (50%)
+**Total**: 224/459 requirements covered (48%)
 
 ---
 
@@ -66,20 +66,20 @@ This report shows test coverage for each specification's success criteria.
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
 - :warning: Users can edit previously submitted annotations (unit)
-- :warning: Annotations sync to MLflow as feedback on save (one entry per rubric question) (unit)
+- :warning: Changes automatically save on navigation (Next/Previous) (unit)
+- :warning: Annotation count reflects unique submissions (not re-submissions) (unit)
 - :warning: MLflow trace tagged with `label: "align"` and `workshop_id` on annotation (unit)
-- :warning: Feedback source is HUMAN with annotator's user_id (unit)
 - :warning: Annotation comment maps to MLflow feedback rationale (unit)
 - :warning: Legacy single-rating format loads correctly alongside multi-rating format (unit)
 
 ### Covered Requirements
 
 - [x] Users can edit previously submitted annotations (unit) **[BE-only]**
-- [x] Changes automatically save on navigation (Next/Previous) (e2e-real, unit)
-- [x] Annotation count reflects unique submissions (not re-submissions) (e2e-real, unit)
-- [x] Annotations sync to MLflow as feedback on save (one entry per rubric question) (unit) **[BE-only]**
+- [x] Changes automatically save on navigation (Next/Previous) (unit) **[BE-only]**
+- [x] Annotation count reflects unique submissions (not re-submissions) (unit) **[BE-only]**
+- [x] Annotations sync to MLflow as feedback on save (one entry per rubric question) (e2e-real, unit)
 - [x] MLflow trace tagged with `label: "align"` and `workshop_id` on annotation (unit) **[BE-only]**
-- [x] Feedback source is HUMAN with annotator's user_id (unit) **[BE-only]**
+- [x] Feedback source is HUMAN with annotator's user_id (e2e-real, unit)
 - [x] Annotation comment maps to MLflow feedback rationale (unit) **[BE-only]**
 - [x] Legacy single-rating format loads correctly alongside multi-rating format (unit) **[BE-only]**
 
@@ -127,9 +127,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_database_service_participant_notes.py` (test_get_participant_notes_empty_result) [unit]
 - `tests/unit/services/test_database_service_participant_notes.py` (test_delete_participant_note_success) [unit]
 - `tests/unit/services/test_database_service_participant_notes.py` (test_delete_participant_note_not_found) [unit]
-- `client/tests/e2e/annotation-mlflow-feedback.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/annotation-flow.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/annotation-last-trace.spec.ts` (file-level) [e2e-real]
 - `client/src/hooks/useWorkshopApi.facilitatorPolling.test.ts` (file-level) [unit]
 - `client/src/pages/AnnotationDemo.completionState.test.tsx` (file-level) [unit]
 - `client/src/pages/AnnotationDemo.completionState.test.tsx` (file-level) [unit]
@@ -138,15 +135,27 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 **Coverage**: 7/7 requirements (100%)
 
+### Backend-Only Requirements (no frontend tests)
+
+These requirements are covered by backend tests only. UI regressions won't be caught:
+
+- :warning: Findings are classified in real-time as participants submit them (unit)
+- :warning: Facilitators see per-trace structured view with category breakdown (unit)
+- :warning: Facilitators can generate targeted questions that broadcast to all participants (unit)
+- :warning: Disagreements are auto-detected and surfaced (unit)
+- :warning: Participants see only fuzzy progress (no category bias) (unit)
+- :warning: Findings can be promoted to draft rubric staging area (unit)
+- :warning: Thresholds are configurable per category per trace (unit)
+
 ### Covered Requirements
 
-- [x] Findings are classified in real-time as participants submit them (e2e-real, unit)
-- [x] Facilitators see per-trace structured view with category breakdown (e2e-real, unit)
-- [x] Facilitators can generate targeted questions that broadcast to all participants (e2e-real, unit)
-- [x] Disagreements are auto-detected and surfaced (e2e-real, unit)
-- [x] Participants see only fuzzy progress (no category bias) (e2e-real, unit)
-- [x] Findings can be promoted to draft rubric staging area (e2e-real, unit)
-- [x] Thresholds are configurable per category per trace (e2e-real, unit)
+- [x] Findings are classified in real-time as participants submit them (unit) **[BE-only]**
+- [x] Facilitators see per-trace structured view with category breakdown (unit) **[BE-only]**
+- [x] Facilitators can generate targeted questions that broadcast to all participants (unit) **[BE-only]**
+- [x] Disagreements are auto-detected and surfaced (unit) **[BE-only]**
+- [x] Participants see only fuzzy progress (no category bias) (unit) **[BE-only]**
+- [x] Findings can be promoted to draft rubric staging area (unit) **[BE-only]**
+- [x] Thresholds are configurable per category per trace (unit) **[BE-only]**
 
 ### Tests Without Requirement Links
 
@@ -154,14 +163,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 - `tests/unit/services/test_discovery_dspy_mlflow_autolog.py` (test_dspy_mlflow_autolog_is_noop_when_env_var_unset) [unit]
 - `tests/unit/services/test_discovery_dspy_mlflow_autolog.py` (test_dspy_mlflow_autolog_uses_experiment_id_from_env) [unit]
-- `client/tests/e2e/assisted-facilitation.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/assisted-facilitation-rubric-promotion.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/assisted-facilitation-classification.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/assisted-facilitation-discovery.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/assisted-facilitation-dashboard.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (file-level) [e2e-real]
 
 ## AUTHENTICATION_SPEC
 
@@ -218,8 +219,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/test_db_config.py` (test_get_password_rejects_unset_or_empty_endpoint[None]) [unit]
 - `tests/unit/test_db_config.py` (test_get_password_rejects_unset_or_empty_endpoint[]) [unit]
 - `tests/unit/test_db_config.py` (test_postgresql_engine_raises_without_endpoint_name) [unit]
-- `client/tests/e2e/facilitator-create-workshop.spec.ts` (file-level) [e2e-mocked]
-- `client/tests/e2e/authentication.spec.ts` (file-level) [e2e-mocked]
 - `client/src/context/UserContext.test.tsx` (file-level) [unit]
 
 ## BUILD_AND_DEPLOY_SPEC
@@ -273,6 +272,8 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/test_build_deploy.py` (test_migration_schema_grant_is_best_effort) [unit]
 - `tests/unit/test_build_deploy.py` (test_migration_version_table_is_created_wide_enough) [unit]
 - `tests/unit/test_build_deploy.py` (test_boolean_migration_defaults_are_postgres_safe) [unit]
+- `tests/unit/test_build_deploy.py` (test_sqlite_backend_does_not_require_setup) [unit]
+- `tests/unit/test_build_deploy.py` (test_postgres_target_without_lakebase_requires_setup) [unit]
 - `tests/unit/test_sqlite_rescue.py` (test_default_database_url) [unit]
 - `tests/unit/test_sqlite_rescue.py` (test_sqlite_triple_slash_url) [unit]
 - `tests/unit/test_sqlite_rescue.py` (test_sqlite_double_slash_url) [unit]
@@ -382,7 +383,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_dataset_operations.py` (test_subtract_nonexistent_traces_ignored) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_subtract_single_trace) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_subtract_result_has_correct_length) [unit]
-- `client/tests/e2e/dataset-operations.spec.ts` (file-level) [e2e-real]
 - `client/src/utils/traceUtils.test.ts` (file-level) [unit]
 - `client/src/utils/traceUtils.test.ts` (file-level) [unit]
 
@@ -404,7 +404,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 These tests are tagged with the spec but don't link to specific requirements:
 
-- `client/tests/e2e/design-system.spec.ts` (file-level) [e2e-mocked]
 - `client/src/test/design-system.test.ts` (file-level) [unit]
 - `client/src/test/design-system.test.ts` (file-level) [unit]
 - `client/src/lib/utils.test.ts` (file-level) [unit]
@@ -438,6 +437,7 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: Questions build progressively on prior answers (unit)
 - :warning: All 3 questions required before moving to next trace (unit)
 - :warning: Error handling with retry for LLM failures (unit)
+- :warning: Feedback saved incrementally (no data loss on failure) (unit)
 - :warning: Completion status shows % of participants finished (integration, unit)
 - :warning: Facilitator can trigger analysis at any time (even partial feedback) (unit)
 - :warning: System aggregates feedback by trace (unit)
@@ -484,7 +484,7 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Previous Q&A visible while answering new questions (unit)
 - [x] Loading spinner during LLM generation (1-3s) (unit)
 - [x] Error handling with retry for LLM failures (unit) **[BE-only]**
-- [x] Feedback saved incrementally (no data loss on failure) (e2e-real, unit)
+- [x] Feedback saved incrementally (no data loss on failure) (unit) **[BE-only]**
 - [x] Completion status shows % of participants finished (integration, unit) **[BE-only]**
 - [x] Facilitator can view participant feedback details (label, comment, follow-up Q&A) (integration, unit)
 - [x] Facilitator can trigger analysis at any time (even partial feedback) (unit) **[BE-only]**
@@ -550,10 +550,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_draft_rubric_items.py` (test_ungrouped_items_each_become_question) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_no_items_raises_400) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_mixed_grouped_and_ungrouped) [unit]
-- `client/tests/e2e/discovery-social-scroll-sync.spec.ts` (file-level) [e2e-mocked]
-- `client/tests/e2e/discovery-model-selection.spec.ts` (file-level) [e2e-mocked]
-- `client/tests/e2e/discovery-analysis.spec.ts` (file-level) [e2e-mocked]
-- `client/tests/e2e/discovery-sidebar-visibility.spec.ts` (file-level) [e2e-mocked]
 - `client/src/components/DiscoveryFeedbackView.submitDisabled.test.tsx` (file-level) [unit]
 - `client/src/components/DiscoveryFeedbackView.stateTransitions.test.tsx` (file-level) [unit]
 - `client/src/components/DiscoveryStartPage.modelSelector.test.tsx` (file-level) [unit]
@@ -604,13 +600,6 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Multiple participants can see same trace with different orders (unit) **[BE-only]**
 - [x] Assignment metadata properly tracks all context (unit)
 - [x] Inter-rater reliability (IRR) can be measured (same traces, different orders) (unit) **[BE-only]**
-
-### Tests Without Requirement Links
-
-These tests are tagged with the spec but don't link to specific requirements:
-
-- `client/tests/e2e/trace-visibility.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/discovery-invite-traces.spec.ts` (file-level) [e2e-mocked]
 
 ## EVAL_MODE_SPEC
 
@@ -680,15 +669,16 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 
 These tests are tagged with the spec but don't link to specific requirements:
 
-- `client/tests/e2e/eval-mode-workflow.spec.ts` (file-level) [e2e-mocked]
 - `client/src/components/eval/CriterionEditor.eval.test.tsx` (file-level) [unit]
 
 ## JUDGE_EVALUATION_SPEC
 
-**Coverage**: 24/25 requirements (96%)
+**Coverage**: 22/25 requirements (88%)
 
 ### Uncovered Requirements
 
+- [ ] Auto-evaluation model stored for re-evaluation consistency
+- [ ] Results appear in Judge Tuning page
 - [ ] Spinner stops when re-evaluation completes
 
 ### Backend-Only Requirements (no frontend tests)
@@ -698,6 +688,7 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: Fallback conversion handles Likert-style returns for binary (unit)
 - :warning: Evaluation results persisted to database (integration, unit)
 - :warning: Results reload correctly in UI (unit)
+- :warning: Auto-evaluation runs in background when annotation phase starts (unit)
 - :warning: Judge prompt auto-derived from rubric questions (unit)
 - :warning: Per-question judge_type parsed from rubric (`[JUDGE_TYPE:xxx]`) (unit)
 - :warning: Binary rubrics evaluated with 0/1 scale (not 1-5) (unit)
@@ -722,12 +713,10 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Fallback conversion handles Likert-style returns for binary (unit) **[BE-only]**
 - [x] Evaluation results persisted to database (integration, unit) **[BE-only]**
 - [x] Results reload correctly in UI (unit) **[BE-only]**
-- [x] Auto-evaluation runs in background when annotation phase starts (e2e-real, unit)
+- [x] Auto-evaluation runs in background when annotation phase starts (unit) **[BE-only]**
 - [x] Judge prompt auto-derived from rubric questions (unit) **[BE-only]**
 - [x] Per-question judge_type parsed from rubric (`[JUDGE_TYPE:xxx]`) (unit) **[BE-only]**
 - [x] Binary rubrics evaluated with 0/1 scale (not 1-5) (unit) **[BE-only]**
-- [x] Auto-evaluation model stored for re-evaluation consistency (e2e-real)
-- [x] Results appear in Judge Tuning page (e2e-real)
 - [x] Re-evaluate loads registered judge with aligned instructions (integration, unit) **[BE-only]**
 - [x] Uses same model as initial auto-evaluation (unit) **[BE-only]**
 - [x] Results stored against correct prompt version (integration, unit) **[BE-only]**
@@ -763,10 +752,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_irr_utils.py` (test_format_irr_result_rounding_and_ready_flag) [unit]
 - `tests/unit/services/test_irr_utils.py` (test_detect_problematic_patterns_question_id_scopes_to_that_metric) [unit]
 - `tests/unit/services/test_irr_utils.py` (test_detect_problematic_patterns_question_id_excludes_other_metric_ratings) [unit]
-- `client/tests/e2e/judge-evaluation.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/evaluation-tagging.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/evaluation-tagging.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/evaluation-tagging.spec.ts` (file-level) [e2e-real]
 - `client/src/pages/IRRResultsDemo.agreement.test.ts` (file-level) [unit]
 - `client/src/components/JudgeTypeSelector.test.tsx` (file-level) [unit]
 - `client/src/components/JudgeTypeSelector.test.tsx` (file-level) [unit]
@@ -774,7 +759,7 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 ## PROJECT_SETUP_SPEC
 
-**Coverage**: 6/26 requirements (23%)
+**Coverage**: 9/26 requirements (34%)
 
 ### Uncovered Requirements
 
@@ -787,10 +772,7 @@ These tests are tagged with the spec but don't link to specific requirements:
 - [ ] UI implementation follows the wiring architecture diagram and keeps setup entry, submission, and progress concerns separate
 - [ ] After setup completes, facilitators and users with `can_manage_workshop` can reach `/project/setup` from the facilitator root workspace
 - [ ] After setup completes, `/project/setup` loads server project state instead of creating a new project by default
-- [ ] The setup form is synced with server project state before and after setup completes
 - [ ] The app shell project setup link navigates to the same server-synced setup form
-- [ ] Facilitators and users with `can_manage_workshop` can update project name and agent/app description after setup completes
-- [ ] Facilitators and users with `can_manage_workshop` can update Databricks UC trace table path after setup completes
 - [ ] Changing the Databricks UC trace table path persists the new trace provider config and exposes setup refresh or validation status
 - [ ] The setup form exposes participant/SME invitation controls from the same visual surface
 - [ ] SMEs, participants, and users without `can_manage_workshop` cannot update project settings or invite SMEs
@@ -812,6 +794,9 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] `POST /api/project/setup` returns `project_id` and `setup_job_id` (unit)
 - [x] Authenticated facilitators and users with `can_manage_workshop` can access `/project/setup` when no project has completed setup (unit)
 - [x] The app shell navigation bar exposes a project setup link for facilitators and users with `can_manage_workshop` (unit)
+- [x] The setup form is synced with server project state before and after setup completes (e2e-mocked)
+- [x] Facilitators and users with `can_manage_workshop` can update project name and agent/app description after setup completes (e2e-mocked)
+- [x] Facilitators and users with `can_manage_workshop` can update Databricks UC trace table path after setup completes (e2e-mocked)
 - [x] The facilitator root workspace can query setup progress and display pending or running setup state (unit) **[BE-only]**
 - [x] Pending/running setup states render a facilitator root workspace progress card with current step and message (unit)
 
@@ -820,7 +805,6 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 These tests are tagged with the spec but don't link to specific requirements:
 
 - `tests/unit/features/project_setup/test_project_setup_service.py` (test_project_setup_service_completes_dev_queue_fallback) [unit]
-- `client/tests/e2e/project-setup-settings.spec.ts` (file-level) [e2e-mocked]
 
 ## ROLE_PERMISSIONS_SPEC
 
@@ -867,15 +851,25 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 
 ## RUBRIC_SPEC
 
-**Coverage**: 25/25 requirements (100%)
+**Coverage**: 21/25 requirements (84%)
+
+### Uncovered Requirements
+
+- [ ] Likert scale shows 1-5 rating options
+- [ ] Binary scale shows Pass/Fail buttons (not star ratings)
+- [ ] Binary feedback logged as 0/1 to MLflow (not 3)
+- [ ] Rubric persists and is retrievable via GET after creation
 
 ### Backend-Only Requirements (no frontend tests)
 
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
 - :warning: Delimiter never appears in user input (by design) (unit)
+- :warning: Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format (unit)
 - :warning: Parsed questions have stable UUIDs within session (unit)
 - :warning: Empty/whitespace-only parts filtered out (unit)
+- :warning: Mixed rubrics support different scales per question (unit)
+- :warning: Facilitator can create a rubric question with title and description (unit)
 - :warning: Facilitator can edit an existing rubric question (unit)
 - :warning: Facilitator can delete a rubric question (unit)
 - :warning: Only one rubric exists per workshop (upsert semantics) (unit)
@@ -894,18 +888,14 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Questions with multi-line descriptions parse correctly (unit)
 - [x] Delimiter never appears in user input (by design) (unit) **[BE-only]**
 - [x] Frontend and backend use same delimiter constant (unit)
-- [x] Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format (e2e-real, unit)
+- [x] Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format (unit) **[BE-only]**
 - [x] Parsed questions have stable UUIDs within session (unit) **[BE-only]**
 - [x] Empty/whitespace-only parts filtered out (unit) **[BE-only]**
-- [x] Likert scale shows 1-5 rating options (e2e-real)
-- [x] Binary scale shows Pass/Fail buttons (not star ratings) (e2e-real)
-- [x] Binary feedback logged as 0/1 to MLflow (not 3) (e2e-real)
-- [x] Mixed rubrics support different scales per question (e2e-real, unit)
-- [x] Facilitator can create a rubric question with title and description (e2e-mocked, unit)
+- [x] Mixed rubrics support different scales per question (unit) **[BE-only]**
+- [x] Facilitator can create a rubric question with title and description (unit) **[BE-only]**
 - [x] Facilitator can edit an existing rubric question (unit) **[BE-only]**
 - [x] Facilitator can delete a rubric question (unit) **[BE-only]**
 - [x] Only one rubric exists per workshop (upsert semantics) (unit) **[BE-only]**
-- [x] Rubric persists and is retrievable via GET after creation (e2e-real)
 - [x] Rubric required before advancing to annotation phase (unit) **[BE-only]**
 - [x] No phase restriction on rubric CRUD (unit) **[BE-only]**
 - [x] Question IDs re-indexed sequentially after deletion (unit) **[BE-only]**
@@ -1054,7 +1044,14 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 ## TRACE_DISPLAY_SPEC
 
-**Coverage**: 18/18 requirements (100%)
+**Coverage**: 14/18 requirements (77%)
+
+### Uncovered Requirements
+
+- [ ] Facilitator can configure input/output JSONPath in settings panel
+- [ ] Preview shows extraction results against first workshop trace
+- [ ] Settings are persisted per workshop
+- [ ] Span filter preview shows match status and filtered inputs/outputs against first trace
 
 ### Backend-Only Requirements (no frontend tests)
 
@@ -1071,34 +1068,29 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: All backend services that consume trace input/output apply the same span filter and JSONPath pipeline as the TraceViewer (unit)
 - :warning: JSONPath evaluation does not noticeably slow down trace display (unit)
 - :warning: Preview responds within 500ms (unit)
+- :warning: Invalid JSONPath syntax shows helpful error message in preview (unit)
 
 ### Covered Requirements
 
-- [x] Facilitator can configure input/output JSONPath in settings panel (e2e-real)
 - [x] JSONPath fields are optional and clearly labeled as such (unit) **[BE-only]**
-- [x] Preview shows extraction results against first workshop trace (e2e-real)
 - [x] TraceViewer applies JSONPath when configured (unit)
 - [x] Multiple JSONPath matches are concatenated with newlines (unit) **[BE-only]**
 - [x] System falls back to raw display when JSONPath is not configured, JSON parsing fails, JSONPath query fails, or JSONPath returns null/empty (unit) **[BE-only]**
-- [x] Settings are persisted per workshop (e2e-real)
 - [x] Facilitator can configure span attribute filter with span name, span type, attribute key, and attribute value (unit) **[BE-only]**
 - [x] Filter criteria are AND-combined and first matching span wins (unit) **[BE-only]**
 - [x] Attribute value input is disabled until attribute key has a value (unit)
-- [x] Span filter preview shows match status and filtered inputs/outputs against first trace (e2e-real)
 - [x] Span filter is applied before JSONPath extraction in TraceViewer (unit) **[BE-only]**
 - [x] Empty filter config results in no filtering and root trace data is used (unit) **[BE-only]**
 - [x] String span inputs and outputs are returned as-is without double-serialization (unit) **[BE-only]**
 - [x] All backend services that consume trace input/output apply the same span filter and JSONPath pipeline as the TraceViewer (unit) **[BE-only]**
 - [x] JSONPath evaluation does not noticeably slow down trace display (unit) **[BE-only]**
 - [x] Preview responds within 500ms (unit) **[BE-only]**
-- [x] Invalid JSONPath syntax shows helpful error message in preview (e2e-real, unit)
+- [x] Invalid JSONPath syntax shows helpful error message in preview (unit) **[BE-only]**
 
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
-- `client/tests/e2e/jsonpath-trace-display.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/jsonpath-trace-display.spec.ts` (file-level) [e2e-real]
 - `client/src/hooks/useJsonPathExtraction.test.ts` (file-level) [unit]
 - `client/src/components/JsonPathSettings.attrValueDisabled.test.tsx` (file-level) [unit]
 - `client/src/components/TraceViewer.copyOutput.test.tsx` (file-level) [unit]
@@ -1288,10 +1280,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 These tests are tagged with the spec but don't link to specific requirements:
 
-- `client/tests/e2e/ui-components.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/ui-components.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/ui-components.spec.ts` (file-level) [e2e-real]
-- `client/tests/e2e/ui-components.spec.ts` (file-level) [e2e-real]
 - `client/src/components/TraceDataViewer.test.tsx` (file-level) [unit]
 - `client/src/components/TraceDataViewer.test.tsx` (file-level) [unit]
 - `client/src/components/Pagination.test.tsx` (file-level) [unit]
