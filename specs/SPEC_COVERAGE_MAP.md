@@ -1,6 +1,6 @@
 # Spec Test Coverage Map
 
-**Generated**: 2026-06-09 21:11:53
+**Generated**: 2026-06-09 21:53:04
 
 This report shows test coverage for each specification's success criteria.
 
@@ -8,8 +8,8 @@ This report shows test coverage for each specification's success criteria.
 
 | Type | Count | Description |
 |------|-------|-------------|
-| Unit | 720 | pytest unit tests, Vitest tests |
-| Integration | 60 | pytest with real DB/API |
+| Unit | 804 | pytest unit tests, Vitest tests |
+| Integration | 68 | pytest with real DB/API |
 | E2E (Mocked) | 11 | Playwright with mocked API |
 | E2E (Real) | 77 | Playwright with real API |
 
@@ -17,25 +17,27 @@ This report shows test coverage for each specification's success criteria.
 
 | Spec | Reqs | Covered | Cover% | Unit | Int | E2E-M | E2E-R | BE-only |
 |------|------|---------|--------|------|-----|-------|-------|---------|
-| [ANNOTATION_SPEC](#annotation-spec) | 21 | 8 | 38% | 50 | 0 | 0 | 7 | **6** |
+| [ANNOTATION_SPEC](#annotation-spec) | 21 | 8 | 38% | 53 | 0 | 0 | 7 | **6** |
 | [ASSISTED_FACILITATION_SPEC](#assisted-facilitation-spec) | 7 | 7 | 100% | 31 | 0 | 0 | 42 | 0 |
-| [AUTHENTICATION_SPEC](#authentication-spec) | 28 | 5 | 17% | 11 | 0 | 2 | 0 | **4** |
+| [AUTHENTICATION_SPEC](#authentication-spec) | 28 | 3 | 10% | 10 | 0 | 2 | 0 | **2** |
 | [BUILD_AND_DEPLOY_SPEC](#build-and-deploy-spec) | 16 | 13 | 81% | 64 | 0 | 0 | 0 | **13** |
 | [CUSTOM_LLM_PROVIDER_SPEC](#custom-llm-provider-spec) | 15 | 0 | 0% | 13 | 0 | 0 | 0 | 0 |
 | [DATASETS_SPEC](#datasets-spec) | 9 | 7 | 77% | 25 | 0 | 0 | 1 | **7** |
 | [DESIGN_SYSTEM_SPEC](#design-system-spec) | 7 | 0 | 0% | 4 | 0 | 1 | 0 | 0 |
 | [DISCOVERY_SPEC](#discovery-spec) | 72 | 61 | 84% | 207 | 5 | 4 | 1 | **40** |
 | [DISCOVERY_TRACE_ASSIGNMENT_SPEC](#discovery-trace-assignment-spec) | 13 | 12 | 92% | 20 | 0 | 1 | 1 | **11** |
-| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 25 | 24 | 96% | 70 | 7 | 0 | 8 | **19** |
-| [PROJECT_SETUP_SPEC](#project-setup-spec) | 26 | 6 | 23% | 9 | 0 | 1 | 0 | **2** |
-| [ROLE_PERMISSIONS_SPEC](#role-permissions-spec) | 16 | 16 | 100% | 24 | 0 | 0 | 0 | **16** |
-| [RUBRIC_SPEC](#rubric-spec) | 25 | 25 | 100% | 63 | 0 | 1 | 6 | **17** |
-| [TESTING_SPEC](#testing-spec) | 30 | 0 | 0% | 35 | 48 | 0 | 0 | 0 |
-| [TRACE_DISPLAY_SPEC](#trace-display-spec) | 18 | 18 | 100% | 68 | 0 | 0 | 7 | **11** |
-| [UI_COMPONENTS_SPEC](#ui-components-spec) | 16 | 0 | 0% | 4 | 0 | 0 | 4 | 0 |
 | [EVAL_MODE_SPEC](#eval-mode-spec) | 35 | 14 | 40% | 22 | 0 | 1 | 0 | **14** |
+| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 25 | 24 | 96% | 79 | 7 | 0 | 8 | **19** |
+| [PROJECT_SETUP_SPEC](#project-setup-spec) | 26 | 6 | 23% | 9 | 0 | 1 | 0 | **2** |
+| [ROLE_PERMISSIONS_SPEC](#role-permissions-spec) | 16 | 12 | 75% | 17 | 0 | 0 | 0 | **12** |
+| [RUBRIC_SPEC](#rubric-spec) | 25 | 25 | 100% | 67 | 0 | 1 | 6 | **15** |
+| [TESTING_SPEC](#testing-spec) | 30 | 0 | 0% | 35 | 50 | 0 | 0 | 0 |
+| [TRACE_DISPLAY_SPEC](#trace-display-spec) | 18 | 18 | 100% | 70 | 0 | 0 | 7 | **11** |
+| [TRACE_INGESTION_SPEC](#trace-ingestion-spec) | 16 | 0 | 0% | 16 | 0 | 0 | 0 | 0 |
+| [TRACE_SUMMARIZATION_SPEC](#trace-summarization-spec) | 64 | 21 | 32% | 58 | 6 | 0 | 0 | **21** |
+| [UI_COMPONENTS_SPEC](#ui-components-spec) | 16 | 0 | 0% | 4 | 0 | 0 | 4 | 0 |
 
-**Total**: 216/379 requirements covered (56%)
+**Total**: 231/459 requirements covered (50%)
 
 ---
 
@@ -128,6 +130,9 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `client/tests/e2e/annotation-mlflow-feedback.spec.ts` (file-level) [e2e-real]
 - `client/tests/e2e/annotation-flow.spec.ts` (file-level) [e2e-real]
 - `client/tests/e2e/annotation-last-trace.spec.ts` (file-level) [e2e-real]
+- `client/src/hooks/useWorkshopApi.facilitatorPolling.test.ts` (file-level) [unit]
+- `client/src/pages/AnnotationDemo.completionState.test.tsx` (file-level) [unit]
+- `client/src/pages/AnnotationDemo.completionState.test.tsx` (file-level) [unit]
 
 ## ASSISTED_FACILITATION_SPEC
 
@@ -160,12 +165,14 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 ## AUTHENTICATION_SPEC
 
-**Coverage**: 5/28 requirements (17%)
+**Coverage**: 3/28 requirements (10%)
 
 ### Uncovered Requirements
 
+- [ ] No page refresh required after login
 - [ ] Slow network: Loading indicator shown until ready
 - [ ] 404 on validation: Session cleared, fresh login allowed
+- [ ] Error recovery: Errors cleared on new login attempt
 - [ ] All Databricks API calls use SDK-resolved tokens (no user-provided PATs)
 - [ ] MLflow operations use SDK auth without `os.environ["DATABRICKS_TOKEN"]` mutation
 - [ ] No token input fields exist in the frontend UI
@@ -193,22 +200,19 @@ These tests are tagged with the spec but don't link to specific requirements:
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
 - :warning: No "permission denied" errors on normal login (unit)
-- :warning: No page refresh required after login (unit)
 - :warning: Permission API failure: User can log in with defaults (unit)
-- :warning: Error recovery: Errors cleared on new login attempt (unit)
 
 ### Covered Requirements
 
 - [x] No "permission denied" errors on normal login (unit) **[BE-only]**
-- [x] No page refresh required after login (unit) **[BE-only]**
 - [x] Permission API failure: User can log in with defaults (unit) **[BE-only]**
 - [x] Rapid navigation: Components wait for `isLoading = false` (unit)
-- [x] Error recovery: Errors cleared on new login attempt (unit) **[BE-only]**
 
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
+- `tests/unit/routers/test_auth_edge_cases.py` (test_auth_session_returns_provider_resolved_user) [unit]
 - `tests/unit/routers/test_auth_edge_cases.py` (test_permission_api_failure_returns_defaults_when_user_not_found) [unit]
 - `tests/unit/routers/test_auth_edge_cases.py` (test_permission_api_returns_role_based_defaults_for_valid_user) [unit]
 - `tests/unit/test_db_config.py` (test_get_password_rejects_unset_or_empty_endpoint[None]) [unit]
@@ -608,6 +612,77 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `client/tests/e2e/trace-visibility.spec.ts` (file-level) [e2e-real]
 - `client/tests/e2e/discovery-invite-traces.spec.ts` (file-level) [e2e-mocked]
 
+## EVAL_MODE_SPEC
+
+**Coverage**: 14/35 requirements (40%)
+
+### Uncovered Requirements
+
+- [ ] Criteria can be authored directly (without discovery)
+- [ ] Discovery analysis can run agent loops over trace spans as alternative to summaries
+- [ ] Richer findings surface example-specific observations
+- [ ] Negative-weight criteria penalize when met
+- [ ] Normalized score = raw / max_possible, clipped to [0, 1]
+- [ ] One independent judge call per criterion
+- [ ] Judge sees trace content + single criterion, not other criteria
+- [ ] Judge returns met (boolean) + rationale
+- [ ] Evaluation runs as background job with progress tracking
+- [ ] Judge scores optionally hidden from human reviewer
+- [ ] One task-level judge aligned using all criteria across all traces as examples
+- [ ] Each criterion's human met/not-met decision stored as a separate MLflow assessment on the trace
+- [ ] All assessments share the judge name; extraction yields all (not just most recent)
+- [ ] Semantic memory distills guidelines from overlapping criteria patterns
+- [ ] Episodic memory indexes specific criterion examples for retrieval
+- [ ] Aligned judge registered to MLflow
+- [ ] Re-hydration rebuilds episodic memory from trace assessments without external state
+- [ ] Re-evaluation compares pre/post alignment accuracy on same trace set
+- [ ] Export produces trace → criteria mapping
+- [ ] Export includes scoring configuration (types, weights, aggregation rules)
+- [ ] Exported eval can be re-run via `mlflow.genai.evaluate()`
+
+### Backend-Only Requirements (no frontend tests)
+
+These requirements are covered by backend tests only. UI regressions won't be caught:
+
+- :warning: Workshop can be created with `mode: "eval"` (unit)
+- :warning: Mode is immutable after creation (unit)
+- :warning: Eval-mode workshops do not use the global rubric system (unit)
+- :warning: Existing workshop-mode behavior is unchanged (unit)
+- :warning: Facilitator can create criteria on a specific trace (unit)
+- :warning: Each criterion has a type (standard or hurdle) and weight (-10 to +10) (unit)
+- :warning: Criteria can be promoted from discovery findings (unit)
+- :warning: Criteria are editable and deletable (unit)
+- :warning: Per-trace rubric is rendered as markdown (unit)
+- :warning: Discovery analysis uses trace summaries when available (unit)
+- :warning: Hurdle criteria gate the entire trace — any hurdle failure → score 0 (unit)
+- :warning: Standard criteria scored as met (1) or not met (0) × weight (unit)
+- :warning: Scoring handles edge cases: no criteria, all hurdles, all negative weights (unit)
+- :warning: Results stored per-criterion with rationale (unit)
+
+### Covered Requirements
+
+- [x] Workshop can be created with `mode: "eval"` (unit) **[BE-only]**
+- [x] Mode is immutable after creation (unit) **[BE-only]**
+- [x] Eval-mode workshops do not use the global rubric system (unit) **[BE-only]**
+- [x] Existing workshop-mode behavior is unchanged (unit) **[BE-only]**
+- [x] Facilitator can create criteria on a specific trace (unit) **[BE-only]**
+- [x] Each criterion has a type (standard or hurdle) and weight (-10 to +10) (unit) **[BE-only]**
+- [x] Criteria can be promoted from discovery findings (unit) **[BE-only]**
+- [x] Criteria are editable and deletable (unit) **[BE-only]**
+- [x] Per-trace rubric is rendered as markdown (unit) **[BE-only]**
+- [x] Discovery analysis uses trace summaries when available (unit) **[BE-only]**
+- [x] Hurdle criteria gate the entire trace — any hurdle failure → score 0 (unit) **[BE-only]**
+- [x] Standard criteria scored as met (1) or not met (0) × weight (unit) **[BE-only]**
+- [x] Scoring handles edge cases: no criteria, all hurdles, all negative weights (unit) **[BE-only]**
+- [x] Results stored per-criterion with rationale (unit) **[BE-only]**
+
+### Tests Without Requirement Links
+
+These tests are tagged with the spec but don't link to specific requirements:
+
+- `client/tests/e2e/eval-mode-workflow.spec.ts` (file-level) [e2e-mocked]
+- `client/src/components/eval/CriterionEditor.eval.test.tsx` (file-level) [unit]
+
 ## JUDGE_EVALUATION_SPEC
 
 **Coverage**: 24/25 requirements (96%)
@@ -682,11 +757,17 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_discovery_dspy_litellm_interop.py` (test_get_sdk_token_normalizes_env_host_for_m2m_token_url) [unit]
 - `tests/unit/services/test_evaluation_tag_overwrite.py` (test_search_tagged_traces_uses_dedicated_align_key) [unit]
 - `tests/unit/services/test_evaluation_tag_overwrite.py` (test_run_evaluation_yields_error_when_no_eval_tagged_traces) [unit]
+- `tests/unit/services/test_irr_service.py` (test_calculate_irr_for_workshop_sends_no_canned_suggestions_for_low_agreement) [unit]
+- `tests/unit/services/test_irr_service.py` (test_calculate_irr_for_workshop_sends_no_canned_suggestions_krippendorff_path) [unit]
+- `tests/unit/services/test_irr_service.py` (test_problematic_patterns_gated_per_metric_on_actual_agreement) [unit]
 - `tests/unit/services/test_irr_utils.py` (test_format_irr_result_rounding_and_ready_flag) [unit]
+- `tests/unit/services/test_irr_utils.py` (test_detect_problematic_patterns_question_id_scopes_to_that_metric) [unit]
+- `tests/unit/services/test_irr_utils.py` (test_detect_problematic_patterns_question_id_excludes_other_metric_ratings) [unit]
 - `client/tests/e2e/judge-evaluation.spec.ts` (file-level) [e2e-real]
 - `client/tests/e2e/evaluation-tagging.spec.ts` (file-level) [e2e-real]
 - `client/tests/e2e/evaluation-tagging.spec.ts` (file-level) [e2e-real]
 - `client/tests/e2e/evaluation-tagging.spec.ts` (file-level) [e2e-real]
+- `client/src/pages/IRRResultsDemo.agreement.test.ts` (file-level) [unit]
 - `client/src/components/JudgeTypeSelector.test.tsx` (file-level) [unit]
 - `client/src/components/JudgeTypeSelector.test.tsx` (file-level) [unit]
 - `client/src/components/JudgeTypeSelector.test.tsx` (file-level) [unit]
@@ -743,7 +824,14 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 ## ROLE_PERMISSIONS_SPEC
 
-**Coverage**: 16/16 requirements (100%)
+**Coverage**: 12/16 requirements (75%)
+
+### Uncovered Requirements
+
+- [ ] Only facilitators can create invitations
+- [ ] Facilitators authenticate via YAML config (preconfigured credentials)
+- [ ] SMEs and participants authenticate via database credentials
+- [ ] Login response includes is_preconfigured_facilitator flag for facilitator logins
 
 ### Backend-Only Requirements (no frontend tests)
 
@@ -758,13 +846,9 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: Permissions derived from role via UserPermissions.for_role() classmethod (unit)
 - :warning: Facilitator role cannot be changed via update endpoint (unit)
 - :warning: Facilitator accounts cannot be deleted via delete endpoint (unit)
-- :warning: Only facilitators can create invitations (unit)
 - :warning: Only facilitators can advance workshop phases (unit)
 - :warning: Phase advancement validates prerequisites before transitioning (unit)
 - :warning: Phase advancement returns 400 if prerequisites not met (unit)
-- :warning: Facilitators authenticate via YAML config (preconfigured credentials) (unit)
-- :warning: SMEs and participants authenticate via database credentials (unit)
-- :warning: Login response includes is_preconfigured_facilitator flag for facilitator logins (unit)
 
 ### Covered Requirements
 
@@ -777,13 +861,9 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Permissions derived from role via UserPermissions.for_role() classmethod (unit) **[BE-only]**
 - [x] Facilitator role cannot be changed via update endpoint (unit) **[BE-only]**
 - [x] Facilitator accounts cannot be deleted via delete endpoint (unit) **[BE-only]**
-- [x] Only facilitators can create invitations (unit) **[BE-only]**
 - [x] Only facilitators can advance workshop phases (unit) **[BE-only]**
 - [x] Phase advancement validates prerequisites before transitioning (unit) **[BE-only]**
 - [x] Phase advancement returns 400 if prerequisites not met (unit) **[BE-only]**
-- [x] Facilitators authenticate via YAML config (preconfigured credentials) (unit) **[BE-only]**
-- [x] SMEs and participants authenticate via database credentials (unit) **[BE-only]**
-- [x] Login response includes is_preconfigured_facilitator flag for facilitator logins (unit) **[BE-only]**
 
 ## RUBRIC_SPEC
 
@@ -793,7 +873,6 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
-- :warning: Questions with multi-line descriptions parse correctly (unit)
 - :warning: Delimiter never appears in user input (by design) (unit)
 - :warning: Parsed questions have stable UUIDs within session (unit)
 - :warning: Empty/whitespace-only parts filtered out (unit)
@@ -808,12 +887,11 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: MLflow re-sync triggered on rubric create/update (best-effort) (unit)
 - :warning: AI suggestions generated from discovery findings and participant notes (unit)
 - :warning: Suggestions validated: title >= 3 chars, description >= 10 chars (unit)
-- :warning: Invalid judge type in suggestions defaults to likert (unit)
 - :warning: Facilitator can accept, reject, or edit suggestions before adding to rubric (unit)
 
 ### Covered Requirements
 
-- [x] Questions with multi-line descriptions parse correctly (unit) **[BE-only]**
+- [x] Questions with multi-line descriptions parse correctly (unit)
 - [x] Delimiter never appears in user input (by design) (unit) **[BE-only]**
 - [x] Frontend and backend use same delimiter constant (unit)
 - [x] Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format (e2e-real, unit)
@@ -836,7 +914,7 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] MLflow re-sync triggered on rubric create/update (best-effort) (unit) **[BE-only]**
 - [x] AI suggestions generated from discovery findings and participant notes (unit) **[BE-only]**
 - [x] Suggestions validated: title >= 3 chars, description >= 10 chars (unit) **[BE-only]**
-- [x] Invalid judge type in suggestions defaults to likert (unit) **[BE-only]**
+- [x] Invalid judge type in suggestions defaults to likert (unit)
 - [x] Facilitator can accept, reject, or edit suggestions before adding to rubric (unit) **[BE-only]**
 
 ### Tests Without Requirement Links
@@ -844,6 +922,8 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 These tests are tagged with the spec but don't link to specific requirements:
 
 - `client/src/utils/rubricUtils.test.ts` (file-level) [unit]
+- `client/src/components/RubricSuggestionPanel.test.tsx` (file-level) [unit]
+- `client/src/pages/RubricCreationDemo.criterionText.test.tsx` (file-level) [unit]
 
 ## TESTING_SPEC
 
@@ -934,6 +1014,8 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/integration/test_connection_resilience.py` (test_non_connection_error_raises_immediately) [integration]
 - `tests/integration/test_connection_resilience.py` (test_stream_discovery_comments_has_no_db_dependency) [integration]
 - `tests/integration/test_connection_resilience.py` (test_stream_discovery_agent_run_has_no_db_dependency) [integration]
+- `tests/integration/test_connection_resilience.py` (test_run_thread_assistant_ag_ui_has_no_db_dependency) [integration]
+- `tests/integration/test_connection_resilience.py` (test_run_summarization_assistant_ag_ui_has_no_db_dependency) [integration]
 - `tests/integration/test_discovery_findings.py` (test_submit_finding) [integration]
 - `tests/integration/test_discovery_findings.py` (test_finding_upsert_same_user_same_trace) [integration]
 - `tests/integration/test_discovery_findings.py` (test_finding_different_users_create_separate_records) [integration]
@@ -1019,6 +1101,165 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `client/tests/e2e/jsonpath-trace-display.spec.ts` (file-level) [e2e-real]
 - `client/src/hooks/useJsonPathExtraction.test.ts` (file-level) [unit]
 - `client/src/components/JsonPathSettings.attrValueDisabled.test.tsx` (file-level) [unit]
+- `client/src/components/TraceViewer.copyOutput.test.tsx` (file-level) [unit]
+- `client/src/components/TraceViewer.copyOutput.test.tsx` (file-level) [unit]
+
+## TRACE_INGESTION_SPEC
+
+**Coverage**: 0/16 requirements (0%)
+
+### Uncovered Requirements
+
+- [ ] Traces are deduplicated by `(workshop_id, mlflow_trace_id)` — re-ingest updates, not duplicates
+- [ ] `mlflow_url`, `mlflow_host`, and `mlflow_experiment_id` are persisted on ingest
+- [ ] MLflow link in TraceViewer opens the correct trace in the correct experiment
+- [ ] Traces without `mlflow_trace_id` get a generated UUID and insert normally
+- [ ] Input extraction prefers the last user-role message from the request payload
+- [ ] Output extraction prefers the last assistant-role message from the response payload
+- [ ] Each trace gets its own unique extracted input (no shared-prefix duplication)
+- [ ] Extraction handles: `{"messages": [...]}`, `{"request": {"input": [...]}}`, list-of-items, and `{"object": "response"}` formats
+- [ ] Extraction falls back to cleaned raw text when no structured format matches
+- [ ] Re-ingesting traces preserves existing `DiscoveryFeedbackDB` FK references
+- [ ] Re-ingesting traces preserves existing `AnnotationDB` FK references
+- [ ] Re-ingesting traces preserves existing `DiscoveryFindingDB` FK references
+- [ ] `active_discovery_trace_ids` remain valid after re-ingestion
+- [ ] Preview format (`request_preview`/`response_preview`) uses column values directly
+- [ ] Raw format (`request`/`response`) applies content extraction with role-aware logic
+- [ ] `mlflow_trace_id` from CSV `trace_id` column is used for deduplication
+
+### Tests Without Requirement Links
+
+These tests are tagged with the spec but don't link to specific requirements:
+
+- `tests/unit/services/test_content_extraction.py` (test_multi_turn_returns_last_user_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_multi_turn_does_not_return_assistant_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_single_user_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_multi_turn_returns_last_assistant_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_single_assistant_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_different_last_user_messages_produce_different_inputs) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_extracts_user_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_default_prefers_assistant) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_plain_string) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_none_returns_empty) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_empty_string_returns_empty) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_mlflow_fields_persisted) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_upsert_same_mlflow_trace_id) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_different_mlflow_trace_ids) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_null_mlflow_trace_id_inserts) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_discovery_finding_fk_survives) [unit]
+
+## TRACE_SUMMARIZATION_SPEC
+
+**Coverage**: 21/64 requirements (32%)
+
+### Uncovered Requirements
+
+- [ ] Facilitator can enable/disable trace summarization per workshop
+- [ ] Settings are persisted per workshop
+- [ ] Summarization runs at ingestion time when enabled and model is configured
+- [ ] Agent accesses trace data through inspection tools (not a full-text dump)
+- [ ] Span data references are resolved in a post-processing step (not LLM-generated values)
+- [ ] Milestone summaries contain substantive content from spans (actual queries, results, decisions)
+- [ ] Milestone summaries avoid mechanical flow narration (not "query received", "results returned")
+- [ ] Summary is stored as JSON on the trace record
+- [ ] The agent determines the number of milestones based on trace complexity
+- [ ] Milestone view is the default display when a summary exists
+- [ ] User can toggle between milestone view and the existing trace viewer
+- [ ] Milestone view shows executive summary at the top
+- [ ] Milestones are numbered and show title, summary, and resolved span data (inputs → outputs)
+- [ ] When no summary exists, the existing trace viewer is shown (no toggle)
+- [ ] Re-ingesting with summarization enabled regenerates summaries
+- [ ] Re-ingesting with summarization disabled preserves existing summaries
+- [ ] Facilitator can trigger re-summarization without full re-ingestion
+- [ ] Ingestion API returns immediately; summarization runs in the background
+- [ ] The ingestion response includes `summarization_job_id` when summarization is triggered
+- [ ] Failed individual traces are retried up to 2 times with exponential backoff
+- [ ] Rate limit responses (429) trigger backoff, not failure
+- [ ] A batch of 100 traces completes summarization within a reasonable wall-clock time given the concurrency limit and model latency
+- [ ] Concurrent LLM calls do not exceed the serving endpoint's rate limit
+- [ ] Summarization does not block the ingestion API response
+- [ ] Individual trace summarization errors are logged with trace ID, error type, and retry count
+- [ ] SummarizationSettings shows a progress indicator while a summarization job is running
+- [ ] Progress indicator shows completed/total/failed counts (e.g., "Summarizing... 45/80 complete, 2 failed")
+- [ ] Progress updates automatically via polling while the job is active
+- [ ] On completion, succeeded/failed counts are displayed in SummarizationSettings
+- [ ] Failed traces are listed with their error descriptions
+- [ ] Facilitator can retry failed traces from the completion view (creates a new job for just those traces)
+- [ ] Re-summarize button exists in SummarizationSettings (disabled while a job is running)
+- [ ] Facilitator can choose to re-summarize all traces or only unsummarized traces
+- [ ] Confirmation dialog is shown before starting re-summarization
+- [ ] `POST /resummarize` accepts a `mode` parameter: "all", "unsummarized", or "failed"
+- [ ] Re-summarization creates a tracked `SummarizationJob` with the same progress UI
+- [ ] Trace list in FacilitatorDashboard shows a visual indicator for traces that have summaries
+- [ ] Aggregate count of summarized vs. unsummarized traces is visible (e.g., "45/80 traces summarized")
+- [ ] Last summarization timestamp is visible in SummarizationSettings
+- [ ] DiscoveryTraceCard defaults to summary view when a summary exists
+- [ ] Facilitator can toggle between summary view and raw user/assistant content
+- [ ] Summary view shows the executive summary text
+- [ ] Summary view has expandable milestones with titles and descriptions
+
+### Backend-Only Requirements (no frontend tests)
+
+These requirements are covered by backend tests only. UI regressions won't be caught:
+
+- :warning: Facilitator can select a model for summarization from available Databricks endpoints (integration, unit)
+- :warning: Facilitator can provide optional free-text guidance for the summarization prompt (unit)
+- :warning: Agent produces an executive summary as the first pass (unit)
+- :warning: Agent extracts milestones with relevant span data as the second pass (unit)
+- :warning: Each milestone includes span data references resolved to actual trace values (unit)
+- :warning: Agent uses trace inspection tools to selectively examine spans (not a full-text dump) (unit)
+- :warning: Agent tools include: get_trace_overview, list_spans, get_span_detail, get_root_span, search_spans (unit)
+- :warning: Summarization failure does not block trace ingestion (unit)
+- :warning: Each milestone has a number, title, and summary (unit)
+- :warning: Each milestone has zero or more input span data references (span_name, field, optional jsonpath) (unit)
+- :warning: Each milestone has zero or more output span data references (span_name, field, optional jsonpath) (unit)
+- :warning: Span data references are resolved to actual values from the trace after agent output (unit)
+- :warning: When jsonpath is null, the entire span inputs or outputs field is included (unit)
+- :warning: Invalid span references (nonexistent span or path) resolve to null without failing the milestone (unit)
+- :warning: Multiple traces are summarized concurrently up to a configurable concurrency limit (unit)
+- :warning: A `SummarizationJob` database row is created when summarization starts (unit)
+- :warning: The job row is updated as each trace completes (trace ID appended to `completed_traces` or `failed_traces`) (unit)
+- :warning: Partial failures do not block the batch — failed traces are ingested with `summary = null` (unit)
+- :warning: `GET /workshops/{id}/summarization-job/{job_id}` returns job status with completed/total/failed counts (unit)
+- :warning: `GET /workshops/{id}/summarization-status` returns summary coverage stats and last job info (unit)
+- :warning: `summarization-status` endpoint provides the data for these indicators without requiring a job (unit)
+
+### Covered Requirements
+
+- [x] Facilitator can select a model for summarization from available Databricks endpoints (integration, unit) **[BE-only]**
+- [x] Facilitator can provide optional free-text guidance for the summarization prompt (unit) **[BE-only]**
+- [x] Agent produces an executive summary as the first pass (unit) **[BE-only]**
+- [x] Agent extracts milestones with relevant span data as the second pass (unit) **[BE-only]**
+- [x] Each milestone includes span data references resolved to actual trace values (unit) **[BE-only]**
+- [x] Agent uses trace inspection tools to selectively examine spans (not a full-text dump) (unit) **[BE-only]**
+- [x] Agent tools include: get_trace_overview, list_spans, get_span_detail, get_root_span, search_spans (unit) **[BE-only]**
+- [x] Summarization failure does not block trace ingestion (unit) **[BE-only]**
+- [x] Each milestone has a number, title, and summary (unit) **[BE-only]**
+- [x] Each milestone has zero or more input span data references (span_name, field, optional jsonpath) (unit) **[BE-only]**
+- [x] Each milestone has zero or more output span data references (span_name, field, optional jsonpath) (unit) **[BE-only]**
+- [x] Span data references are resolved to actual values from the trace after agent output (unit) **[BE-only]**
+- [x] When jsonpath is null, the entire span inputs or outputs field is included (unit) **[BE-only]**
+- [x] Invalid span references (nonexistent span or path) resolve to null without failing the milestone (unit) **[BE-only]**
+- [x] Multiple traces are summarized concurrently up to a configurable concurrency limit (unit) **[BE-only]**
+- [x] A `SummarizationJob` database row is created when summarization starts (unit) **[BE-only]**
+- [x] The job row is updated as each trace completes (trace ID appended to `completed_traces` or `failed_traces`) (unit) **[BE-only]**
+- [x] Partial failures do not block the batch — failed traces are ingested with `summary = null` (unit) **[BE-only]**
+- [x] `GET /workshops/{id}/summarization-job/{job_id}` returns job status with completed/total/failed counts (unit) **[BE-only]**
+- [x] `GET /workshops/{id}/summarization-status` returns summary coverage stats and last job info (unit) **[BE-only]**
+- [x] `summarization-status` endpoint provides the data for these indicators without requiring a job (unit) **[BE-only]**
+
+### Tests Without Requirement Links
+
+These tests are tagged with the spec but don't link to specific requirements:
+
+- `tests/unit/services/test_trace_summarization_service.py` (test_from_dict) [unit]
+- `tests/unit/services/test_trace_summarization_service.py` (test_from_dict_missing_fields_uses_defaults) [unit]
+- `tests/unit/services/test_trace_summarization_service.py` (test_resolve_multiple_refs) [unit]
+- `tests/unit/services/test_trace_summarization_service.py` (test_batch_progress_callback) [unit]
+- `tests/unit/test_summarization_job.py` (test_get_summarization_job_not_found) [unit]
+- `tests/unit/test_summarization_job.py` (test_update_job_status) [unit]
+- `tests/unit/test_summarization_job.py` (test_get_latest_job) [unit]
+- `tests/unit/test_summarization_job.py` (test_get_latest_job_none) [unit]
 
 ## UI_COMPONENTS_SPEC
 
@@ -1055,77 +1296,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `client/src/components/TraceDataViewer.test.tsx` (file-level) [unit]
 - `client/src/components/Pagination.test.tsx` (file-level) [unit]
 - `client/src/components/Pagination.test.tsx` (file-level) [unit]
-
-## EVAL_MODE_SPEC
-
-**Coverage**: 14/35 requirements (40%)
-
-### Uncovered Requirements
-
-- [ ] Criteria can be authored directly (without discovery)
-- [ ] Discovery analysis can run agent loops over trace spans as alternative to summaries
-- [ ] Richer findings surface example-specific observations
-- [ ] Negative-weight criteria penalize when met
-- [ ] Normalized score = raw / max_possible, clipped to [0, 1]
-- [ ] One independent judge call per criterion
-- [ ] Judge sees trace content + single criterion, not other criteria
-- [ ] Judge returns met (boolean) + rationale
-- [ ] Evaluation runs as background job with progress tracking
-- [ ] Judge scores optionally hidden from human reviewer
-- [ ] One task-level judge aligned using all criteria across all traces as examples
-- [ ] Each criterion's human met/not-met decision stored as a separate MLflow assessment on the trace
-- [ ] All assessments share the judge name; extraction yields all (not just most recent)
-- [ ] Semantic memory distills guidelines from overlapping criteria patterns
-- [ ] Episodic memory indexes specific criterion examples for retrieval
-- [ ] Aligned judge registered to MLflow
-- [ ] Re-hydration rebuilds episodic memory from trace assessments without external state
-- [ ] Re-evaluation compares pre/post alignment accuracy on same trace set
-- [ ] Export produces trace → criteria mapping
-- [ ] Export includes scoring configuration (types, weights, aggregation rules)
-- [ ] Exported eval can be re-run via `mlflow.genai.evaluate()`
-
-### Backend-Only Requirements (no frontend tests)
-
-These requirements are covered by backend tests only. UI regressions won't be caught:
-
-- :warning: Workshop can be created with `mode: "eval"` (unit)
-- :warning: Mode is immutable after creation (unit)
-- :warning: Eval-mode workshops do not use the global rubric system (unit)
-- :warning: Existing workshop-mode behavior is unchanged (unit)
-- :warning: Facilitator can create criteria on a specific trace (unit)
-- :warning: Each criterion has a type (standard or hurdle) and weight (-10 to +10) (unit)
-- :warning: Criteria can be promoted from discovery findings (unit)
-- :warning: Criteria are editable and deletable (unit)
-- :warning: Per-trace rubric is rendered as markdown (unit)
-- :warning: Discovery analysis uses trace summaries when available (unit)
-- :warning: Hurdle criteria gate the entire trace — any hurdle failure → score 0 (unit)
-- :warning: Standard criteria scored as met (1) or not met (0) × weight (unit)
-- :warning: Scoring handles edge cases: no criteria, all hurdles, all negative weights (unit)
-- :warning: Results stored per-criterion with rationale (unit)
-
-### Covered Requirements
-
-- [x] Workshop can be created with `mode: "eval"` (unit) **[BE-only]**
-- [x] Mode is immutable after creation (unit) **[BE-only]**
-- [x] Eval-mode workshops do not use the global rubric system (unit) **[BE-only]**
-- [x] Existing workshop-mode behavior is unchanged (unit) **[BE-only]**
-- [x] Facilitator can create criteria on a specific trace (unit) **[BE-only]**
-- [x] Each criterion has a type (standard or hurdle) and weight (-10 to +10) (unit) **[BE-only]**
-- [x] Criteria can be promoted from discovery findings (unit) **[BE-only]**
-- [x] Criteria are editable and deletable (unit) **[BE-only]**
-- [x] Per-trace rubric is rendered as markdown (unit) **[BE-only]**
-- [x] Discovery analysis uses trace summaries when available (unit) **[BE-only]**
-- [x] Hurdle criteria gate the entire trace — any hurdle failure → score 0 (unit) **[BE-only]**
-- [x] Standard criteria scored as met (1) or not met (0) × weight (unit) **[BE-only]**
-- [x] Scoring handles edge cases: no criteria, all hurdles, all negative weights (unit) **[BE-only]**
-- [x] Results stored per-criterion with rationale (unit) **[BE-only]**
-
-### Tests Without Requirement Links
-
-These tests are tagged with the spec but don't link to specific requirements:
-
-- `client/tests/e2e/eval-mode-workflow.spec.ts` (file-level) [e2e-mocked]
-- `client/src/components/eval/CriterionEditor.eval.test.tsx` (file-level) [unit]
 
 ---
 

@@ -3,6 +3,24 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('@/hooks/useWorkshopApi', () => ({
+  useDiscoveryComments: () => ({ data: [], refetch: vi.fn() }),
+  useCreateDiscoveryComment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useVoteDiscoveryComment: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteDiscoveryComment: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+vi.mock('@/hooks/useWorkflowMode', () => ({
+  useWorkflowMode: () => ({ isEvalMode: false }),
+}));
+
+class MockEventSource {
+  addEventListener() {}
+  removeEventListener() {}
+  close() {}
+}
+vi.stubGlobal('EventSource', MockEventSource);
+
 import { DiscoveryTraceCard } from './DiscoveryTraceCard';
 
 const mockTrace = {

@@ -3,13 +3,10 @@
 Tests verify cross-spec permission enforcement at API boundaries:
 - Role-to-permission matrix (for_role classmethod)
 - Role protection (facilitator cannot be changed/deleted)
-- Invitation creation restricted to facilitators
 - Phase advancement with prerequisite validation
-- Login flow differences by role
 """
 
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock
+from datetime import datetime
 
 import pytest
 
@@ -194,7 +191,7 @@ async def test_permissions_endpoint_uses_for_role(async_client, app):
 
     app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
     try:
-        resp = await async_client.get("/users/u-sme/permissions")
+        resp = await async_client.get("/api/users/u-sme/permissions")
         assert resp.status_code == 200
         body = resp.json()
         expected = UserPermissions.for_role(UserRole.SME).model_dump()
@@ -230,7 +227,7 @@ async def test_facilitator_role_cannot_be_changed(async_client, app):
     app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
     try:
         resp = await async_client.put(
-            "/users/workshops/w1/users/u-fac/role",
+            "/api/users/workshops/w1/users/u-fac/role",
             json={"role": "sme"},
         )
         assert resp.status_code == 403
@@ -260,7 +257,7 @@ async def test_facilitator_cannot_be_deleted(async_client, app):
 
     app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
     try:
-        resp = await async_client.delete("/users/u-fac")
+        resp = await async_client.delete("/api/users/u-fac")
         assert resp.status_code == 403
         assert "Cannot delete facilitators" in resp.json()["detail"]
     finally:
@@ -286,89 +283,9 @@ async def test_non_facilitator_can_be_deleted(async_client, app):
 
     app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
     try:
-        resp = await async_client.delete("/users/u-sme")
+        resp = await async_client.delete("/api/users/u-sme")
         assert resp.status_code == 200
         assert "deleted successfully" in resp.json()["message"]
-    finally:
-        app.dependency_overrides.pop(users_router.get_database_service, None)
-
-
-# ===========================================================================
-# Requirement 10: Only facilitators can create invitations
-# ===========================================================================
-
-
-@pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("Only facilitators can create invitations")
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_only_facilitators_can_create_invitations(async_client, app):
-    """POST /users/invitations/ must return 403 when inviter is not a facilitator."""
-    import server.routers.users as users_router
-
-    sme_inviter = _make_user("u-sme", UserRole.SME)
-
-    class FakeDBService:
-        def get_user(self, user_id: str):
-            return sme_inviter
-
-    app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
-    try:
-        resp = await async_client.post(
-            "/users/invitations/",
-            json={
-                "email": "new@example.com",
-                "name": "New User",
-                "role": "participant",
-                "workshop_id": "w1",
-                "invited_by": "u-sme",
-                "expires_at": (datetime.now() + timedelta(days=7)).isoformat(),
-            },
-        )
-        assert resp.status_code == 403
-        assert "Only facilitators can create invitations" in resp.json()["detail"]
-    finally:
-        app.dependency_overrides.pop(users_router.get_database_service, None)
-
-
-@pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("Only facilitators can create invitations")
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_facilitator_can_create_invitation(async_client, app):
-    """POST /users/invitations/ must succeed when inviter is a facilitator."""
-    import server.routers.users as users_router
-
-    facilitator = _make_user("u-fac", UserRole.FACILITATOR)
-
-    class FakeInvitation:
-        invitation_token = "tok123"
-
-    class FakeDBService:
-        def get_user(self, user_id: str):
-            return facilitator
-
-        def get_user_by_email(self, email: str):
-            return None  # new user
-
-        def create_invitation(self, invitation_data):
-            return FakeInvitation()
-
-    app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
-    try:
-        resp = await async_client.post(
-            "/users/invitations/",
-            json={
-                "email": "new@example.com",
-                "name": "New User",
-                "role": "participant",
-                "workshop_id": "w1",
-                "invited_by": "u-fac",
-                "expires_at": (datetime.now() + timedelta(days=7)).isoformat(),
-            },
-        )
-        assert resp.status_code == 200
-        assert "Invitation created successfully" in resp.json()["message"]
     finally:
         app.dependency_overrides.pop(users_router.get_database_service, None)
 
@@ -597,190 +514,3 @@ async def test_advance_from_wrong_phase_returns_400(
 
     resp = await async_client.post("/workshops/w-skip/advance-to-annotation")
     assert resp.status_code == 400
-
-
-# ===========================================================================
-# Requirement 14: Facilitators authenticate via YAML config
-# ===========================================================================
-
-
-@pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("Facilitators authenticate via YAML config (preconfigured credentials)")
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_facilitator_authenticates_via_yaml(async_client, app):
-    """Login endpoint must try YAML auth first; facilitator matched in YAML succeeds."""
-    import server.routers.users as users_router
-
-    facilitator = _make_user("u-fac", UserRole.FACILITATOR)
-
-    class FakeDBService:
-        def authenticate_facilitator_from_yaml(self, email, password):
-            return {"email": email, "name": "Fac", "workshop_id": "w1"}
-
-        def get_or_create_facilitator_user(self, facilitator_data):
-            return facilitator
-
-        def authenticate_user(self, email, password):
-            raise AssertionError("DB auth should not be attempted for YAML facilitator")
-
-    app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
-    try:
-        resp = await async_client.post(
-            "/users/auth/login",
-            json={"email": "fac@example.com", "password": "secret"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["is_preconfigured_facilitator"] is True
-        assert body["user"]["role"] == "facilitator"
-    finally:
-        app.dependency_overrides.pop(users_router.get_database_service, None)
-
-
-# ===========================================================================
-# Requirement 15: SMEs and participants authenticate via database credentials
-# ===========================================================================
-
-
-@pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("SMEs and participants authenticate via database credentials")
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_sme_authenticates_via_database(async_client, app):
-    """When YAML auth returns None, login falls through to DB authentication."""
-    import server.routers.users as users_router
-
-    sme_user = _make_user("u-sme", UserRole.SME)
-
-    class FakeDBService:
-        def authenticate_facilitator_from_yaml(self, email, password):
-            return None  # Not a YAML facilitator
-
-        def authenticate_user(self, email, password):
-            return sme_user  # Authenticated via DB
-
-        def activate_user_on_login(self, user_id):
-            pass
-
-        def get_user(self, user_id):
-            return sme_user
-
-    app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
-    try:
-        resp = await async_client.post(
-            "/users/auth/login",
-            json={"email": "u-sme@example.com", "password": "pw"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["is_preconfigured_facilitator"] is False
-        assert body["user"]["role"] == "sme"
-    finally:
-        app.dependency_overrides.pop(users_router.get_database_service, None)
-
-
-@pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("SMEs and participants authenticate via database credentials")
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_participant_authenticates_via_database(async_client, app):
-    """Participants also authenticate through the database path."""
-    import server.routers.users as users_router
-
-    participant = _make_user("u-part", UserRole.PARTICIPANT)
-
-    class FakeDBService:
-        def authenticate_facilitator_from_yaml(self, email, password):
-            return None
-
-        def authenticate_user(self, email, password):
-            return participant
-
-        def activate_user_on_login(self, user_id):
-            pass
-
-        def get_user(self, user_id):
-            return participant
-
-    app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
-    try:
-        resp = await async_client.post(
-            "/users/auth/login",
-            json={"email": "u-part@example.com", "password": "pw"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["is_preconfigured_facilitator"] is False
-        assert body["user"]["role"] == "participant"
-    finally:
-        app.dependency_overrides.pop(users_router.get_database_service, None)
-
-
-# ===========================================================================
-# Requirement 16: Login response includes is_preconfigured_facilitator flag
-# ===========================================================================
-
-
-@pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("Login response includes is_preconfigured_facilitator flag for facilitator logins")
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_login_response_includes_is_preconfigured_flag_true(async_client, app):
-    """Facilitator login must return is_preconfigured_facilitator=True."""
-    import server.routers.users as users_router
-
-    facilitator = _make_user("u-fac", UserRole.FACILITATOR)
-
-    class FakeDBService:
-        def authenticate_facilitator_from_yaml(self, email, password):
-            return {"email": email, "name": "Fac", "workshop_id": "w1"}
-
-        def get_or_create_facilitator_user(self, data):
-            return facilitator
-
-    app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
-    try:
-        resp = await async_client.post(
-            "/users/auth/login",
-            json={"email": "fac@example.com", "password": "pw"},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["is_preconfigured_facilitator"] is True
-    finally:
-        app.dependency_overrides.pop(users_router.get_database_service, None)
-
-
-@pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("Login response includes is_preconfigured_facilitator flag for facilitator logins")
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_login_response_includes_is_preconfigured_flag_false(async_client, app):
-    """Non-facilitator login must return is_preconfigured_facilitator=False."""
-    import server.routers.users as users_router
-
-    sme = _make_user("u-sme", UserRole.SME)
-
-    class FakeDBService:
-        def authenticate_facilitator_from_yaml(self, email, password):
-            return None
-
-        def authenticate_user(self, email, password):
-            return sme
-
-        def activate_user_on_login(self, user_id):
-            pass
-
-        def get_user(self, user_id):
-            return sme
-
-    app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
-    try:
-        resp = await async_client.post(
-            "/users/auth/login",
-            json={"email": "sme@example.com", "password": "pw"},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["is_preconfigured_facilitator"] is False
-    finally:
-        app.dependency_overrides.pop(users_router.get_database_service, None)

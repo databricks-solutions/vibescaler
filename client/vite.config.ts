@@ -117,6 +117,13 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    server: {
+      deps: {
+        // ESM deps that ship raw .css imports; must be transformed by Vite
+        // rather than loaded through Node's ESM loader.
+        inline: [/@copilotkit\//],
+      },
+    },
     // JSON reporter for LLM agents (set VITEST_JSON_REPORT=1)
     reporters: process.env.VITEST_JSON_REPORT === '1'
       ? ['json']

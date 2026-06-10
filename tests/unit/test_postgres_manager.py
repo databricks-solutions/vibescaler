@@ -55,11 +55,12 @@ class TestAllowedTables:
 
     def test_contains_config_tables(self):
         config_tables = {
-            "facilitator_configs",
             "mlflow_intake_config",
             "custom_llm_provider_config",
         }
         assert config_tables.issubset(ALLOWED_TABLES)
+        # Dropped by migration 0024 — V2 resolves users via provider identity
+        assert "facilitator_configs" not in ALLOWED_TABLES
 
     def test_contains_ordering_tables(self):
         ordering_tables = {

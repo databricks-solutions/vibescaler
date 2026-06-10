@@ -203,3 +203,21 @@ class TestStreamingEndpointsDoNotHoldSessions:
             "Streaming endpoint must not bind a Session via Depends(get_db) — "
             "acquire SessionLocal() per poll iteration instead. See gh#163."
         )
+
+    def test_run_thread_assistant_ag_ui_has_no_db_dependency(self):
+        from server.routers.discovery import run_thread_assistant_ag_ui
+
+        params = self._signature_params(run_thread_assistant_ag_ui)
+        assert "db" not in params, (
+            "AG-UI streaming endpoint must not bind a Session via Depends(get_db) — "
+            "acquire SessionLocal() around each DB read/write instead. See gh#163."
+        )
+
+    def test_run_summarization_assistant_ag_ui_has_no_db_dependency(self):
+        from server.routers.discovery import run_summarization_assistant_ag_ui
+
+        params = self._signature_params(run_summarization_assistant_ag_ui)
+        assert "db" not in params, (
+            "AG-UI streaming endpoint must not bind a Session via Depends(get_db) — "
+            "acquire SessionLocal() around each DB read/write instead. See gh#163."
+        )

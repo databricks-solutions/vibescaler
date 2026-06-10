@@ -1,6 +1,7 @@
 """Edge case tests for authentication endpoints.
 
 Tests verify success criteria from AUTHENTICATION_SPEC.md:
+- Provider-resolved session returned by GET /api/auth/session
 - Permission API failure returns defaults (fallback behavior)
 """
 
@@ -9,6 +10,45 @@ from datetime import datetime
 import pytest
 
 from server.models import User, UserPermissions, UserRole, UserStatus
+
+
+@pytest.mark.spec("AUTHENTICATION_SPEC")
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_auth_session_returns_provider_resolved_user(async_client, app):
+    """GET /api/auth/session returns the provider-resolved user, permissions, and provider role."""
+    from server.features.auth.schemas import AuthSession, ProviderRole
+    from server.features.auth.service import get_current_session
+
+    facilitator = User(
+        id="u-fac",
+        email="fac@example.com",
+        name="Fac",
+        role=UserRole.FACILITATOR,
+        workshop_id="w1",
+        status=UserStatus.ACTIVE,
+        created_at=datetime.now(),
+        last_active=None,
+    )
+    session = AuthSession(
+        user=facilitator,
+        permissions=UserPermissions.for_role(UserRole.FACILITATOR),
+        provider="local_dev",
+        provider_role=ProviderRole.CAN_MANAGE,
+        project=None,
+    )
+
+    app.dependency_overrides[get_current_session] = lambda: session
+    try:
+        resp = await async_client.get("/api/auth/session")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["user"]["role"] == "facilitator"
+        assert body["provider"] == "local_dev"
+        assert body["provider_role"] == "CAN_MANAGE"
+        assert body["permissions"]["can_manage_workshop"] is True
+    finally:
+        app.dependency_overrides.pop(get_current_session, None)
 
 
 @pytest.mark.spec("AUTHENTICATION_SPEC")
@@ -29,7 +69,7 @@ async def test_permission_api_failure_returns_defaults_when_user_not_found(async
 
     app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
     try:
-        resp = await async_client.get("/users/nonexistent-user/permissions")
+        resp = await async_client.get("/api/users/nonexistent-user/permissions")
         # Per AUTHENTICATION_SPEC: 404 on validation clears session
         assert resp.status_code == 404
         assert "not found" in resp.json()["detail"].lower()
@@ -71,7 +111,7 @@ async def test_permission_api_returns_role_based_defaults_for_valid_user(async_c
 
     app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
     try:
-        resp = await async_client.get("/users/u-participant/permissions")
+        resp = await async_client.get("/api/users/u-participant/permissions")
         assert resp.status_code == 200
         body = resp.json()
         # Verify the permissions match what for_role returns for participants
@@ -104,6 +144,6 @@ async def test_permission_api_failure_when_db_service_raises(async_client, app):
     app.dependency_overrides[users_router.get_database_service] = lambda: FakeDBService()
     try:
         with pytest.raises(RuntimeError, match="Database connection lost"):
-            await async_client.get("/users/u-broken/permissions")
+            await async_client.get("/api/users/u-broken/permissions")
     finally:
         app.dependency_overrides.pop(users_router.get_database_service, None)

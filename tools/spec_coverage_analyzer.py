@@ -41,26 +41,23 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Literal
 
-# All known specs (without .md extension)
-KNOWN_SPECS = [
-    "ANNOTATION_SPEC",
-    "ASSISTED_FACILITATION_SPEC",
-    "AUTHENTICATION_SPEC",
-    "BUILD_AND_DEPLOY_SPEC",
-    "CUSTOM_LLM_PROVIDER_SPEC",
-    "DATASETS_SPEC",
-    "DESIGN_SYSTEM_SPEC",
-    "DISCOVERY_SPEC",
-    "DISCOVERY_TRACE_ASSIGNMENT_SPEC",
-    "JUDGE_EVALUATION_SPEC",
-    "PROJECT_SETUP_SPEC",
-    "ROLE_PERMISSIONS_SPEC",
-    "RUBRIC_SPEC",
-    "TESTING_SPEC",
-    "TRACE_DISPLAY_SPEC",
-    "UI_COMPONENTS_SPEC",
-    "EVAL_MODE_SPEC",
-]
+# Repo root (this file lives in tools/)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _discover_known_specs() -> list[str]:
+    """Discover all spec names from specs/*_SPEC.md files.
+
+    Specs are discovered dynamically so newly added spec files are picked up
+    automatically (previously this was a hardcoded list that drifted out of
+    sync with the specs/ directory).
+    """
+    specs_dir = _REPO_ROOT / "specs"
+    return sorted(p.stem for p in specs_dir.glob("*_SPEC.md"))
+
+
+# All known specs (without .md extension), discovered from specs/*_SPEC.md
+KNOWN_SPECS = _discover_known_specs()
 
 TestType = Literal["unit", "integration", "e2e-mocked", "e2e-real"]
 
@@ -1353,7 +1350,7 @@ def main():
         # Warn about unknown specs
         if scanner.unknown_specs:
             print(f"\nUnknown specs referenced: {', '.join(sorted(scanner.unknown_specs))}")
-            print("   Add them to KNOWN_SPECS in spec_coverage_analyzer.py if they are valid.")
+            print("   Add a specs/<NAME>_SPEC.md file if they are valid (specs are discovered from specs/*_SPEC.md).")
 
 
 if __name__ == "__main__":

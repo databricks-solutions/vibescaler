@@ -1330,54 +1330,58 @@ const CitationsDisplay: React.FC<{
  * ChatCompletion and other LLM response formats. Only if that fails
  * does it fall back to the JSONPath-transformed displayOutput.
  */
+const extractOutputLLMContent = (
+  rawOutput: string | object
+): { content: string | null; metadata: Record<string, unknown> | null } => {
+  // First, try to extract judge result from malformed JSON string
+  if (typeof rawOutput === 'string') {
+    const judgeResult = extractJudgeResultFromMalformed(rawOutput);
+    if (judgeResult && judgeResult.rationale) {
+      const resultLabel = judgeResult.result !== undefined ? `**Rating: ${String(judgeResult.result)}**\n\n` : '';
+      const content = resultLabel + judgeResult.rationale;
+
+      // Extract basic metadata from the raw string
+      const idMatch = rawOutput.match(/"id":\s*"([^"]+)"/);
+      const modelMatch = rawOutput.match(/"model":\s*"([^"]+)"/);
+      const metadata: Record<string, unknown> = {};
+      if (idMatch) metadata.id = idMatch[1];
+      if (modelMatch) metadata.model = modelMatch[1];
+
+      return { content, metadata: Object.keys(metadata).length > 0 ? metadata : null };
+    }
+  }
+
+  try {
+    // Handle both string and already-parsed object
+    let parsed: unknown;
+    if (typeof rawOutput === 'string') {
+      parsed = JSON.parse(rawOutput);
+      // Handle double-stringified JSON (string containing JSON string)
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          // It was a regular string, not double-encoded
+        }
+      }
+    } else if (typeof rawOutput === 'object' && rawOutput !== null) {
+      parsed = rawOutput;
+    } else {
+      return { content: null, metadata: null };
+    }
+
+    return extractLLMResponseContent(parsed);
+  } catch {
+    return { content: null, metadata: null };
+  }
+};
+
 const OutputRenderer: React.FC<{
   rawOutput: string | object;
   displayOutput: string;
 }> = ({ rawOutput, displayOutput }) => {
   // Try to extract LLM content from the raw output first
-  const llmExtraction = useMemo(() => {
-    // First, try to extract judge result from malformed JSON string
-    if (typeof rawOutput === 'string') {
-      const judgeResult = extractJudgeResultFromMalformed(rawOutput);
-      if (judgeResult && judgeResult.rationale) {
-        const resultLabel = judgeResult.result !== undefined ? `**Rating: ${String(judgeResult.result)}**\n\n` : '';
-        const content = resultLabel + judgeResult.rationale;
-
-        // Extract basic metadata from the raw string
-        const idMatch = rawOutput.match(/"id":\s*"([^"]+)"/);
-        const modelMatch = rawOutput.match(/"model":\s*"([^"]+)"/);
-        const metadata: Record<string, unknown> = {};
-        if (idMatch) metadata.id = idMatch[1];
-        if (modelMatch) metadata.model = modelMatch[1];
-
-        return { content, metadata: Object.keys(metadata).length > 0 ? metadata : null };
-      }
-    }
-
-    try {
-      // Handle both string and already-parsed object
-      let parsed: unknown;
-      if (typeof rawOutput === 'string') {
-        parsed = JSON.parse(rawOutput);
-        // Handle double-stringified JSON (string containing JSON string)
-        if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(parsed);
-          } catch {
-            // It was a regular string, not double-encoded
-          }
-        }
-      } else if (typeof rawOutput === 'object' && rawOutput !== null) {
-        parsed = rawOutput;
-      } else {
-        return { content: null, metadata: null };
-      }
-
-      return extractLLMResponseContent(parsed);
-    } catch {
-      return { content: null, metadata: null };
-    }
-  }, [rawOutput]);
+  const llmExtraction = useMemo(() => extractOutputLLMContent(rawOutput), [rawOutput]);
 
   // If we found LLM content in raw output, render it prominently
   if (llmExtraction.content) {
@@ -1463,7 +1467,24 @@ const TraceDetailContent: React.FC<{
   displayOutput,
   isInputJson,
   isOutputJson,
-}) => (
+}) => {
+  const rawOutputText = useMemo(() => {
+    if (typeof trace.output === 'string') {
+      try {
+        return JSON.stringify(JSON.parse(trace.output), null, 2);
+      } catch {
+        return trace.output;
+      }
+    }
+    return JSON.stringify(trace.output, null, 2);
+  }, [trace.output]);
+
+  const formattedOutputText = useMemo(() => {
+    const { content } = extractOutputLLMContent(trace.output);
+    return content ?? displayOutput;
+  }, [trace.output, displayOutput]);
+
+  return (
   <>
     {/* Context sections */}
     {trace.context?.conversation_history && (
@@ -1579,18 +1600,7 @@ const TraceDetailContent: React.FC<{
               {showRawOutput ? 'Show Formatted' : 'Show Raw JSON'}
             </Button>
             <CopyButton
-              text={showRawOutput
-                ? (typeof trace.output === 'string'
-                    ? (() => {
-                        try {
-                          return JSON.stringify(JSON.parse(trace.output), null, 2);
-                        } catch {
-                          return trace.output;
-                        }
-                      })()
-                    : JSON.stringify(trace.output, null, 2))
-                : displayOutput
-              }
+              text={showRawOutput ? rawOutputText : formattedOutputText}
               label="Copy Output"
             />
           </div>
@@ -1600,16 +1610,7 @@ const TraceDetailContent: React.FC<{
         <div className="bg-green-50/50 p-4 rounded-lg border border-green-100">
           {showRawOutput ? (
             <pre className="text-sm text-gray-800 whitespace-pre-wrap overflow-x-auto font-mono bg-white p-3 rounded border border-green-200">
-              {typeof trace.output === 'string'
-                ? (() => {
-                    try {
-                      return JSON.stringify(JSON.parse(trace.output), null, 2);
-                    } catch {
-                      return trace.output;
-                    }
-                  })()
-                : JSON.stringify(trace.output, null, 2)
-              }
+              {rawOutputText}
             </pre>
           ) : (
             <OutputRenderer rawOutput={trace.output} displayOutput={displayOutput} />
@@ -1618,7 +1619,8 @@ const TraceDetailContent: React.FC<{
       </CardContent>
     </Card>
   </>
-);
+  );
+};
 
 export const TraceViewer: React.FC<TraceViewerProps> = ({
   trace,

@@ -3,19 +3,26 @@
 /**
  * Tests for UserContext authentication loading state management.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { UserProvider, useUser } from './UserContext';
 
-// Mock the UsersService
-vi.mock('@/client', () => ({
-  UsersService: {
-    getUserUsersUserIdGet: vi.fn(),
-    getUserPermissionsUsersUserIdPermissionsGet: vi.fn(),
-    updateLastActiveUsersUsersUserIdLastActivePut: vi.fn(),
+const sessionPayload = {
+  user: {
+    id: 'u1',
+    email: 'u1@example.com',
+    name: 'U1',
+    role: 'sme',
+    status: 'active',
+    created_at: new Date().toISOString(),
+    last_active: null,
   },
-}));
+  permissions: { can_annotate: true },
+  provider: 'local_dev',
+  provider_role: 'CAN_USE',
+  project: null,
+};
 
 function LoadingStateDisplay() {
   const { isLoading } = useUser();
@@ -34,15 +41,25 @@ function createWrapper() {
 }
 
 describe('@spec:AUTHENTICATION_SPEC UserContext loading state', () => {
+  const fetchMock = vi.fn();
+
   beforeEach(() => {
-    localStorage.clear();
-    vi.clearAllMocks();
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => sessionPayload,
+    });
+    vi.stubGlobal('fetch', fetchMock);
   });
 
-  it('isLoading starts true and transitions to false after initialization', async () => {
-    // Per AUTHENTICATION_SPEC: isLoading must remain true until ALL initialization
-    // steps complete. Components should only render interactive content when
-    // isLoading === false. This test verifies the transition.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('isLoading starts true and transitions to false after session resolution', async () => {
+    // Per AUTHENTICATION_SPEC: isLoading must remain true until the backend
+    // session is resolved. Components should only render interactive content
+    // when isLoading === false. This test verifies the transition.
     const Wrapper = createWrapper();
     render(
       <Wrapper>
@@ -50,9 +67,13 @@ describe('@spec:AUTHENTICATION_SPEC UserContext loading state', () => {
       </Wrapper>,
     );
 
-    // After initialization (no saved user), isLoading becomes false
+    expect(screen.getByTestId('loading-state').textContent).toBe('loading');
+
+    // After the provider-resolved session loads, isLoading becomes false
     await waitFor(() => {
       expect(screen.getByTestId('loading-state').textContent).toBe('ready');
     });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/session', expect.objectContaining({ credentials: 'include' }));
   });
 });

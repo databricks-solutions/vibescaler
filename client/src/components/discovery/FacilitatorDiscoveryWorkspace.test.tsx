@@ -5,6 +5,17 @@ import { describe, it, expect, vi } from 'vitest';
 import { FacilitatorDiscoveryWorkspace } from './FacilitatorDiscoveryWorkspace';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+vi.mock('@/hooks/useWorkflowMode', () => ({
+  useWorkflowMode: () => ({ isEvalMode: false }),
+}));
+
+class MockEventSource {
+  addEventListener() {}
+  removeEventListener() {}
+  close() {}
+}
+vi.stubGlobal('EventSource', MockEventSource);
+
 // Mock the hooks
 vi.mock('@/hooks/useWorkshopApi', () => ({
   useAllTraces: () => ({ data: [

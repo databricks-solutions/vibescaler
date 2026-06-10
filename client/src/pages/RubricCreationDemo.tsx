@@ -51,7 +51,7 @@ import { WorkshopsService } from '@/client';
 import { JudgeType } from '@/client';
 import type { Rubric, RubricCreate, Trace } from '@/client';
 import { toast } from 'sonner';
-import { parseRubricQuestions, formatRubricQuestions, QUESTION_DELIMITER, type RubricQuestion } from '@/utils/rubricUtils';
+import { parseRubricQuestions, formatRubricQuestions, buildCriterionDescription, parseCriterionDescription, type RubricQuestion } from '@/utils/rubricUtils';
 
 
 // Convert API Rubric to local RubricQuestion format
@@ -327,14 +327,12 @@ export function RubricCreationDemo() {
   }
 
   // Build combined description from structured fields
-  const buildDescription = () => {
-    const parts: string[] = [];
-    if (newDefinition.trim()) parts.push(newDefinition.trim());
-    if (newPositiveDirection.trim()) parts.push(`Positive: ${newPositiveDirection.trim()}`);
-    if (newNegativeDirection.trim()) parts.push(`Negative: ${newNegativeDirection.trim()}`);
-    if (newExamples.trim()) parts.push(`Examples: ${newExamples.trim()}`);
-    return parts.join('\n');
-  };
+  const buildDescription = () => buildCriterionDescription({
+    definition: newDefinition,
+    positive: newPositiveDirection,
+    negative: newNegativeDirection,
+    examples: newExamples,
+  });
 
   const resetDialogFields = () => {
     setNewQuestion({ title: '', description: '', judgeType: JudgeType.LIKERT });
@@ -345,35 +343,9 @@ export function RubricCreationDemo() {
     setEditingQuestionId(null);
   };
 
-  // Parse a stored description string back into structured fields
-  const parseDescription = (description: string) => {
-    let definition = '';
-    let positive = '';
-    let negative = '';
-    let examples = '';
-    
-    const lines = description.split('\n');
-    const definitionLines: string[] = [];
-    
-    for (const line of lines) {
-      if (line.startsWith('Positive: ')) {
-        positive = line.replace('Positive: ', '');
-      } else if (line.startsWith('Negative: ')) {
-        negative = line.replace('Negative: ', '');
-      } else if (line.startsWith('Examples: ')) {
-        examples = line.replace('Examples: ', '');
-      } else {
-        definitionLines.push(line);
-      }
-    }
-    
-    definition = definitionLines.join('\n').trim();
-    return { definition, positive, negative, examples };
-  };
-
   // Open the dialog in edit mode for an existing question
   const openEditDialog = (question: RubricQuestion) => {
-    const parsed = parseDescription(question.description);
+    const parsed = parseCriterionDescription(question.description);
     setNewQuestion({ title: question.title, description: question.description, judgeType: question.judgeType || 'likert' });
     setNewDefinition(parsed.definition);
     setNewPositiveDirection(parsed.positive);
@@ -839,8 +811,8 @@ export function RubricCreationDemo() {
                 <div className="flex items-start gap-3">
                   <Lightbulb className="h-4 w-4 text-indigo-600 mt-0.5 flex-shrink-0" />
                   <p className="text-sm text-indigo-700">
-                    Each criterion can have its own evaluation type: <strong>Likert Scale</strong> (1-5 ratings),
-                    <strong> Binary</strong> (Pass/Fail), or <strong>Free-form</strong> (open text feedback).
+                    Each criterion can have its own evaluation type: <strong>Likert Scale</strong> (1-5 ratings)
+                    or <strong>Binary</strong> (Pass/Fail).
                   </p>
                 </div>
               </CardContent>
@@ -884,7 +856,7 @@ export function RubricCreationDemo() {
             )}
 
             {questions.map((question, index) => {
-              const parsed = parseDescription(question.description);
+              const parsed = parseCriterionDescription(question.description);
               const judgeType = question.judgeType || 'likert';
               const borderColor =
                 judgeType === 'likert' ? 'border-green-500' :
@@ -955,7 +927,7 @@ export function RubricCreationDemo() {
                     {parsed.definition && (
                       <div>
                         <span className="font-medium text-gray-700">Definition: </span>
-                        <span className="text-gray-600">{parsed.definition}</span>
+                        <span className="text-gray-600 whitespace-pre-wrap">{parsed.definition}</span>
                       </div>
                     )}
                     {parsed.positive && (
@@ -963,7 +935,7 @@ export function RubricCreationDemo() {
                         <CheckCircle className="h-3.5 w-3.5 text-green-600 mt-0.5 flex-shrink-0" />
                         <div>
                           <span className="font-medium text-green-700">Positive: </span>
-                          <span className="text-gray-600">{parsed.positive}</span>
+                          <span className="text-gray-600 whitespace-pre-wrap">{parsed.positive}</span>
                         </div>
                       </div>
                     )}
@@ -972,7 +944,7 @@ export function RubricCreationDemo() {
                         <AlertCircle className="h-3.5 w-3.5 text-red-600 mt-0.5 flex-shrink-0" />
                         <div>
                           <span className="font-medium text-red-700">Negative: </span>
-                          <span className="text-gray-600">{parsed.negative}</span>
+                          <span className="text-gray-600 whitespace-pre-wrap">{parsed.negative}</span>
                         </div>
                       </div>
                     )}
@@ -981,7 +953,7 @@ export function RubricCreationDemo() {
                         <Lightbulb className="h-3.5 w-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
                         <div>
                           <span className="font-medium text-amber-700">Examples: </span>
-                          <span className="text-gray-600">{parsed.examples}</span>
+                          <span className="text-gray-600 whitespace-pre-wrap">{parsed.examples}</span>
                         </div>
                       </div>
                     )}
@@ -1124,13 +1096,6 @@ export function RubricCreationDemo() {
                       >
                         Binary
                       </Badge>
-                      <Badge
-                        variant={newQuestion.judgeType === 'freeform' ? 'default' : 'outline'}
-                        className={`cursor-pointer px-4 py-1.5 ${newQuestion.judgeType !== 'freeform' ? 'bg-white hover:bg-gray-50' : ''}`}
-                        onClick={() => setNewQuestion({ ...newQuestion, judgeType: JudgeType.FREEFORM })}
-                      >
-                        Free-form
-                      </Badge>
                     </div>
                   </div>
 
@@ -1178,21 +1143,6 @@ export function RubricCreationDemo() {
                             </div>
                             <label className="text-sm font-medium text-red-700">{binaryLabels.fail}</label>
                           </div>
-                        </div>
-                      </>
-                    )}
-                    {newQuestion.judgeType === 'freeform' && (
-                      <>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-medium text-gray-700">Free-form Feedback Preview</div>
-                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                            Open Text
-                          </Badge>
-                        </div>
-                        <div className="border-2 border-dashed border-purple-200 rounded-lg p-4 bg-purple-50/30">
-                          <p className="text-sm text-gray-500 italic">
-                            Annotators will provide detailed written feedback for this focus area...
-                          </p>
                         </div>
                       </>
                     )}
@@ -1338,19 +1288,12 @@ export function RubricCreationDemo() {
           workshopId={workshopId!}
           onAcceptSuggestion={async (suggestion) => {
             // Convert suggestion to RubricQuestion format
-            const descriptionParts = [suggestion.description];
-
-            if (suggestion.positive) {
-              descriptionParts.push(`\nPositive: ${suggestion.positive}`);
-            }
-            if (suggestion.negative) {
-              descriptionParts.push(`\nNegative: ${suggestion.negative}`);
-            }
-            if (suggestion.examples) {
-              descriptionParts.push(`\nExamples: ${suggestion.examples}`);
-            }
-
-            const description = descriptionParts.join('');
+            const description = buildCriterionDescription({
+              definition: suggestion.description,
+              positive: suggestion.positive || '',
+              negative: suggestion.negative || '',
+              examples: suggestion.examples || '',
+            });
 
             // Persist to backend immediately
             setIsEditingExisting(true);

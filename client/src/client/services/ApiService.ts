@@ -16,6 +16,9 @@ import type { CreateDraftRubricItemRequest } from '../models/CreateDraftRubricIt
 import type { CreateRubricFromDraftRequest } from '../models/CreateRubricFromDraftRequest';
 import type { CriterionEvaluation } from '../models/CriterionEvaluation';
 import type { CriterionEvaluationCreate } from '../models/CriterionEvaluationCreate';
+import type { CustomLLMProviderConfigCreate } from '../models/CustomLLMProviderConfigCreate';
+import type { CustomLLMProviderStatus } from '../models/CustomLLMProviderStatus';
+import type { CustomLLMProviderTestResult } from '../models/CustomLLMProviderTestResult';
 import type { DatabricksConfig } from '../models/DatabricksConfig';
 import type { DatabricksConnectionTest } from '../models/DatabricksConnectionTest';
 import type { DatabricksEndpointInfo } from '../models/DatabricksEndpointInfo';
@@ -2733,6 +2736,105 @@ export class ApiService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/workshops/{workshop_id}/alignment-status',
+            path: {
+                'workshop_id': workshopId,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Get Custom Llm Provider Status
+     * Get the status of custom LLM provider configuration for a workshop.
+     *
+     * Returns configuration status including whether it's configured, enabled,
+     * and whether an API key is available (without exposing the actual key).
+     * @param workshopId
+     * @returns CustomLLMProviderStatus Successful Response
+     * @throws ApiError
+     */
+    public static getCustomLlmProviderStatusWorkshopsWorkshopIdCustomLlmProviderGet(
+        workshopId: string,
+    ): CancelablePromise<CustomLLMProviderStatus> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/workshops/{workshop_id}/custom-llm-provider',
+            path: {
+                'workshop_id': workshopId,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Create Custom Llm Provider
+     * Create or update custom LLM provider configuration for a workshop.
+     *
+     * The API key is stored in-memory only and will expire after 24 hours.
+     * Configuration details (provider name, base URL, model name) are persisted.
+     * @param workshopId
+     * @param requestBody
+     * @returns CustomLLMProviderStatus Successful Response
+     * @throws ApiError
+     */
+    public static createCustomLlmProviderWorkshopsWorkshopIdCustomLlmProviderPost(
+        workshopId: string,
+        requestBody: CustomLLMProviderConfigCreate,
+    ): CancelablePromise<CustomLLMProviderStatus> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/workshops/{workshop_id}/custom-llm-provider',
+            path: {
+                'workshop_id': workshopId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Delete Custom Llm Provider
+     * Delete custom LLM provider configuration for a workshop.
+     *
+     * Removes both the persisted configuration and the in-memory API key.
+     * @param workshopId
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteCustomLlmProviderWorkshopsWorkshopIdCustomLlmProviderDelete(
+        workshopId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/workshops/{workshop_id}/custom-llm-provider',
+            path: {
+                'workshop_id': workshopId,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Test Custom Llm Provider
+     * Test connection to the configured custom LLM provider.
+     *
+     * Makes a minimal API call to verify the endpoint is reachable and
+     * the API key is valid. Returns response time on success.
+     * @param workshopId
+     * @returns CustomLLMProviderTestResult Successful Response
+     * @throws ApiError
+     */
+    public static testCustomLlmProviderWorkshopsWorkshopIdCustomLlmProviderTestPost(
+        workshopId: string,
+    ): CancelablePromise<CustomLLMProviderTestResult> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/workshops/{workshop_id}/custom-llm-provider/test',
             path: {
                 'workshop_id': workshopId,
             },

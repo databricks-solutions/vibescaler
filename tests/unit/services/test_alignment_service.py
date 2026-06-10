@@ -379,6 +379,137 @@ def test_re_evaluate_endpoint_passes_use_registered_judge_true():
     pytest.fail("use_registered_judge keyword not found in re_evaluate function")
 
 
+# === Episodic memory dedup on re-alignment (GitHub #161) ===
+
+
+def _alignment_trace(trace_id: str) -> SimpleNamespace:
+    return SimpleNamespace(info=SimpleNamespace(trace_id=trace_id))
+
+
+def _registered_memory_judge(trace_ids: list[str]) -> MagicMock:
+    judge = MagicMock()
+    judge.kind = "ScorerKind.MEMORY_AUGMENTED"
+    judge.name = "quality_judge"
+    judge.instructions = "Rate {{ inputs }} vs {{ outputs }}"
+    judge._episodic_trace_ids = list(trace_ids)
+    judge._semantic_memory = []
+    return judge
+
+
+def _run_alignment_with_mocks(monkeypatch, traces, registered_judge):
+    import mlflow
+    import mlflow.genai.judges as judges_mod
+    import mlflow.genai.judges.optimizers as optimizers_mod
+    import mlflow.genai.scorers as scorers_mod
+
+    import server.services.alignment_service as svc
+
+    monkeypatch.setattr(mlflow, "set_experiment", MagicMock())
+    monkeypatch.setattr(
+        mlflow,
+        "active_run",
+        MagicMock(return_value=SimpleNamespace(info=SimpleNamespace(run_id="run-1"))),
+    )
+    monkeypatch.setattr(mlflow, "log_param", MagicMock())
+    monkeypatch.setattr(mlflow, "log_text", MagicMock())
+    monkeypatch.setattr(judges_mod, "make_judge", MagicMock(name="make_judge"))
+    monkeypatch.setattr(scorers_mod, "get_scorer", MagicMock(return_value=registered_judge))
+    monkeypatch.setattr(optimizers_mod, "MemAlignOptimizer", MagicMock(name="MemAlignOptimizer"))
+    monkeypatch.setattr(svc, "get_judge_type_from_rubric", MagicMock(return_value="likert"))
+    monkeypatch.setattr(
+        AlignmentService, "_search_tagged_traces", lambda self, *args, **kwargs: traces
+    )
+
+    service = AlignmentService(MagicMock())
+    messages: list[str] = []
+    result = None
+    for item in service.run_alignment(
+        workshop_id="ws-1",
+        judge_name="quality_judge",
+        judge_prompt="Rate {{ inputs }} vs {{ outputs }}",
+        evaluation_model_name="databricks-claude-sonnet-4",
+        alignment_model_name="databricks-claude-sonnet-4",
+        mlflow_config=SimpleNamespace(experiment_id="exp-123"),
+    ):
+        if isinstance(item, dict):
+            result = item
+        else:
+            messages.append(item)
+    return messages, result
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+@pytest.mark.req("Metrics reported (guideline count, example count)")
+def test_realignment_with_all_traces_already_aligned_skips_align(monkeypatch):
+    """Reused judge with 10 persisted trace IDs + the same 10 traces: align() is
+    never called and the episodic example count stays 10 (not 20).
+
+    GitHub #161: Judge Tuning showed 20 evaluations when annotation produced
+    only 10, because re-alignment fed all 'align'-tagged traces back into
+    MemAlign, which does no trace-ID dedup.
+    """
+    trace_ids = [f"tr-{i}" for i in range(10)]
+    registered_judge = _registered_memory_judge(trace_ids)
+    traces = [_alignment_trace(tid) for tid in trace_ids]
+
+    messages, result = _run_alignment_with_mocks(monkeypatch, traces, registered_judge)
+
+    registered_judge.align.assert_not_called()
+    assert result is not None and result["success"] is True
+    assert result["example_count"] == 10
+    assert result["trace_count"] == 0
+    assert any("skipping re-alignment" in m for m in messages)
+    assert any("Episodic memory: 10 examples" in m for m in messages)
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+@pytest.mark.req("Metrics reported (guideline count, example count)")
+def test_realignment_passes_only_new_traces_to_align(monkeypatch):
+    """Reused judge with 10 persisted trace IDs + 5 new traces: align() receives
+    exactly the 5 new traces and the example count reflects the deduped total."""
+    persisted_ids = [f"tr-{i}" for i in range(10)]
+    new_ids = [f"tr-{i}" for i in range(10, 15)]
+    registered_judge = _registered_memory_judge(persisted_ids)
+
+    aligned_judge = MagicMock()
+    aligned_judge.name = "quality_judge"
+    aligned_judge.instructions = "Rate {{ inputs }} vs {{ outputs }}"
+    aligned_judge._semantic_memory = []
+    aligned_judge._episodic_memory = [
+        SimpleNamespace(_trace_id=tid) for tid in persisted_ids + new_ids
+    ]
+    registered_judge.align.return_value = aligned_judge
+
+    traces = [_alignment_trace(tid) for tid in persisted_ids + new_ids]
+
+    messages, result = _run_alignment_with_mocks(monkeypatch, traces, registered_judge)
+
+    registered_judge.align.assert_called_once()
+    aligned_trace_ids = [t.info.trace_id for t in registered_judge.align.call_args.args[0]]
+    assert aligned_trace_ids == new_ids
+    assert result is not None and result["success"] is True
+    assert result["trace_count"] == 5
+    assert result["example_count"] == 15
+    assert any("Episodic memory: 15 examples" in m for m in messages)
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+@pytest.mark.req("Metrics reported (guideline count, example count)")
+def test_realignment_dedupes_legacy_duplicated_trace_ids(monkeypatch):
+    """A judge corrupted by prior duplicating runs (10 IDs persisted twice)
+    reports 10 examples, not 20, when re-aligned with the same traces."""
+    trace_ids = [f"tr-{i}" for i in range(10)]
+    registered_judge = _registered_memory_judge(trace_ids * 2)
+    traces = [_alignment_trace(tid) for tid in trace_ids]
+
+    messages, result = _run_alignment_with_mocks(monkeypatch, traces, registered_judge)
+
+    registered_judge.align.assert_not_called()
+    assert registered_judge._episodic_trace_ids == trace_ids
+    assert result is not None and result["example_count"] == 10
+    assert any("duplicate trace IDs" in m for m in messages)
+
+
 # === store_evaluation_results tests ===
 
 

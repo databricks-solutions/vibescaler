@@ -76,8 +76,11 @@ class TestSummarizationJobCRUD:
     def test_add_completed_trace(self, service):
         """Appending a completed trace updates the job row."""
         job = service.create_summarization_job(workshop_id=WORKSHOP_ID, total=10)
-        updated = service.add_summarization_job_completed(job.id, "trace-0")
-        assert "trace-0" in updated.completed_traces
+        updated = service.add_summarization_job_completed(
+            job.id, "trace-0", events=[{"type": "llm_call"}]
+        )
+        assert updated.completed_traces[0]["trace_id"] == "trace-0"
+        assert updated.completed_traces[0]["events"] == [{"type": "llm_call"}]
         assert updated.completed == 1
         assert updated.failed == 0
 
@@ -100,7 +103,7 @@ class TestSummarizationJobCRUD:
         updated = service.add_summarization_job_failed(job.id, "trace-2", "parse error")
         assert updated.completed == 2
         assert updated.failed == 1
-        assert set(updated.completed_traces) == {"trace-0", "trace-1"}
+        assert {entry["trace_id"] for entry in updated.completed_traces} == {"trace-0", "trace-1"}
 
     @pytest.mark.req("`GET /workshops/{id}/summarization-job/{job_id}` returns job status with completed/total/failed counts")
     def test_get_summarization_job(self, service):
