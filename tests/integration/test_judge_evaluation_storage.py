@@ -338,11 +338,11 @@ async def test_re_evaluate_api_returns_200_and_starts_job(
 
 # ---------------------------------------------------------------------------
 # Fix 4: promote_finding propagates DB errors (API-level)
+# NOTE: covers the dormant v1 promote endpoint (no UI caller); the
+# ASSISTED_FACILITATION_SPEC was retired, so these carry no spec tags.
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
-@pytest.mark.req("Findings can be promoted to draft rubric staging area")
 @pytest.mark.asyncio
 async def test_promote_finding_returns_500_on_db_error(
     client, integration_db, seed_workshop
@@ -371,8 +371,6 @@ async def test_promote_finding_returns_500_on_db_error(
             "promote_finding should not return fake success with the finding_id as the item id"
 
 
-@pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
-@pytest.mark.req("Findings can be promoted to draft rubric staging area")
 @pytest.mark.asyncio
 async def test_promote_real_finding_succeeds(
     client, integration_db, seed_workshop, seed_trace

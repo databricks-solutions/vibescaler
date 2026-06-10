@@ -104,12 +104,9 @@ Edit Annotation:
 4. User modifies ratings and/or comment
 5. User clicks Next or Previous to navigate
 6. System compares current values to original
-7. If changed:
-   a. System saves updated annotation
-   b. Toast shows: "Annotation updated!"
-8. If unchanged:
-   a. No save operation
-   b. No toast notification
+7. If changed: system saves the updated annotation in the background
+   (the persistent "Saved" indicator remains on the trace)
+8. If unchanged: no save operation
 ```
 
 ### View-Only Navigation
@@ -120,9 +117,23 @@ View Without Edit:
 2. User views but doesn't change anything
 3. User clicks Next or Previous
 4. System detects no changes (hasAnnotationChanged() = false)
-5. No save operation, no toast
+5. No save operation
 6. Silent navigation to next trace
 ```
+
+### Completion Terminal State
+
+When the user clicks **Complete** on the final trace:
+
+1. The final annotation save is awaited (not backgrounded) so the last trace
+   cannot be lost
+2. On success, the trace UI is replaced by a terminal completion screen
+   (`data-testid="annotation-complete-screen"`) showing "All Annotations
+   Complete!" and the annotated count
+3. A "Review my annotations" button returns to the annotation view for edits;
+   completing again returns to the terminal state
+4. If the final save fails, a "Save failed" error toast is shown and the
+   completion state is not entered
 
 ## Change Detection
 
@@ -211,17 +222,55 @@ This ensures:
 
 ## Notification Behavior
 
-### Toast Messages
+### Save Feedback Model
 
-| Scenario | Toast Message | When Shown |
-|----------|---------------|------------|
-| New annotation saved | "Annotation saved!" | After first submission |
-| Annotation updated | "Annotation updated!" | After editing changes |
-| No changes made | (none) | Silent navigation |
+Saves are optimistic and happen in the background: clicking Next/Previous
+advances the UI immediately while the save completes behind the scenes.
+Successful saves are silent — there is no per-annotation success toast.
+Instead, any trace with a submitted annotation shows a persistent indicator:
+
+> ✓ Saved — edit and navigate to update
+
+### Toast Messages (errors and recovery only)
+
+| Scenario | Toast Message | Type |
+|----------|---------------|------|
+| Background save failed and was queued for retry | "Retrying save" | warning |
+| User-initiated save failed (e.g., Complete on the final trace) | "Save failed" | error |
+| Required ratings missing on navigation | "Missing ratings" | error |
+| Manual bulk retry started (Retry button) | "Retrying saves" | info |
+| Bulk retry recovered queued annotations | "Annotations saved" | success |
+| Bulk retry left annotations unsaved | "Some saves pending" | error |
 
 ### Key Principle
 
-**Only show notifications when meaningful action occurs.** Navigating through previously-annotated traces without changes should be silent.
+**Success is communicated through persistent state, not transient toasts.**
+The "Saved" indicator and the progress bar reflect save status; toasts are
+reserved for failures, retries, and bulk-recovery outcomes.
+
+## Facilitator Monitoring
+
+While annotation is running, the facilitator dashboard polls annotation stats
+so progress updates without a page refresh:
+
+- `useFacilitatorAnnotations` and `useFacilitatorAnnotationsWithUserDetails`
+  refetch every 15 seconds (`refetchInterval: 15000`)
+- Polling runs only while the tab is in the foreground
+  (`refetchIntervalInBackground: false`)
+
+## Participant Notes
+
+When the facilitator enables `show_participant_notes` on a workshop,
+annotators get a notepad alongside the rating panel:
+
+- Notes are scoped to a phase (`discovery` or `annotation`, default
+  `discovery`) and optionally to a trace
+- Saving a note always appends a new entry — existing notes are never
+  overwritten
+- Notes can be listed (filtered by user and/or phase) and deleted
+- Endpoints: `POST/GET /workshops/{id}/participant-notes`,
+  `DELETE /workshops/{id}/participant-notes/{note_id}`,
+  `PUT /workshops/{id}/toggle-participant-notes`
 
 ## Data Model
 
@@ -307,8 +356,8 @@ Key implementation points:
 2. **Load existing annotation** - Populate both current and original on trace change
 3. **Change detection** - Compare before save operations
 4. **Conditional save** - Only save when changes detected or new annotation
-5. **Conditional toast** - Only notify when action meaningful
-6. **Navigation handling** - Save on Next/Previous, not on explicit button
+5. **Background saves** - Navigation is optimistic; saves run in the background with retry, and toasts fire only on failure/recovery
+6. **Navigation handling** - Save on Next/Previous; the final trace save is awaited before showing the terminal completion screen
 
 ### Legacy Format Support
 
@@ -332,13 +381,14 @@ Load logic detects format and normalizes to current structure.
 
 - [ ] Users can edit previously submitted annotations
 - [ ] Changes automatically save on navigation (Next/Previous)
-- [ ] Toast shows "Annotation saved!" for new submissions
-- [ ] Toast shows "Annotation updated!" only when changes detected
-- [ ] No toast when navigating without changes
+- [ ] Annotated traces show a persistent Saved indicator instead of a success toast
+- [ ] Save success is silent; toasts appear only for save failures, retries, and bulk-recovery outcomes
 - [ ] Multi-line comments preserved throughout the stack
 - [ ] Comments display with proper line breaks
 - [ ] Next button enabled for annotated traces (allows re-navigation)
 - [ ] Annotation count reflects unique submissions (not re-submissions)
+- [ ] Annotation upsert persists every trace submission, including the final trace in a session
+- [ ] Completing the final trace shows a terminal completion state
 
 ### MLflow Sync
 
@@ -355,6 +405,16 @@ Load logic detects format and normalizes to current structure.
 - [ ] Navigation is optimistic (UI advances immediately, save completes in background)
 - [ ] Navigation debounced at 300ms to prevent duplicate saves
 
+### Facilitator Monitoring
+
+- [ ] Facilitator annotation stats poll every 15 seconds while the tab is in the foreground
+
+### Participant Notes
+
+- [ ] Participants can create, retrieve, and delete notes during discovery and annotation phases
+- [ ] Participant notes always append as new entries; existing notes are never overwritten
+- [ ] Facilitators can toggle participant notes visibility per workshop
+
 ### Freeform Questions
 
 - [ ] Freeform question responses are optional (not required for navigation)
@@ -369,22 +429,21 @@ Load logic detects format and normalizes to current structure.
 ### Test 1: New Annotation
 1. Navigate to unannotated trace
 2. Provide ratings
-3. Click Next
-4. Verify toast: "Annotation saved!"
-5. Navigate back, verify values persisted
+3. Click Next — the UI advances immediately (optimistic) while the save
+   completes in the background
+4. Navigate back, verify values persisted and the "Saved" indicator is visible
 
 ### Test 2: Edit Annotation
 1. Navigate to annotated trace
 2. Change a rating
-3. Click Next
-4. Verify toast: "Annotation updated!"
-5. Navigate back, verify changes persisted
+3. Click Next (the update saves in the background, no toast)
+4. Navigate back, verify changes persisted
 
 ### Test 3: View Without Change
 1. Navigate to annotated trace
 2. Don't change anything
 3. Click Next
-4. Verify NO toast appears
+4. Verify no save request is issued (silent navigation)
 
 ### Test 4: Multi-line Comment
 1. Enter comment with multiple lines
@@ -396,7 +455,21 @@ Load logic detects format and normalizes to current structure.
 1. Navigate to annotated trace
 2. Change only the comment (not ratings)
 3. Click Next
-4. Verify toast: "Annotation updated!"
+4. Navigate back, verify the updated comment persisted
+
+### Test 6: Save Failure and Retry
+1. Simulate a failing save endpoint
+2. Rate a trace and navigate — the UI advances, and the save retries with
+   exponential backoff (1s/2s/4s)
+3. After retries are exhausted, a "Retrying save" toast appears and a Retry
+   button shows the queued count
+4. Once saves succeed (automatic queue retry or manual Retry), the queue
+   drains; manual bulk retry shows an "Annotations saved" toast
+
+### Test 7: Completion
+1. Annotate all traces; click Complete on the final trace
+2. The terminal completion screen replaces the trace UI
+3. All annotations (including the final trace) are persisted server-side
 
 ## Backwards Compatibility
 

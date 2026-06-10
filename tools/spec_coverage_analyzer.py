@@ -32,6 +32,7 @@ Output:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import subprocess
@@ -44,19 +45,19 @@ from typing import Literal
 # All known specs (without .md extension)
 KNOWN_SPECS = [
     "ANNOTATION_SPEC",
-    "ASSISTED_FACILITATION_SPEC",
     "AUTHENTICATION_SPEC",
     "BUILD_AND_DEPLOY_SPEC",
     "CUSTOM_LLM_PROVIDER_SPEC",
     "DATASETS_SPEC",
     "DESIGN_SYSTEM_SPEC",
     "DISCOVERY_SPEC",
-    "DISCOVERY_TRACE_ASSIGNMENT_SPEC",
     "JUDGE_EVALUATION_SPEC",
     "ROLE_PERMISSIONS_SPEC",
     "RUBRIC_SPEC",
     "TESTING_SPEC",
     "TRACE_DISPLAY_SPEC",
+    "TRACE_INGESTION_SPEC",
+    "TRACE_SUMMARIZATION_SPEC",
     "UI_COMPONENTS_SPEC",
     "EVAL_MODE_SPEC",
 ]
@@ -71,6 +72,7 @@ class Requirement:
     text: str
     spec_name: str
     line_number: int
+    roadmap: bool = False  # True when criterion is roadmap-only (excluded from denominator)
 
 
 @dataclass
@@ -83,6 +85,7 @@ class TestCoverage:
     test_type: TestType
     requirement: str | None = None  # Linked requirement text (if @req used)
     line_number: int | None = None
+    skipped: bool = False  # True when test carries static skip/skipif/xfail markers
 
 
 @dataclass
@@ -93,17 +96,27 @@ class RequirementCoverage:
     tests: list[TestCoverage] = field(default_factory=list)
 
     @property
+    def active_tests(self) -> list[TestCoverage]:
+        """Tests that actually run (not statically skipped/xfailed)."""
+        return [t for t in self.tests if not t.skipped]
+
+    @property
     def is_covered(self) -> bool:
-        return len(self.tests) > 0
+        return len(self.active_tests) > 0
+
+    @property
+    def is_skipped_only(self) -> bool:
+        """True when the only tests linked to this requirement are skipped."""
+        return bool(self.tests) and not self.active_tests
 
     @property
     def test_types(self) -> set[TestType]:
-        return {t.test_type for t in self.tests}
+        return {t.test_type for t in self.active_tests}
 
     @property
     def has_frontend_test(self) -> bool:
-        """True if at least one test is a frontend test (E2E or client/ unit)."""
-        for t in self.tests:
+        """True if at least one active test is a frontend test (E2E or client/ unit)."""
+        for t in self.active_tests:
             if t.test_type in ("e2e-mocked", "e2e-real"):
                 return True
             if t.file_path.startswith("client/"):
@@ -123,6 +136,7 @@ class SpecCoverage:
     spec_name: str
     requirements: list[RequirementCoverage] = field(default_factory=list)
     unlinked_tests: list[TestCoverage] = field(default_factory=list)  # Tests without @req
+    roadmap_requirements: list[Requirement] = field(default_factory=list)  # Excluded from denominator
 
     @property
     def total_requirements(self) -> int:
@@ -133,9 +147,15 @@ class SpecCoverage:
         return sum(1 for r in self.requirements if r.is_covered)
 
     @property
+    def skipped_only_requirements(self) -> int:
+        """Count requirements whose only linked tests are skipped."""
+        return sum(1 for r in self.requirements if r.is_skipped_only)
+
+    @property
     def coverage_percent(self) -> int:
         if self.total_requirements == 0:
-            return 100 if self.unlinked_tests else 0
+            has_active_unlinked = any(not t.skipped for t in self.unlinked_tests)
+            return 100 if has_active_unlinked else 0
         return 100 * self.covered_requirements // self.total_requirements
 
     @property
@@ -147,7 +167,8 @@ class SpecCoverage:
         return tests
 
     def count_by_type(self, test_type: TestType) -> int:
-        return sum(1 for t in self.all_tests if t.test_type == test_type)
+        """Count active (non-skipped) tests of a given type."""
+        return sum(1 for t in self.all_tests if t.test_type == test_type and not t.skipped)
 
     @property
     def backend_only_requirements(self) -> int:
@@ -156,12 +177,48 @@ class SpecCoverage:
 
 
 class SpecParser:
-    """Parses spec files to extract requirements (success criteria)."""
+    """Parses spec files to extract requirements (success criteria).
+
+    Roadmap criteria (excluded from the coverage denominator) are detected when:
+    - the criterion text ends with "(roadmap)" (case-insensitive), or
+    - the criterion appears under a heading starting with "Roadmap"
+      (e.g. "### Roadmap" or "### Roadmap (not shipping)").
+    """
 
     SPECS_DIR = Path("specs")
 
     # Pattern for success criteria: - [ ] requirement text
     REQUIREMENT_PATTERN = re.compile(r"^- \[ \] (.+)$", re.MULTILINE)
+    HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.*)$")
+    ROADMAP_SUFFIX_PATTERN = re.compile(r"\(roadmap\)\s*$", re.IGNORECASE)
+    ROADMAP_HEADING_PATTERN = re.compile(r"^roadmap\b", re.IGNORECASE)
+
+    def parse_spec_text(self, content: str, spec_name: str) -> list[Requirement]:
+        """Parse a single spec's markdown content into Requirements."""
+        requirements: list[Requirement] = []
+        in_roadmap_section = False
+
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            heading_match = self.HEADING_PATTERN.match(line)
+            if heading_match:
+                heading_text = heading_match.group(2).strip()
+                in_roadmap_section = bool(self.ROADMAP_HEADING_PATTERN.match(heading_text))
+                continue
+
+            criterion_match = re.match(r"^- \[ \] (.+)$", line)
+            if criterion_match:
+                text = criterion_match.group(1).strip()
+                roadmap = in_roadmap_section or bool(self.ROADMAP_SUFFIX_PATTERN.search(text))
+                requirements.append(
+                    Requirement(
+                        text=text,
+                        spec_name=spec_name,
+                        line_number=line_number,
+                        roadmap=roadmap,
+                    )
+                )
+
+        return requirements
 
     def parse_all(self) -> dict[str, list[Requirement]]:
         """Parse all spec files and return requirements by spec name."""
@@ -171,17 +228,149 @@ class SpecParser:
             spec_file = self.SPECS_DIR / f"{spec_name}.md"
             if spec_file.exists():
                 content = spec_file.read_text()
-                for match in self.REQUIREMENT_PATTERN.finditer(content):
-                    line_number = content[: match.start()].count("\n") + 1
-                    requirements[spec_name].append(
-                        Requirement(
-                            text=match.group(1).strip(),
-                            spec_name=spec_name,
-                            line_number=line_number,
-                        )
-                    )
+                requirements[spec_name] = self.parse_spec_text(content, spec_name)
 
         return requirements
+
+
+class PytestSkipDetector:
+    """Statically detects pytest tests carrying skip/skipif/xfail markers.
+
+    A test is considered skipped when the marker appears:
+    - directly on the test function,
+    - on an enclosing class, or
+    - in a module-level ``pytestmark`` assignment.
+    """
+
+    SKIP_MARK_NAMES = frozenset({"skip", "skipif", "xfail"})
+
+    def __init__(self):
+        self._file_cache: dict[str, dict | None] = {}
+
+    def is_skipped(self, nodeid: str) -> bool:
+        """Return True when the test identified by a pytest nodeid is statically skipped."""
+        file_path, _, rest = nodeid.partition("::")
+        info = self._analyze_file(file_path)
+        if info is None:
+            return False
+        if info["module_skipped"]:
+            return True
+        if not rest:
+            return False
+
+        # Strip parametrization suffixes: test_foo[case] -> test_foo
+        parts = tuple(p.split("[")[0] for p in rest.split("::") if p)
+        if parts in info["paths"]:
+            return info["paths"][parts]
+        return self._name_lookup(info, parts[-1]) if parts else False
+
+    def is_test_name_skipped(self, file_path: str, test_name: str | None) -> bool:
+        """Best-effort lookup by bare test function name (source-scan fallback path)."""
+        info = self._analyze_file(file_path)
+        if info is None:
+            return False
+        if info["module_skipped"]:
+            return True
+        if not test_name:
+            return False
+        return self._name_lookup(info, test_name.split("[")[0])
+
+    @staticmethod
+    def _name_lookup(info: dict, name: str) -> bool:
+        # Conservative: only report skipped when every definition with this name is skipped
+        flags = info["by_name"].get(name)
+        return bool(flags) and all(flags)
+
+    def _analyze_file(self, file_path: str) -> dict | None:
+        if file_path in self._file_cache:
+            return self._file_cache[file_path]
+
+        info: dict | None
+        try:
+            tree = ast.parse(Path(file_path).read_text())
+        except (OSError, SyntaxError, UnicodeDecodeError, ValueError):
+            info = None
+            self._file_cache[file_path] = info
+            return info
+
+        info = {"module_skipped": False, "paths": {}, "by_name": {}}
+
+        # Module-level pytestmark = pytest.mark.skip(...) / [pytest.mark.xfail, ...]
+        for node in tree.body:
+            targets: list[ast.expr] = []
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                targets = [node.target]
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id == "pytestmark":
+                    value = node.value
+                    if value is not None and self._contains_skip_mark(value):
+                        info["module_skipped"] = True
+
+        self._walk(tree, (), info["module_skipped"], info)
+        self._file_cache[file_path] = info
+        return info
+
+    def _walk(self, node: ast.AST, path: tuple[str, ...], inherited: bool, info: dict):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                skipped = inherited or any(self._decorator_is_skip(d) for d in child.decorator_list)
+                child_path = (*path, child.name)
+                info["paths"][child_path] = skipped
+                info["by_name"].setdefault(child.name, []).append(skipped)
+            elif isinstance(child, ast.ClassDef):
+                skipped = inherited or any(self._decorator_is_skip(d) for d in child.decorator_list)
+                self._walk(child, (*path, child.name), skipped, info)
+
+    @classmethod
+    def _decorator_is_skip(cls, decorator: ast.expr) -> bool:
+        """True for @pytest.mark.skip, @pytest.mark.skipif(...), @mark.xfail, etc."""
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        parts: list[str] = []
+        while isinstance(target, ast.Attribute):
+            parts.append(target.attr)
+            target = target.value
+        if isinstance(target, ast.Name):
+            parts.append(target.id)
+        # parts is leaf-first, e.g. ['skip', 'mark', 'pytest']
+        return bool(parts) and parts[0] in cls.SKIP_MARK_NAMES and ("mark" in parts or "pytest" in parts)
+
+    @classmethod
+    def _contains_skip_mark(cls, expr: ast.expr) -> bool:
+        return any(
+            isinstance(node, ast.Attribute) and node.attr in cls.SKIP_MARK_NAMES for node in ast.walk(expr)
+        )
+
+
+def find_static_skip_ranges(content: str, skip_call_pattern: re.Pattern) -> list[tuple[int, int]]:
+    """Find character ranges covered by static skip declarations in JS/TS test sources.
+
+    ``skip_call_pattern`` must match up to and including the opening parenthesis of
+    a skip call (e.g. ``test.describe.skip(`` or ``test.skip(``). The returned range
+    spans the entire call (including the callback body), so any marker found inside
+    belongs to a skipped test or describe block.
+    """
+    ranges: list[tuple[int, int]] = []
+    for match in skip_call_pattern.finditer(content):
+        open_paren = match.end() - 1
+        depth = 0
+        end = len(content)
+        for i in range(open_paren, len(content)):
+            char = content[i]
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        ranges.append((match.start(), end))
+    return ranges
+
+
+def offset_in_ranges(offset: int, ranges: list[tuple[int, int]]) -> bool:
+    return any(start <= offset < end for start, end in ranges)
 
 
 class SpecCoverageScanner:
@@ -251,9 +440,20 @@ class SpecCoverageScanner:
         re.MULTILINE,
     )
 
+    # Static skip declarations in Playwright sources:
+    # test.skip(, test.fixme(, test.describe.skip(, test.describe.fixme(
+    PLAYWRIGHT_SKIP_CALL_PATTERN = re.compile(r"\btest\.(?:describe\.)?(?:skip|fixme)\s*\(")
+    # Static skip declarations in Vitest sources: describe.skip(, it.skip(, test.todo(, ...
+    VITEST_SKIP_CALL_PATTERN = re.compile(r"\b(?:describe|it|test)\.(?:skip|todo|fixme)\s*\(")
+
     def __init__(self):
         self.tests: list[TestCoverage] = []
-        self.unknown_specs: set[str] = set()
+        # Unknown spec name -> number of tagged tests referencing it
+        self.unknown_specs: dict[str, int] = {}
+        self._pytest_skip_detector = PytestSkipDetector()
+
+    def _record_unknown_spec(self, spec_name: str):
+        self.unknown_specs[spec_name] = self.unknown_specs.get(spec_name, 0) + 1
 
     def scan_all(self) -> list[TestCoverage]:
         """Scan all test directories and return all test coverage entries."""
@@ -294,7 +494,7 @@ class SpecCoverageScanner:
         for item in items:
             spec_name = item["spec"]
             if spec_name not in KNOWN_SPECS:
-                self.unknown_specs.add(spec_name)
+                self._record_unknown_spec(spec_name)
                 continue
 
             file_path = item["nodeid"].split("::")[0]
@@ -309,6 +509,7 @@ class SpecCoverageScanner:
                     test_type=test_type,
                     requirement=item.get("req"),
                     line_number=item.get("lineno"),
+                    skipped=self._pytest_skip_detector.is_skipped(item["nodeid"]),
                 )
             )
 
@@ -316,7 +517,7 @@ class SpecCoverageScanner:
     def _collect_pytest_markers() -> list[dict]:
         """Run tools/collect_pytest_markers.py to extract spec/req marker values."""
         result = subprocess.run(
-            ["uv", "run", "python", "tools/collect_pytest_markers.py"],
+            ["uv", "run", "--no-sync", "python", "tools/collect_pytest_markers.py"],
             capture_output=True,
             text=True,
             timeout=30,
@@ -340,7 +541,7 @@ class SpecCoverageScanner:
             for spec_match in self.PYTEST_SPEC_PATTERN.finditer(content):
                 spec_name = spec_match.group(1)
                 if spec_name not in KNOWN_SPECS:
-                    self.unknown_specs.add(spec_name)
+                    self._record_unknown_spec(spec_name)
                     continue
                 line_number = content[: spec_match.start()].count("\n") + 1
                 after_marker = content[spec_match.end() :]
@@ -361,6 +562,7 @@ class SpecCoverageScanner:
                         test_type=test_type,
                         requirement=requirement,
                         line_number=line_number,
+                        skipped=self._pytest_skip_detector.is_test_name_skipped(file_path, test_name),
                     )
                 )
 
@@ -433,7 +635,7 @@ class SpecCoverageScanner:
                         if name in KNOWN_SPECS:
                             spec_names.add(name)
                         else:
-                            self.unknown_specs.add(name)
+                            self._record_unknown_spec(name)
                     elif tag_clean.startswith("req:"):
                         requirements.append(tag_clean[4:])
                     elif tag_clean == "e2e-real":
@@ -445,6 +647,11 @@ class SpecCoverageScanner:
                 # Determine test type from @e2e-real tag or withRealApi() in source
                 is_real = has_real_tag or file_path in real_api_files
                 test_type: TestType = "e2e-real" if is_real else "e2e-mocked"
+
+                # Statically-skipped tests (test.skip/test.fixme declarations or
+                # test.describe.skip blocks) report expectedStatus == "skipped"
+                # or carry skip/fixme annotations even in --list mode.
+                skipped = self._playwright_spec_is_skipped(spec)
 
                 # Emit one TestCoverage per (spec, requirement) pair.
                 # If no requirements, emit one with requirement=None.
@@ -459,10 +666,28 @@ class SpecCoverageScanner:
                                 test_type=test_type,
                                 requirement=req,
                                 line_number=line,
+                                skipped=skipped,
                             )
                         )
 
             self._walk_playwright_suites(suite.get("suites", []), real_api_files)
+
+    @staticmethod
+    def _playwright_spec_is_skipped(spec: dict) -> bool:
+        """True when a Playwright reporter spec entry is statically skipped.
+
+        Covers test.skip / test.fixme declarations and test.describe.skip blocks,
+        which set expectedStatus == "skipped" (and skip/fixme annotations) at
+        declaration time, so they are visible in --list mode.
+        """
+        tests_meta = spec.get("tests", [])
+        if not tests_meta:
+            return False
+        return all(
+            t.get("expectedStatus") == "skipped"
+            or any(a.get("type") in ("skip", "fixme") for a in t.get("annotations", []))
+            for t in tests_meta
+        )
 
     def _scan_playwright_source_fallback(self):
         """Fallback: scan Playwright source files directly for spec tags.
@@ -473,11 +698,12 @@ class SpecCoverageScanner:
             content = test_file.read_text()
             file_path = str(test_file)
             test_type = self._detect_playwright_test_type(content)
+            skip_ranges = find_static_skip_ranges(content, self.PLAYWRIGHT_SKIP_CALL_PATTERN)
 
             for spec_match in self.PLAYWRIGHT_SPEC_TAG_PATTERN.finditer(content):
                 spec_name = spec_match.group(1)
                 if spec_name not in KNOWN_SPECS:
-                    self.unknown_specs.add(spec_name)
+                    self._record_unknown_spec(spec_name)
                     continue
                 line_number = content[: spec_match.start()].count("\n") + 1
                 context = content[max(0, spec_match.start() - 100) : spec_match.end() + 100]
@@ -491,13 +717,14 @@ class SpecCoverageScanner:
                         test_type=test_type,
                         requirement=requirement,
                         line_number=line_number,
+                        skipped=offset_in_ranges(spec_match.start(), skip_ranges),
                     )
                 )
 
             for spec_match in self.PLAYWRIGHT_TITLE_PATTERN.finditer(content):
                 spec_name = spec_match.group(1)
                 if spec_name not in KNOWN_SPECS:
-                    self.unknown_specs.add(spec_name)
+                    self._record_unknown_spec(spec_name)
                     continue
                 line_number = content[: spec_match.start()].count("\n") + 1
                 self.tests.append(
@@ -508,6 +735,7 @@ class SpecCoverageScanner:
                         test_type=test_type,
                         requirement=None,
                         line_number=line_number,
+                        skipped=offset_in_ranges(spec_match.start(), skip_ranges),
                     )
                 )
 
@@ -563,7 +791,7 @@ class SpecCoverageScanner:
                 files_with_spec_in_name.add(file_path)
 
                 if spec_name not in KNOWN_SPECS:
-                    self.unknown_specs.add(spec_name)
+                    self._record_unknown_spec(spec_name)
                     continue
 
                 # Extract the leaf test name (after the last " > ")
@@ -601,7 +829,7 @@ class SpecCoverageScanner:
             for match in self.VITEST_SPEC_COMMENT_PATTERN.finditer(content):
                 spec_name = match.group(1)
                 if spec_name not in KNOWN_SPECS:
-                    self.unknown_specs.add(spec_name)
+                    self._record_unknown_spec(spec_name)
                     continue
                 # Read @req from source (same as describe-block path)
                 req_data = self._read_vitest_req(str(abs_path.resolve()))
@@ -641,11 +869,12 @@ class SpecCoverageScanner:
         for test_file in self.VITEST_DIR.rglob("*.test.ts"):
             content = test_file.read_text()
             file_path = str(test_file)
+            skip_ranges = find_static_skip_ranges(content, self.VITEST_SKIP_CALL_PATTERN)
 
             for spec_match in self.VITEST_SPEC_COMMENT_PATTERN.finditer(content):
                 spec_name = spec_match.group(1)
                 if spec_name not in KNOWN_SPECS:
-                    self.unknown_specs.add(spec_name)
+                    self._record_unknown_spec(spec_name)
                     continue
                 line_number = content[: spec_match.start()].count("\n") + 1
                 context = content[max(0, spec_match.start() - 100) : spec_match.end() + 100]
@@ -659,13 +888,14 @@ class SpecCoverageScanner:
                         test_type="unit",
                         requirement=requirement,
                         line_number=line_number,
+                        skipped=offset_in_ranges(spec_match.start(), skip_ranges),
                     )
                 )
 
             for spec_match in self.VITEST_DESCRIBE_PATTERN.finditer(content):
                 spec_name = spec_match.group(1)
                 if spec_name not in KNOWN_SPECS:
-                    self.unknown_specs.add(spec_name)
+                    self._record_unknown_spec(spec_name)
                     continue
                 line_number = content[: spec_match.start()].count("\n") + 1
                 self.tests.append(
@@ -676,6 +906,7 @@ class SpecCoverageScanner:
                         test_type="unit",
                         requirement=None,
                         line_number=line_number,
+                        skipped=offset_in_ranges(spec_match.start(), skip_ranges),
                     )
                 )
 
@@ -868,16 +1099,27 @@ class AffectedSpecDetector:
 
 
 def build_coverage(requirements: dict[str, list[Requirement]], tests: list[TestCoverage]) -> dict[str, SpecCoverage]:
-    """Build coverage data from requirements and tests."""
-    matcher = RequirementMatcher(requirements)
+    """Build coverage data from requirements and tests.
+
+    Roadmap criteria are excluded from the coverage denominator and tracked
+    separately on SpecCoverage.roadmap_requirements. Tests tagged against a
+    roadmap criterion fall back to the spec's unlinked tests list.
+    """
+    # Only active (non-roadmap) criteria participate in matching and the denominator
+    active_requirements = {
+        spec_name: [r for r in reqs if not r.roadmap] for spec_name, reqs in requirements.items()
+    }
+    matcher = RequirementMatcher(active_requirements)
 
     # Initialize coverage for all specs
     coverage: dict[str, SpecCoverage] = {}
     for spec_name in KNOWN_SPECS:
-        spec_reqs = requirements.get(spec_name, [])
+        spec_reqs = active_requirements.get(spec_name, [])
+        roadmap_reqs = [r for r in requirements.get(spec_name, []) if r.roadmap]
         coverage[spec_name] = SpecCoverage(
             spec_name=spec_name,
             requirements=[RequirementCoverage(requirement=req) for req in spec_reqs],
+            roadmap_requirements=roadmap_reqs,
         )
 
     # Match tests to requirements
@@ -967,8 +1209,46 @@ def print_console_summary(coverage: dict[str, SpecCoverage], verbose: bool = Fal
     print("   BE-only = requirements covered exclusively by backend tests (no E2E/Vitest)")
     print("")
 
+    # Skipped-only criteria: tests exist but are all statically skipped/xfailed
+    skipped_only = {
+        spec_name: coverage[spec_name].skipped_only_requirements
+        for spec_name in specs_to_show
+        if coverage[spec_name].skipped_only_requirements > 0
+    }
+    if skipped_only:
+        print("Skipped-only criteria (only skip/xfail tests; NOT counted as covered):")
+        for spec_name, count in sorted(skipped_only.items()):
+            print(f"  - {spec_name}: {count}")
+        print("")
 
-def generate_json_report(coverage: dict[str, SpecCoverage]) -> dict:
+    # Roadmap criteria excluded from the denominator
+    roadmap = {
+        spec_name: len(coverage[spec_name].roadmap_requirements)
+        for spec_name in specs_to_show
+        if coverage[spec_name].roadmap_requirements
+    }
+    if roadmap:
+        print("Roadmap criteria (not shipping; excluded from coverage denominator):")
+        for spec_name, count in sorted(roadmap.items()):
+            print(f"  - {spec_name}: {count}")
+        print("")
+
+
+def print_unknown_specs_warning(unknown_specs: dict[str, int]):
+    """Print a loud warning for tags referencing specs not in KNOWN_SPECS."""
+    if not unknown_specs:
+        return
+    total = sum(unknown_specs.values())
+    print("=" * 90)
+    print(f"WARNING: {total} test tag(s) reference UNKNOWN specs (zero coverage credit):")
+    for spec_name, count in sorted(unknown_specs.items()):
+        print(f"  - {spec_name}: {count} tagged test(s)")
+    print("Add valid specs to KNOWN_SPECS in tools/spec_coverage_analyzer.py, or fix the tags.")
+    print("=" * 90)
+    print("")
+
+
+def generate_json_report(coverage: dict[str, SpecCoverage], unknown_specs: dict[str, int] | None = None) -> dict:
     """Generate JSON report data."""
     total_reqs = 0
     total_covered = 0
@@ -996,6 +1276,7 @@ def generate_json_report(coverage: dict[str, SpecCoverage]) -> dict:
                     "name": t.test_name or "file-level",
                     "type": t.test_type,
                     "file": t.file_path,
+                    "skipped": t.skipped,
                 }
                 for t in req_cov.tests
             ]
@@ -1004,6 +1285,7 @@ def generate_json_report(coverage: dict[str, SpecCoverage]) -> dict:
                     "text": req_cov.requirement.text,
                     "covered": req_cov.is_covered,
                     "backend_only": req_cov.is_backend_only,
+                    "skipped_only": req_cov.is_skipped_only,
                     "tests": tests_data,
                 }
             )
@@ -1012,11 +1294,16 @@ def generate_json_report(coverage: dict[str, SpecCoverage]) -> dict:
 
         backend_only = [req_cov.requirement.text for req_cov in cov.requirements if req_cov.is_backend_only]
 
+        skipped_only = [req_cov.requirement.text for req_cov in cov.requirements if req_cov.is_skipped_only]
+
+        roadmap = [req.text for req in cov.roadmap_requirements]
+
         unlinked_tests_data = [
             {
                 "name": t.test_name or "file-level",
                 "type": t.test_type,
                 "file": t.file_path,
+                "skipped": t.skipped,
             }
             for t in cov.unlinked_tests
         ]
@@ -1035,6 +1322,10 @@ def generate_json_report(coverage: dict[str, SpecCoverage]) -> dict:
             "uncovered": uncovered,
             "backend_only": backend_only,
             "backend_only_count": len(backend_only),
+            "skipped_only": skipped_only,
+            "skipped_only_count": len(skipped_only),
+            "roadmap": roadmap,
+            "roadmap_count": len(roadmap),
             "unlinked_tests": unlinked_tests_data,
         }
 
@@ -1047,10 +1338,11 @@ def generate_json_report(coverage: dict[str, SpecCoverage]) -> dict:
             "coverage_percent": 100 * total_covered // total_reqs if total_reqs > 0 else 0,
         },
         "pyramid": total_by_type,
+        "unknown_specs": dict(sorted((unknown_specs or {}).items())),
     }
 
 
-def generate_markdown_report(coverage: dict[str, SpecCoverage]) -> str:
+def generate_markdown_report(coverage: dict[str, SpecCoverage], unknown_specs: dict[str, int] | None = None) -> str:
     """Generate a markdown report of spec coverage."""
     lines = [
         "# Spec Test Coverage Map",
@@ -1059,11 +1351,34 @@ def generate_markdown_report(coverage: dict[str, SpecCoverage]) -> str:
         "",
         "This report shows test coverage for each specification's success criteria.",
         "",
-        "## Test Pyramid Summary",
-        "",
-        "| Type | Count | Description |",
-        "|------|-------|-------------|",
     ]
+
+    # Unknown spec tags get reported loudly, up front
+    if unknown_specs:
+        total_unknown = sum(unknown_specs.values())
+        lines.extend(
+            [
+                "## :rotating_light: Unknown Spec Tags",
+                "",
+                f"**{total_unknown} test tag(s) reference specs not registered in `KNOWN_SPECS`.**",
+                "These tests earn ZERO coverage credit until the spec is registered or the tag is fixed:",
+                "",
+                "| Unknown Spec | Tagged Tests |",
+                "|--------------|--------------|",
+            ]
+        )
+        for spec_name, count in sorted(unknown_specs.items()):
+            lines.append(f"| {spec_name} | {count} |")
+        lines.append("")
+
+    lines.extend(
+        [
+            "## Test Pyramid Summary",
+            "",
+            "| Type | Count | Description |",
+            "|------|-------|-------------|",
+        ]
+    )
 
     # Calculate totals
     total_by_type: dict[str, int] = {
@@ -1131,7 +1446,7 @@ def generate_markdown_report(coverage: dict[str, SpecCoverage]) -> str:
         lines.append(f"## {spec_name}")
         lines.append("")
 
-        if cov.total_requirements == 0 and not cov.unlinked_tests:
+        if cov.total_requirements == 0 and not cov.unlinked_tests and not cov.roadmap_requirements:
             lines.append("No success criteria defined in spec.")
             lines.append("")
             continue
@@ -1143,13 +1458,21 @@ def generate_markdown_report(coverage: dict[str, SpecCoverage]) -> str:
             )
             lines.append("")
 
-            # Show uncovered requirements prominently
+            # Show uncovered requirements prominently.
+            # Skipped-only criteria are uncovered too, but annotated so the reason is visible.
             uncovered = [req for req in cov.requirements if not req.is_covered]
             if uncovered:
                 lines.append("### Uncovered Requirements")
                 lines.append("")
                 for req_cov in uncovered:
-                    lines.append(f"- [ ] {req_cov.requirement.text}")
+                    if req_cov.is_skipped_only:
+                        n_skipped = len(req_cov.tests)
+                        lines.append(
+                            f"- [ ] {req_cov.requirement.text} "
+                            f"**(skipped-only: {n_skipped} skipped/xfail test(s) — not counted)**"
+                        )
+                    else:
+                        lines.append(f"- [ ] {req_cov.requirement.text}")
                 lines.append("")
 
             # Show backend-only requirements (covered but no frontend tests)
@@ -1175,6 +1498,16 @@ def generate_markdown_report(coverage: dict[str, SpecCoverage]) -> str:
                     lines.append(f"- [x] {req_cov.requirement.text} ({test_types}){be_flag}")
                 lines.append("")
 
+        # Roadmap criteria: not shipping, excluded from the coverage denominator
+        if cov.roadmap_requirements:
+            lines.append("### Roadmap (not shipping)")
+            lines.append("")
+            lines.append("These criteria are roadmap-only and excluded from the coverage denominator:")
+            lines.append("")
+            for req in cov.roadmap_requirements:
+                lines.append(f"- {req.text}")
+            lines.append("")
+
         # Show unlinked tests (tests without @req markers)
         if cov.unlinked_tests:
             lines.append("### Tests Without Requirement Links")
@@ -1183,7 +1516,8 @@ def generate_markdown_report(coverage: dict[str, SpecCoverage]) -> str:
             lines.append("")
             for test in cov.unlinked_tests:
                 test_desc = test.test_name or "file-level"
-                lines.append(f"- `{test.file_path}` ({test_desc}) [{test.test_type}]")
+                skipped_flag = " **[skipped — not counted]**" if test.skipped else ""
+                lines.append(f"- `{test.file_path}` ({test_desc}) [{test.test_type}]{skipped_flag}")
             lines.append("")
 
     # Tagging instructions
@@ -1324,7 +1658,7 @@ def main():
 
     if args.json:
         # JSON output mode
-        report = generate_json_report(coverage)
+        report = generate_json_report(coverage, unknown_specs=scanner.unknown_specs)
         if args.affected:
             report["affected_mode"] = {
                 "base_ref": args.affected,
@@ -1339,19 +1673,21 @@ def main():
             print_affected_specs(specs_to_analyze or set(), changed_files)
 
         print("Scanning for spec coverage markers...")
+
+        # Report unknown spec tags loudly, before the summary table
+        print_unknown_specs_warning(scanner.unknown_specs)
+
         print_console_summary(coverage)
 
         if not args.no_markdown and not args.affected:
             # Only write full markdown report when not in affected mode
-            report = generate_markdown_report(coverage)
+            report = generate_markdown_report(coverage, unknown_specs=scanner.unknown_specs)
             output_path = Path("specs/SPEC_COVERAGE_MAP.md")
             output_path.write_text(report)
             print(f"Report written to: {output_path}")
 
-        # Warn about unknown specs
-        if scanner.unknown_specs:
-            print(f"\nUnknown specs referenced: {', '.join(sorted(scanner.unknown_specs))}")
-            print("   Add them to KNOWN_SPECS in spec_coverage_analyzer.py if they are valid.")
+        # Repeat unknown-spec warning at the end so it is not scrolled away
+        print_unknown_specs_warning(scanner.unknown_specs)
 
 
 if __name__ == "__main__":

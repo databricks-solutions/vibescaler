@@ -148,6 +148,8 @@ Criteria are authored through two paths:
 
 ### Judge Evaluation
 
+**Status:** Partially built. Evaluation storage (`CriterionEvaluation`) and score aggregation over stored evaluations are implemented; judge *execution* (LLM calls per criterion, background job, blind review) is roadmap — see [Roadmap](#roadmap).
+
 After criteria are authored for one or more traces, the facilitator can trigger judge evaluation:
 
 1. System iterates over each trace with criteria
@@ -159,6 +161,8 @@ After criteria are authored for one or more traces, the facilitator can trigger 
 Judge scores are optionally hidden from the human reviewer to prevent anchoring.
 
 ### Judge Alignment (MemAlign)
+
+**Status:** Roadmap — not implemented. Depends on the upstream `trace_to_dspy_example` multi-assessment change described below. See [Roadmap](#roadmap).
 
 Eval mode aligns a single **task-level judge** using MemAlign, where every criterion evaluation across all traces feeds into alignment as a separate example.
 
@@ -228,6 +232,8 @@ This change also fixes **judge re-hydration** — when a registered judge is loa
 When the aligned judge is loaded (via `get_scorer` or re-instantiation), episodic memory is rebuilt by re-walking traces. Because all criterion assessments are stored on the traces and the extraction yields all of them, re-hydration reconstructs the full example set without our system needing to maintain a separate store.
 
 ### Offline Eval Export
+
+**Status:** Roadmap — not implemented. See [Roadmap](#roadmap).
 
 The output is a mapping of `{trace_id → [criteria]}` plus the configuration to re-run evaluation:
 
@@ -346,20 +352,28 @@ DELETE /workshops/{workshop_id}/criteria/{criterion_id}
 
 ### Judge Evaluation
 
+Built today:
+
+```
+GET    /workshops/{workshop_id}/eval-results
+       Query: ?trace_id=...        # omit to aggregate all workshop traces
+       Response: [TraceEvalScore]
+```
+
+Roadmap (judge execution — see [Roadmap](#roadmap)):
+
 ```
 POST   /workshops/{workshop_id}/evaluate
        Request: { model_name, trace_ids?: string[] }  # null = all traces with criteria
        Response: { job_id, total_criteria, message }
-
-GET    /workshops/{workshop_id}/eval-results
-       Query: ?trace_id=...
-       Response: [TraceEvalScore]
 
 GET    /workshops/{workshop_id}/eval-job/{job_id}
        Response: { status, completed, total, failed }
 ```
 
 ### Export
+
+Roadmap — see [Roadmap](#roadmap):
 
 ```
 GET    /workshops/{workshop_id}/eval-export
@@ -403,7 +417,6 @@ GET    /workshops/{workshop_id}/eval-export
 ### Discovery Improvements
 - [ ] Discovery analysis uses trace summaries when available
 - [ ] Discovery analysis can run agent loops over trace spans as alternative to summaries
-- [ ] Richer findings surface example-specific observations
 
 ### Scoring
 - [ ] Hurdle criteria gate the entire trace — any hurdle failure → score 0
@@ -413,27 +426,36 @@ GET    /workshops/{workshop_id}/eval-export
 - [ ] Scoring handles edge cases: no criteria, all hurdles, all negative weights
 
 ### Judge Evaluation
-- [ ] One independent judge call per criterion
-- [ ] Judge sees trace content + single criterion, not other criteria
-- [ ] Judge returns met (boolean) + rationale
-- [ ] Evaluation runs as background job with progress tracking
 - [ ] Results stored per-criterion with rationale
-- [ ] Judge scores optionally hidden from human reviewer
+- [ ] Aggregated eval scores are available per trace or for all workshop traces
 
-### Judge Alignment
-- [ ] One task-level judge aligned using all criteria across all traces as examples
-- [ ] Each criterion's human met/not-met decision stored as a separate MLflow assessment on the trace
-- [ ] All assessments share the judge name; extraction yields all (not just most recent)
-- [ ] Semantic memory distills guidelines from overlapping criteria patterns
-- [ ] Episodic memory indexes specific criterion examples for retrieval
-- [ ] Aligned judge registered to MLflow
-- [ ] Re-hydration rebuilds episodic memory from trace assessments without external state
-- [ ] Re-evaluation compares pre/post alignment accuracy on same trace set
+### Roadmap
 
-### Offline Eval Export
-- [ ] Export produces trace → criteria mapping
-- [ ] Export includes scoring configuration (types, weights, aggregation rules)
-- [ ] Exported eval can be re-run via `mlflow.genai.evaluate()`
+Design intent for behavior that is not yet built. These items are not success
+criteria for the current implementation and do not count toward coverage;
+promote an item back to a `- [ ]` criterion when the behavior ships.
+
+**Judge execution**
+- One independent judge call per criterion
+- Judge sees trace content + single criterion, not other criteria
+- Judge returns met (boolean) + rationale
+- Evaluation runs as background job with progress tracking
+- Judge scores optionally hidden from human reviewer
+
+**Judge alignment (MemAlign)** — blocked on the upstream `trace_to_dspy_example` multi-assessment change
+- One task-level judge aligned using all criteria across all traces as examples
+- Each criterion's human met/not-met decision stored as a separate MLflow assessment on the trace
+- All assessments share the judge name; extraction yields all (not just most recent)
+- Semantic memory distills guidelines from overlapping criteria patterns
+- Episodic memory indexes specific criterion examples for retrieval
+- Aligned judge registered to MLflow
+- Re-hydration rebuilds episodic memory from trace assessments without external state
+- Re-evaluation compares pre/post alignment accuracy on same trace set
+
+**Offline eval export**
+- Export produces trace → criteria mapping
+- Export includes scoring configuration (types, weights, aggregation rules)
+- Exported eval can be re-run via `mlflow.genai.evaluate()`
 
 ## Future Work
 
@@ -446,7 +468,7 @@ GET    /workshops/{workshop_id}/eval-export
 
 ## Related Specs
 
-- [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md) — Discovery and finding promotion (shared mechanics)
+- [DISCOVERY_SPEC](./DISCOVERY_SPEC.md) — Discovery and finding promotion (shared mechanics)
 - [RUBRIC_SPEC](./RUBRIC_SPEC.md) — Global rubric system (workshop mode only)
 - [JUDGE_EVALUATION_SPEC](./JUDGE_EVALUATION_SPEC.md) — Judge execution and alignment
 - [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md) — Trace summaries used by improved discovery

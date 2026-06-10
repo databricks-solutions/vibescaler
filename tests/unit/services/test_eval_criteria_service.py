@@ -63,6 +63,30 @@ def test_create_and_list_criteria_in_eval_mode(test_db, eval_workshop):
 
 
 @pytest.mark.spec("EVAL_MODE_SPEC")
+@pytest.mark.req("Criteria can be authored directly (without discovery)")
+def test_create_criterion_directly_without_discovery_finding(test_db, eval_workshop):
+    service = EvalCriteriaService(test_db)
+    created = service.create_criterion(
+        "ws-eval",
+        "trace-1",
+        TraceCriterionCreate(
+            text="Cites the relevant policy section",
+            criterion_type=TraceCriterionType.HURDLE,
+            weight=1,
+            created_by="fac-1",
+        ),
+    )
+
+    # Direct authoring: no discovery finding backs this criterion
+    assert created.source_finding_id is None
+    assert created.criterion_type == TraceCriterionType.HURDLE
+
+    listed = service.list_criteria("ws-eval", "trace-1")
+    assert [c.id for c in listed] == [created.id]
+    assert listed[0].source_finding_id is None
+
+
+@pytest.mark.spec("EVAL_MODE_SPEC")
 @pytest.mark.req("Criteria are editable and deletable")
 def test_update_and_delete_criteria(test_db, eval_workshop):
     service = EvalCriteriaService(test_db)

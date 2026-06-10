@@ -1,11 +1,16 @@
 /**
  * E2E tests for Custom LLM Provider feature
  *
- * These tests verify the success criteria from CUSTOM_LLM_PROVIDER_SPEC.md:
+ * These tests verify the Configuration and Connection Testing success criteria
+ * from CUSTOM_LLM_PROVIDER_SPEC.md:
  * - Configuration UI is accessible in Judge Tuning phase
  * - Users can configure custom LLM provider (provider name, URL, API key, model)
  * - Test connection validates configuration
- * - Configuration can be deleted
+ * - Configuration can be updated and deleted
+ *
+ * NOTE: judge evaluation does not consume custom providers (roadmap in the
+ * spec), so nothing here asserts judge model selection or provider switching
+ * for evaluation.
  */
 
 import { test, expect } from '@playwright/test';
@@ -19,7 +24,7 @@ import {
 } from '../lib/actions/custom-llm-provider';
 
 test.describe('Custom LLM Provider Configuration', { tag: ['@spec:CUSTOM_LLM_PROVIDER_SPEC']}, () => {
-  test('facilitator can access custom LLM provider config in judge tuning', async ({ page }) => {
+  test('facilitator can access custom LLM provider config in judge tuning', { tag: ['@req:Users can configure custom LLM provider via UI'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'LLM Provider Test Workshop' })
       .withFacilitator()
@@ -40,7 +45,7 @@ test.describe('Custom LLM Provider Configuration', { tag: ['@spec:CUSTOM_LLM_PRO
     await scenario.cleanup();
   });
 
-  test('facilitator can configure and test custom LLM provider', async ({ page }) => {
+  test('facilitator can configure and test custom LLM provider', { tag: ['@req:Test Connection button verifies endpoint is reachable', '@req:Response time is displayed on success'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Config Test Workshop' })
       .withFacilitator()
@@ -69,11 +74,13 @@ test.describe('Custom LLM Provider Configuration', { tag: ['@spec:CUSTOM_LLM_PRO
     await page.getByRole('button', { name: /Test Connection/i }).click();
 
     await expect(page.getByText(/Successfully connected/i)).toBeVisible({ timeout: 10000 });
+    // Response time is displayed alongside the success message
+    await expect(page.getByText(/\(\d+ms\)/)).toBeVisible({ timeout: 5000 });
 
     await scenario.cleanup();
   });
 
-  test('facilitator can delete custom LLM provider configuration', async ({ page }) => {
+  test('facilitator can delete custom LLM provider configuration', { tag: ['@req:Configuration can be deleted, removing both the stored config and the in-memory API key'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Delete Test Workshop' })
       .withFacilitator()
@@ -102,7 +109,7 @@ test.describe('Custom LLM Provider Configuration', { tag: ['@spec:CUSTOM_LLM_PRO
     await scenario.cleanup();
   });
 
-  test('shows stored badge after saving API key', async ({ page }) => {
+  test('shows stored badge after saving API key', { tag: ['@req:API key is stored securely in memory (not database)'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'API Key Badge Workshop' })
       .withFacilitator()
@@ -132,7 +139,7 @@ test.describe('Custom LLM Provider Configuration', { tag: ['@spec:CUSTOM_LLM_PRO
     await scenario.cleanup();
   });
 
-  test('validation requires all fields', async ({ page }) => {
+  test('validation requires all fields', { tag: ['@req:Users can configure custom LLM provider via UI'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Validation Workshop' })
       .withFacilitator()
@@ -159,7 +166,10 @@ test.describe('Custom LLM Provider Configuration', { tag: ['@spec:CUSTOM_LLM_PRO
     await scenario.cleanup();
   });
 
-  test('custom provider appears in model selector when configured', async ({ page }) => {
+  // NOTE: the judge model selector does NOT offer a custom provider option
+  // (roadmap in CUSTOM_LLM_PROVIDER_SPEC); this test only verifies the saved
+  // configuration is reflected back in the configuration form.
+  test('saved provider configuration is reflected in the configuration form', { tag: ['@req:Base URL, API key, and model name are captured'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Model Selector Workshop' })
       .withFacilitator()
@@ -185,12 +195,16 @@ test.describe('Custom LLM Provider Configuration', { tag: ['@spec:CUSTOM_LLM_PRO
 
     // Verify the custom provider config is saved
     await expect(page.getByLabel('Provider Name')).toHaveValue('My Custom Provider', { timeout: 5000 });
+    await expect(page.getByLabel('Base URL')).toHaveValue('https://custom-api.example.com/v1', { timeout: 5000 });
     await expect(page.getByLabel('Model Name')).toHaveValue('custom-model-1', { timeout: 5000 });
 
     await scenario.cleanup();
   });
 
-  test('switch between providers works', async ({ page }) => {
+  // NOTE: this updates the stored provider configuration in place; it does not
+  // (and cannot, yet) switch which provider judge evaluation uses — that
+  // integration is roadmap in CUSTOM_LLM_PROVIDER_SPEC.
+  test('provider configuration can be updated in place', { tag: ['@req:Configuration can be updated without losing other workshop data'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Switch Provider Workshop' })
       .withFacilitator()

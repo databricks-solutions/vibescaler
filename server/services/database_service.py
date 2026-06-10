@@ -1502,7 +1502,8 @@ class DatabaseService:
         question_id: The ID of the question to update (e.g., "q_1", "q_2")
         title: New question title
         description: New question description
-        judge_type: Optional judge type ('likert', 'binary', 'freeform')
+        judge_type: Optional judge type ('likert' or 'binary'; legacy 'freeform'
+            values coerce to 'likert' when the rubric is re-parsed)
     """
     # Get existing rubric
     existing_rubric = self.db.query(RubricDB).filter(RubricDB.workshop_id == workshop_id).first()
@@ -1616,8 +1617,11 @@ class DatabaseService:
         content_part, type_part = part.split(JUDGE_TYPE_DELIMITER, 1)
         content = content_part.strip()
         parsed_type = type_part.strip()
-        if parsed_type in ('likert', 'binary', 'freeform'):
+        if parsed_type in ('likert', 'binary'):
           judge_type = parsed_type
+        # Legacy 'freeform' (and any unknown type) coerces to the 'likert' default
+        # at the parse boundary — mirrors parseRubricQuestions in rubricUtils.ts,
+        # keeping legacy rows readable without exposing 'freeform' downstream.
         
       # Split only at the first colon to separate title from description
       if ':' in content:
@@ -1766,7 +1770,7 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     Returns a list of dicts, each containing:
     - judge_name: The derived judge name (e.g., "helpful_judge")
     - judge_prompt: The prompt for this specific criterion
-    - judge_type: 'likert', 'binary', or 'freeform'
+    - judge_type: 'likert' or 'binary' (legacy 'freeform' coerces to likert on parse)
     - question_id: The question ID (e.g., "q_1")
     - title: The question title
     """

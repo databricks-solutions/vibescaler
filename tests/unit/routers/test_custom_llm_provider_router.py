@@ -17,6 +17,7 @@ from server.models import Workshop, WorkshopPhase, WorkshopStatus
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Configuration persists across page refreshes (except API key which requires re-entry after 24h)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_custom_llm_provider_not_configured(async_client, override_get_db, monkeypatch):
@@ -61,6 +62,7 @@ async def test_get_custom_llm_provider_not_configured(async_client, override_get
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Configuration persists across page refreshes (except API key which requires re-entry after 24h)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_custom_llm_provider_configured(async_client, override_get_db, monkeypatch):
@@ -120,6 +122,7 @@ async def test_get_custom_llm_provider_configured(async_client, override_get_db,
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("API key is stored securely in memory (not database)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_create_custom_llm_provider(async_client, override_get_db, monkeypatch):
@@ -191,6 +194,7 @@ async def test_create_custom_llm_provider(async_client, override_get_db, monkeyp
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Configuration can be deleted, removing both the stored config and the in-memory API key")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_delete_custom_llm_provider(async_client, override_get_db, monkeypatch):
@@ -241,6 +245,7 @@ async def test_delete_custom_llm_provider(async_client, override_get_db, monkeyp
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Test Connection button verifies endpoint is reachable")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_test_custom_llm_provider_success(async_client, override_get_db, monkeypatch):
@@ -305,6 +310,7 @@ async def test_test_custom_llm_provider_success(async_client, override_get_db, m
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Clear error messages for common failures (auth, timeout, invalid URL)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_test_custom_llm_provider_auth_failure(async_client, override_get_db, monkeypatch):
@@ -367,6 +373,7 @@ async def test_test_custom_llm_provider_auth_failure(async_client, override_get_
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Clear error messages for common failures (auth, timeout, invalid URL)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_test_custom_llm_provider_no_config(async_client, override_get_db, monkeypatch):
@@ -407,6 +414,7 @@ async def test_test_custom_llm_provider_no_config(async_client, override_get_db,
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Clear error messages for common failures (auth, timeout, invalid URL)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_test_custom_llm_provider_no_api_key(async_client, override_get_db, monkeypatch):

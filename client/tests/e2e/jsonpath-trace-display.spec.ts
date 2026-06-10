@@ -74,7 +74,7 @@ test.describe('JSONPath Trace Display Customization', { tag }, () => {
     await expect(page.getByText('Extracted').first()).toBeVisible();
 
     // Save the settings
-    await page.getByRole('button', { name: /Save Settings/i }).click();
+    await page.getByTestId('jsonpath-save-settings').click();
 
     // Verify save success toast
     await expect(page.getByText(/JSONPath settings saved successfully/i)).toBeVisible();

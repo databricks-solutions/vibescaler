@@ -180,8 +180,10 @@ Databricks Apps can forward the logged-in user's OAuth token via the `x-forwarde
 
 ### Permission Types
 
-| Permission | Description | Default |
-|------------|-------------|---------|
+The full role-to-permission matrix (10 permissions derived via `UserPermissions.for_role()`) is owned by [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md). This spec owns the **frontend fallback subset** — the five permissions the client applies as defaults when the permission API is unavailable:
+
+| Permission | Description | Fallback Default |
+|------------|-------------|------------------|
 | `can_annotate` | User can submit annotations | `true` |
 | `can_view_rubric` | User can view rubric questions | `true` |
 | `can_create_rubric` | User can create/edit rubrics | `false` |
@@ -199,6 +201,28 @@ Permission Loading Flow:
 ```
 
 ## Authentication Flow
+
+### Server Login Endpoint
+
+`POST /users/auth/login` authenticates in two paths, tried in order:
+
+```
+Server Login Flow:
+1. Try facilitator auth against YAML config (config/auth.yaml)
+   - On match: get or create the facilitator user record
+   - Return AuthResponse with is_preconfigured_facilitator=true
+2. Otherwise: database lookup by email (case-insensitive)
+   - SMEs/participants: email lookup only — no password verification
+     (workshop access is controlled by invitation instead)
+   - Facilitator users stored in the database: password verified
+   - No user found / facilitator password mismatch: HTTP 401
+3. For SMEs/participants with a workshop_id in the request:
+   validate they are invited to that workshop (403 otherwise),
+   then update their current workshop_id
+4. Activate pending users on first login
+```
+
+See [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md) for the role-specific login criteria.
 
 ### Initialization (App Load)
 
@@ -341,9 +365,9 @@ Key implementation points:
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/users/{id}` | GET | Validate user exists |
-| `/users/{id}/permissions` | GET | Load user permissions |
-| `/login` | POST | Authenticate user |
+| `/users/{user_id}` | GET | Validate user exists |
+| `/users/{user_id}/permissions` | GET | Load user permissions (role-derived) |
+| `/users/auth/login` | POST | Authenticate user (YAML facilitator first, then database email lookup) |
 
 ## Success Criteria
 
@@ -357,6 +381,7 @@ Key implementation points:
 - [ ] 404 on validation: Session cleared, fresh login allowed
 - [ ] Rapid navigation: Components wait for `isLoading = false`
 - [ ] Error recovery: Errors cleared on new login attempt
+- [ ] Invalid login credentials are rejected with HTTP 401 and an explanatory error message
 
 ### Databricks API Auth
 - [ ] All Databricks API calls use SDK-resolved tokens (no user-provided PATs)
@@ -414,13 +439,6 @@ Key implementation points:
 - Immediately navigates
 - Components wait for loading
 - No permission errors
-
-## Backwards Compatibility
-
-- All existing authentication flows work unchanged
-- No database changes required
-- No API changes needed
-- Graceful fallbacks for all error cases
 
 ## Implementation Log
 

@@ -9,6 +9,10 @@ from server.database import DiscoveryFindingDB, RubricDB
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.spec("TESTING_SPEC"),
+    pytest.mark.req(
+        "Phase transition prerequisites enforced: no discovery without traces, "
+        "no annotation without rubric"
+    ),
     pytest.mark.asyncio,
 ]
 

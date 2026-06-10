@@ -1,15 +1,15 @@
-"""Tests for Assisted Facilitation v2 discovery service methods.
+"""Tests for the dormant assisted-facilitation v1 discovery service methods.
 
-These tests verify spec requirements for the discovery service.
-Tests that document unimplemented features are marked clearly.
+NOTE: These cover backend paths with no UI caller (fuzzy progress,
+per-trace discovery state, thresholds, v1 finding promotion). The
+ASSISTED_FACILITATION_SPEC was retired (folded into DISCOVERY_SPEC as
+roadmap), so these tests carry no spec tags — they remain as regression
+coverage for the retained backend code.
 """
 
 import pytest
-from fastapi import HTTPException
 from server.services.discovery_service import DiscoveryService
 from server.services.classification_service import FINDING_CATEGORIES
-
-pytestmark = pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
 
 
 class MockFinding:
@@ -92,14 +92,9 @@ class MockDatabaseService:
         return self.thresholds.get((workshop_id, trace_id), {})
 
 
-@pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
 class TestFuzzyProgress:
-    """Tests for fuzzy progress (participant view).
+    """Tests for fuzzy progress (participant view, dormant v1 backend)."""
 
-    SPEC: "Participants see only fuzzy progress (no category bias)"
-    """
-
-    @pytest.mark.req("Participants see only fuzzy progress (no category bias)")
     def test_get_fuzzy_progress_empty(self, mock_db_session):
         """Test fuzzy progress with no traces."""
         service = DiscoveryService(mock_db_session)
@@ -112,7 +107,6 @@ class TestFuzzyProgress:
         assert result["status"] == "exploring"
         assert result["percentage"] == 0.0
 
-    @pytest.mark.req("Participants see only fuzzy progress (no category bias)")
     def test_get_fuzzy_progress_exploring(self, mock_db_session):
         """Test fuzzy progress in exploring state."""
         service = DiscoveryService(mock_db_session)
@@ -129,7 +123,6 @@ class TestFuzzyProgress:
         assert result["status"] == "exploring"
         assert 0 <= result["percentage"] < 30
 
-    @pytest.mark.req("Participants see only fuzzy progress (no category bias)")
     def test_fuzzy_progress_does_not_expose_categories(self, mock_db_session):
         """Test that fuzzy progress doesn't reveal category breakdown.
 
@@ -152,14 +145,12 @@ class TestFuzzyProgress:
         assert "missing_info" not in result
 
 
-@pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
 class TestFacilitatorStructuredView:
     """Tests for facilitator structured view.
 
     SPEC: "Facilitators see per-trace structured view with category breakdown"
     """
 
-    @pytest.mark.req("Facilitators see per-trace structured view with category breakdown")
     def test_get_trace_discovery_state_structure(self, mock_db_session):
         """Test that get_trace_discovery_state returns correct structure."""
         service = DiscoveryService(mock_db_session)
@@ -184,7 +175,6 @@ class TestFacilitatorStructuredView:
         expected_categories = set(FINDING_CATEGORIES)
         assert set(result["categories"].keys()) == expected_categories
 
-    @pytest.mark.req("Facilitators see per-trace structured view with category breakdown")
     def test_discovery_state_includes_stored_findings(self, mock_db_session):
         """Test that discovery state includes findings from database.
 
@@ -217,14 +207,12 @@ class TestFacilitatorStructuredView:
         )
 
 
-@pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
 class TestThresholdConfiguration:
     """Tests for threshold configuration.
 
     SPEC: "Thresholds are configurable per category per trace"
     """
 
-    @pytest.mark.req("Thresholds are configurable per category per trace")
     def test_update_trace_thresholds_returns_structure(self, mock_db_session):
         """Test that update_trace_thresholds returns correct structure."""
         service = DiscoveryService(mock_db_session)
@@ -243,7 +231,6 @@ class TestThresholdConfiguration:
         assert result["thresholds"] == thresholds
         assert result["updated"] is True
 
-    @pytest.mark.req("Thresholds are configurable per category per trace")
     def test_thresholds_are_persisted(self, mock_db_session):
         """Test that thresholds are actually saved to database.
 
@@ -276,14 +263,12 @@ class TestThresholdConfiguration:
         )
 
 
-@pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
 class TestFindingPromotion:
     """Tests for finding promotion to draft rubric.
 
     SPEC: "Findings can be promoted to draft rubric staging area"
     """
 
-    @pytest.mark.req("Findings can be promoted to draft rubric staging area")
     def test_promote_finding_returns_structure(self, mock_db_session):
         """Test that promote_finding returns correct structure."""
         service = DiscoveryService(mock_db_session)
@@ -303,7 +288,6 @@ class TestFindingPromotion:
         assert "promoted_by" in result
         assert result["promoted_by"] == "facilitator_1"
 
-    @pytest.mark.req("Findings can be promoted to draft rubric staging area")
     def test_promote_finding_propagates_db_error(self, mock_db_session):
         """promote_finding must NOT return success when the DB write fails."""
         service = DiscoveryService(mock_db_session)
@@ -319,94 +303,3 @@ class TestFindingPromotion:
 
         with pytest.raises(RuntimeError, match="DB locked"):
             service.promote_finding("test_workshop", "finding_123", "facilitator_1")
-
-
-@pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
-@pytest.mark.skip(reason="This test is not implemented yet")
-class TestFindingClassification:
-    """Tests for finding classification.
-
-    SPEC: "Findings are classified in real-time as participants submit them"
-    """
-
-    @pytest.mark.req("Findings are classified in real-time as participants submit them")
-    def test_submit_finding_v2_returns_classification(self, mock_db_session):
-        """Test that submit_finding_v2 returns classification."""
-        service = DiscoveryService(mock_db_session)
-        service.db_service = MockDatabaseService()
-
-        workshop = type("Workshop", (), {"id": "test_workshop"})()
-        trace = type("Trace", (), {"id": "test_trace", "workshop_id": "test_workshop"})()
-
-        service.db_service.workshops["test_workshop"] = workshop
-        service.db_service.traces["test_trace"] = trace
-
-        result = service.submit_finding_v2(
-            "test_workshop",
-            "test_trace",
-            "user_1",
-            "The response is missing important details",
-        )
-
-        assert "category" in result
-        assert result["category"] in FINDING_CATEGORIES
-
-    @pytest.mark.req("Findings are classified in real-time as participants submit them")
-    def test_submit_finding_v2_accurate_classification(self, mock_db_session):
-        """Test that classification is accurate for clear cases."""
-        service = DiscoveryService(mock_db_session)
-        service.db_service = MockDatabaseService()
-
-        workshop = type("Workshop", (), {"id": "test_workshop"})()
-        trace = type("Trace", (), {"id": "test_trace", "workshop_id": "test_workshop"})()
-
-        service.db_service.workshops["test_workshop"] = workshop
-        service.db_service.traces["test_trace"] = trace
-
-        # Test missing_info classification
-        result = service.submit_finding_v2(
-            "test_workshop",
-            "test_trace",
-            "user_1",
-            "Missing error handling for null inputs",
-        )
-        assert result["category"] == "missing_info"
-
-        # Test failure_modes classification
-        result = service.submit_finding_v2(
-            "test_workshop",
-            "test_trace",
-            "user_1",
-            "The code fails when given empty input",
-        )
-        assert result["category"] == "failure_modes"
-
-    @pytest.mark.req("Findings are classified in real-time as participants submit them")
-    def test_submit_finding_v2_persists_finding(self, mock_db_session):
-        """Test that submit_finding_v2 persists the classified finding.
-
-        SPEC: "Finding is stored with assigned category"
-        This test will FAIL because submit_finding_v2 doesn't persist.
-        """
-        service = DiscoveryService(mock_db_session)
-        mock_db = MockDatabaseService()
-        service.db_service = mock_db
-
-        workshop = type("Workshop", (), {"id": "test_workshop"})()
-        trace = type("Trace", (), {"id": "test_trace", "workshop_id": "test_workshop"})()
-
-        mock_db.workshops["test_workshop"] = workshop
-        mock_db.traces["test_trace"] = trace
-
-        service.submit_finding_v2(
-            "test_workshop",
-            "test_trace",
-            "user_1",
-            "Missing documentation",
-        )
-
-        # SPEC REQUIREMENT: Finding must be persisted
-        assert len(mock_db.findings) > 0, (
-            "SPEC VIOLATION: submit_finding_v2 must persist findings. "
-            "Currently it only returns the result without saving to database."
-        )

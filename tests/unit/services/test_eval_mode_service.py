@@ -83,8 +83,6 @@ def test_hurdle_failure_forces_zero_score():
 
 @pytest.mark.spec("EVAL_MODE_SPEC")
 @pytest.mark.req("Standard criteria scored as met (1) or not met (0) × weight")
-@pytest.mark.req("Negative-weight criteria penalize when met")
-@pytest.mark.req("Normalized score = raw / max_possible, clipped to [0, 1]")
 def test_weighted_sum_and_normalization_with_negative_weights():
     criteria = [
         _criterion("s1", "Includes required detail", TraceCriterionType.STANDARD, 10),
@@ -104,6 +102,83 @@ def test_weighted_sum_and_normalization_with_negative_weights():
     assert score.raw_score == 5.0
     assert score.max_possible == 15.0
     assert score.normalized_score == pytest.approx(1 / 3)
+
+
+@pytest.mark.spec("EVAL_MODE_SPEC")
+@pytest.mark.req("Negative-weight criteria penalize when met")
+def test_negative_weight_criterion_penalizes_only_when_met():
+    criteria = [
+        _criterion("s1", "Includes required detail", TraceCriterionType.STANDARD, 8),
+        _criterion("s2", "Recommends invasive procedure", TraceCriterionType.STANDARD, -6),
+    ]
+    now = datetime.now()
+
+    without_penalty = EvalModeService.aggregate_trace_score(
+        "trace-1",
+        criteria,
+        [_evaluation("s1", met=True, created_at=now), _evaluation("s2", met=False, created_at=now)],
+    )
+    with_penalty = EvalModeService.aggregate_trace_score(
+        "trace-1",
+        criteria,
+        [_evaluation("s1", met=True, created_at=now), _evaluation("s2", met=True, created_at=now)],
+    )
+
+    # Not met -> no penalty applied
+    assert without_penalty.raw_score == 8.0
+    # Met -> full negative weight subtracted from the raw score
+    assert with_penalty.raw_score == 2.0
+    assert with_penalty.raw_score == without_penalty.raw_score - 6.0
+    assert with_penalty.normalized_score < without_penalty.normalized_score
+
+
+@pytest.mark.spec("EVAL_MODE_SPEC")
+@pytest.mark.req("Normalized score = raw / max_possible, clipped to [0, 1]")
+def test_normalized_score_is_raw_over_max_clipped_to_unit_interval():
+    criteria = [
+        _criterion("s1", "Primary requirement", TraceCriterionType.STANDARD, 6),
+        _criterion("s2", "Secondary requirement", TraceCriterionType.STANDARD, 2),
+        _criterion("s3", "Harmful behavior", TraceCriterionType.STANDARD, -10),
+    ]
+    now = datetime.now()
+
+    # Exact ratio: raw = 6, max_possible = 6 + 2 = 8 (negative weights excluded from max)
+    ratio = EvalModeService.aggregate_trace_score(
+        "trace-1",
+        criteria,
+        [
+            _evaluation("s1", met=True, created_at=now),
+            _evaluation("s2", met=False, created_at=now),
+            _evaluation("s3", met=False, created_at=now),
+        ],
+    )
+    assert ratio.max_possible == 8.0
+    assert ratio.normalized_score == pytest.approx(6.0 / 8.0)
+
+    # Negative raw score (6 - 10 = -4) clips to the lower bound 0
+    clipped_low = EvalModeService.aggregate_trace_score(
+        "trace-1",
+        criteria,
+        [
+            _evaluation("s1", met=True, created_at=now),
+            _evaluation("s2", met=False, created_at=now),
+            _evaluation("s3", met=True, created_at=now),
+        ],
+    )
+    assert clipped_low.raw_score == -4.0
+    assert clipped_low.normalized_score == 0.0
+
+    # All positive criteria met reaches exactly the upper bound 1
+    full = EvalModeService.aggregate_trace_score(
+        "trace-1",
+        criteria,
+        [
+            _evaluation("s1", met=True, created_at=now),
+            _evaluation("s2", met=True, created_at=now),
+            _evaluation("s3", met=False, created_at=now),
+        ],
+    )
+    assert full.normalized_score == 1.0
 
 
 @pytest.mark.spec("EVAL_MODE_SPEC")

@@ -12,6 +12,7 @@ from server.models import Rubric, Trace, Workshop, WorkshopPhase, WorkshopStatus
 
 
 @pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+@pytest.mark.req("Auto-evaluation model stored for re-evaluation consistency")
 @pytest.mark.req("Auto-evaluation runs in background when annotation phase starts")
 @pytest.mark.unit
 @pytest.mark.asyncio
@@ -110,6 +111,7 @@ async def test_begin_annotation_with_auto_eval_enabled(async_client, override_ge
 
         def update_auto_evaluation_job(self, workshop_id, job_id, prompt, model):
             self.auto_eval_updated = True
+            self.stored_model = model
 
         def get_rubric_questions_for_evaluation(self, workshop_id):
             return [{
@@ -144,6 +146,9 @@ async def test_begin_annotation_with_auto_eval_enabled(async_client, override_ge
     body = resp.json()
     assert body.get("auto_evaluation_started") is True or body.get("auto_eval_job_id") is not None
     assert "traces_used" in body
+    # The selected model is persisted on the workshop for re-evaluation consistency
+    assert fake_db_service.auto_eval_updated is True
+    assert fake_db_service.stored_model == "databricks-meta-llama-3-3-70b-instruct"
 
 
 @pytest.mark.spec("JUDGE_EVALUATION_SPEC")

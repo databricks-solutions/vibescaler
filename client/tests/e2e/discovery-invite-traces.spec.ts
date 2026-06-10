@@ -7,8 +7,10 @@ declare const process: { env: Record<string, string | undefined> };
 
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000';
 
+// NOTE: skipped test — deliberately untagged so it cannot count as spec coverage.
+// It exercises the shipped v2 discovery completion flow; re-tag to DISCOVERY_SPEC
+// ("Completion status shows % of participants finished") only if it is un-skipped.
 test.skip('discovery blocks until multiple participants complete; facilitator-driven phase with trace-based discovery', {
-  tag: ['@spec:DISCOVERY_TRACE_ASSIGNMENT_SPEC'],
   timeout: 60_000,
 }, async ({
   page,

@@ -9,7 +9,7 @@ import SpecCoverage from '@site/src/components/SpecCoverage';
 
 ## Overview
 
-This specification defines the build process, database migrations, and deployment procedures for the Human Evaluation Workshop. It covers frontend builds, backend database management with Alembic, and production deployment.
+This specification defines the build process, database migrations, and deployment procedures for the Human Evaluation Workshop. It covers frontend builds, backend database management with Alembic (SQLite locally, Lakebase Postgres on Databricks Apps via `DATABASE_ENV=postgres`), and production deployment to Databricks Apps.
 
 ## Architecture
 
@@ -25,8 +25,8 @@ This specification defines the build process, database migrations, and deploymen
 │         │                   │                   │           │
 │         ▼                   ▼                   ▼           │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │  npm build   │    │   uvicorn    │    │   Alembic    │  │
-│  │  (terser)    │    │              │    │  migrations  │  │
+│  │  npm build   │    │  gunicorn +  │    │   Alembic    │  │
+│  │  (terser)    │    │uvicorn worker│    │  migrations  │  │
 │  └──────────────┘    └──────────────┘    └──────────────┘  │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -47,7 +47,9 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,    // Remove all console statements
+        // Temporarily keep console statements for debugging
+        // TODO: Re-enable drop_console: true for production
+        drop_console: false,
         drop_debugger: true,   // Remove debugger statements
       },
     },
@@ -59,34 +61,18 @@ export default defineConfig({
 
 | Command | Purpose | Output |
 |---------|---------|--------|
-| `npm run build` | Production build | `client/build/` |
-| `npm run dev` | Development server | localhost:5173 |
+| `just ui-build` (`npm run build`) | Production build | `client/build/` |
+| `just ui-dev` (`npm run dev`) | Development server | localhost:5173 |
 | `npm run preview` | Preview production build | localhost:4173 |
 
-### Console Removal
+### Console and Debugger Statements
 
-Production builds automatically remove:
-- `console.log()`
-- `console.error()`
-- `console.warn()`
-- `console.info()`
-- `console.debug()`
-- `debugger` statements
+Production builds remove `debugger` statements (`drop_debugger: true`).
 
-**Development mode preserves all console statements for debugging.**
-
-### Selective Console Preservation
-
-To keep specific console methods in production:
-
-```typescript
-terserOptions: {
-  compress: {
-    pure_funcs: ['console.log', 'console.info', 'console.debug'],
-    // console.error and console.warn preserved
-  },
-}
-```
+`console.*` statements are **currently preserved** in production builds
+(`drop_console: false`) to aid debugging of deployed apps. Re-enabling
+`drop_console: true` is roadmap (see Success Criteria); when that happens this
+section and the linked tests must be updated together.
 
 ### Build Output
 
@@ -106,7 +92,7 @@ client/build/
 
 ### Overview
 
-The project uses Alembic for SQLite database migrations with batch mode support (required for SQLite's limited ALTER TABLE capabilities).
+The project uses Alembic for database migrations against both backends: SQLite (local development, E2E) and Lakebase Postgres (`DATABASE_ENV=postgres`, the Databricks Apps default in `app.yaml`). SQLite migrations use batch mode (required for SQLite's limited ALTER TABLE capabilities).
 
 ### Configuration Files
 
@@ -133,8 +119,17 @@ The project uses Alembic for SQLite database migrations with batch mode support 
 migrations/versions/
 ├── 0001_baseline.py              # Initial schema
 ├── 0002_legacy_schema_fixes.py   # Legacy compatibility
-└── 0003_judge_schema_updates.py  # Judge table updates
+├── 0003_judge_schema_updates.py  # Judge table updates
+├── ...                           # 0004–0021: feature migrations
+│                                 # (randomization, discovery, summarization,
+│                                 #  eval mode, social threads, ...)
+└── 0f8f0efbbe57_add_assisted_facilitation_v2_tables.py
 ```
+
+The history contains parallel branches (duplicate `0006`–`0010` prefixes,
+different slugs) joined by merge revisions (`0013_merge_heads.py`,
+`0015_merge_analysis_and_draft_rubric.py`). `alembic upgrade head` resolves
+the full graph; see `migrations/versions/` for the authoritative list.
 
 ### Batch Mode for SQLite
 
@@ -153,7 +148,7 @@ This creates a new table, copies data, drops old table, and renames.
 
 **Development**: `just api-dev`, `just api`, and `just dev` automatically run `just db-bootstrap` before starting.
 
-**Production (Gunicorn)**: The `gunicorn_conf.py` `on_starting` hook runs `bootstrap_database(full=True)` once in the master process before workers fork. This ensures pending migrations are applied before any worker accepts traffic. If migrations fail, gunicorn exits.
+**Production (Gunicorn)**: The `gunicorn_conf.py` `on_starting` hook runs `bootstrap_database(full=True)` once in the master process before workers fork. This ensures pending migrations are applied before any worker accepts traffic when the database is reachable. Startup is **optimistic**: if bootstrap fails (e.g., Lakebase is unconfigured or waking up), the failure is logged and gunicorn continues starting so the app can still serve `/docs` and the setup-status gate. Database-backed routes may return errors until the database becomes available.
 
 **Production (Manual)**: Run `just db-bootstrap` as a separate step before starting the server.
 
@@ -185,18 +180,29 @@ This auto-generates a migration based on model changes.
 
 ## Deployment
 
-### Full Deployment Command
+### Databricks Apps Deployment Command
 
 ```bash
 just deploy
 ```
 
-This runs:
-1. `just db-bootstrap` - Ensure database is current
-2. `npm run build` - Build frontend
-3. `./deploy.sh` - Run deployment script
+This deploys source (not artifacts) to a Databricks App:
+1. `databricks sync . "$WORKSPACE_PATH"` — sync the repo to the workspace,
+   excluding `.git`, `.claude`, `node_modules`, `package-lock.json`,
+   `__pycache__`, `*.db`, `.venv`, `docs/.docusaurus`, `docs/build`,
+   `docs/package-lock.json`, `.e2e-*`, and `htmlcov`
+2. `databricks apps create "$APP"` — create the app if it doesn't exist
+3. `databricks apps deploy "$APP" --source-code-path "$WORKSPACE_PATH"`
 
-### Manual Steps
+The Databricks Apps build then runs on the platform:
+`npm install` → `pip install -r requirements.txt` → `npm run build` → the
+`app.yaml` command. Requires `DATABRICKS_APP_NAME` (set by `just configure`)
+and optionally `DATABRICKS_CONFIG_PROFILE`.
+
+There is no `deploy.sh`; database bootstrap happens at app startup via the
+gunicorn `on_starting` hook (see Bootstrap Behavior), not as a deploy step.
+
+### Manual Steps (local production-style run)
 
 ```bash
 # 1. Database
@@ -211,13 +217,14 @@ uv run uvicorn server.app:app --host 0.0.0.0 --port 8000
 
 ### Production Server
 
+The `app.yaml` command (what Databricks Apps actually runs):
+
 ```bash
-# With Gunicorn (multiple workers + automatic migrations)
-uv run gunicorn server.app:app \
+gunicorn server.app:app \
   -c gunicorn_conf.py \
-  -w 4 \
-  -k uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8000
+  -w 2 \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --timeout 1800
 ```
 
 ### Environment Variables
@@ -255,17 +262,17 @@ just db-revision      # Create new migration
 ### Development
 
 ```bash
-just dev              # Start full dev environment
+just dev              # Start full dev environment (API + UI)
 just api-dev          # Start API with hot reload
-just client-dev       # Start frontend dev server
+just ui-dev           # Start frontend dev server
 ```
 
 ### Testing
 
 ```bash
-just test             # Run all tests
-just test-server      # Run Python tests
-just test-client      # Run React tests
+just test-server      # Run Python unit tests
+just test-integration # Run Python integration tests
+just ui-test          # Run React tests (typecheck + vitest)
 just e2e              # Run E2E tests (headless)
 just e2e headed       # Run E2E tests (with browser)
 just e2e ui           # Run E2E tests (Playwright UI)
@@ -274,8 +281,8 @@ just e2e ui           # Run E2E tests (Playwright UI)
 ### Build & Deploy
 
 ```bash
-just build            # Build frontend
-just deploy           # Full deployment
+just ui-build         # Build frontend
+just deploy           # Sync source to the workspace and deploy the Databricks App
 ```
 
 ---
@@ -284,14 +291,14 @@ just deploy           # Full deployment
 
 ### Automated Release Workflow
 
-**File**: `.github/workflows/release.yml`
+**File**: `.github/workflows/release-build.yml`
 
 Triggers on:
-- Push tags matching `v*`
-- Manual workflow dispatch
+- GitHub release **published**
 
 Creates:
-- `project-with-build.zip` with pre-built client
+- `project-with-build.zip` with pre-built client, uploaded as a release asset
+  via `softprops/action-gh-release`
 
 ### Release Artifact Contents
 
@@ -306,7 +313,8 @@ project-with-build.zip
 └── README.md
 ```
 
-**Excludes**: `node_modules/`, `.git/`, `*.db`, `__pycache__/`
+**Excludes**: `node_modules/`, `.git/`, `.github/`, `*.db`, `__pycache__/`,
+`.env`, `.venv/`/`venv/`, `uv.lock`, `doc/`, test caches, and editor/OS files
 
 ---
 
@@ -316,7 +324,6 @@ project-with-build.zip
 
 ### Frontend Build
 - [ ] Production build completes without errors
-- [ ] Console statements removed in production
 - [ ] Assets minified and hashed
 - [ ] Build directory contains all required files
 
@@ -326,6 +333,7 @@ project-with-build.zip
 - [ ] Batch mode works for SQLite ALTER TABLE
 - [ ] File lock prevents race conditions with multiple workers
 - [ ] Pending Alembic migrations are applied automatically before workers accept traffic
+- [ ] Lakebase schema privilege grants are best-effort
 
 ### Deployment
 - [ ] Full deployment completes successfully
@@ -333,11 +341,16 @@ project-with-build.zip
 - [ ] Server starts and serves frontend
 - [ ] API endpoints respond correctly
 - [ ] Database connection established
+- [ ] Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap provisions the app schema and reuses existing data across restarts
 
 ### CI/CD
 - [ ] Release workflow creates zip artifact
 - [ ] Pre-built client included in release
 - [ ] No sensitive files in artifact
+- [ ] Lockfiles resolve against public registries (no internal proxy URLs)
+
+### Roadmap
+- [ ] Console statements removed in production (roadmap)
 
 ---
 
@@ -515,4 +528,5 @@ Limitations:
 | 2026-04-10 | [SDK Auth Migration](../.claude/plans/2026-04-10-sdk-auth-migration.md) | complete | Replace PAT token auth with SDK auth; update Databricks Apps auth section; add Lakebase env vars |
 | 2026-04-11 | (inline) | complete | Fix Lakebase connection pool: `do_connect` token injection, `pool_recycle=3600`, `pool_pre_ping=False`, `generate_database_credential()` API |
 | 2026-04-11 | [Gunicorn on_starting hook](../.claude/plans/jaunty-leaping-lighthouse.md) | complete | Run Alembic migrations in gunicorn master before workers fork |
+| 2026-06-10 | (inline) | complete | v1.10 honesty pass: optimistic-startup prose (no gunicorn exit on migration failure), real `just deploy` path (databricks sync + apps deploy; no deploy.sh), console removal moved to roadmap (`drop_console: false` today), added Lakebase persistence + registry-portability criteria and genuine runtime tests |
 

@@ -112,14 +112,7 @@ async def test_update_and_delete_criterion(async_client, override_get_db, monkey
     assert delete_resp.status_code == 204
 
 
-@pytest.mark.spec("EVAL_MODE_SPEC")
-@pytest.mark.req("Per-trace rubric is rendered as markdown")
-@pytest.mark.req("Scoring handles edge cases: no criteria, all hurdles, all negative weights")
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_trace_rubric_and_eval_results(async_client, override_get_db, monkeypatch):
-    import server.routers.eval_mode as eval_router
-
+def _install_rubric_fakes(eval_router, monkeypatch):
     criterion = _criterion("c-rubric")
     evaluation = CriterionEvaluation(
         id="e1",
@@ -159,14 +152,43 @@ async def test_trace_rubric_and_eval_results(async_client, override_get_db, monk
 
     monkeypatch.setattr(eval_router, "EvalCriteriaService", FakeEvalCriteriaService)
     monkeypatch.setattr(eval_router, "DatabaseService", FakeDatabaseService)
+    return criterion
+
+
+@pytest.mark.spec("EVAL_MODE_SPEC")
+@pytest.mark.req("Per-trace rubric is rendered as markdown")
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_trace_rubric_rendered_as_markdown(async_client, override_get_db, monkeypatch):
+    import server.routers.eval_mode as eval_router
+
+    criterion = _install_rubric_fakes(eval_router, monkeypatch)
 
     rubric_resp = await async_client.get("/workshops/w1/traces/t1/rubric")
     assert rubric_resp.status_code == 200
     rubric = TraceRubric(**rubric_resp.json())
     assert "## Criteria" in rubric.markdown
+    assert criterion.text in rubric.markdown
 
+
+@pytest.mark.spec("EVAL_MODE_SPEC")
+@pytest.mark.req("Aggregated eval scores are available per trace or for all workshop traces")
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_eval_results_per_trace_and_for_all_traces(async_client, override_get_db, monkeypatch):
+    import server.routers.eval_mode as eval_router
+
+    _install_rubric_fakes(eval_router, monkeypatch)
+
+    # All workshop traces when no trace_id filter is given
     results_resp = await async_client.get("/workshops/w1/eval-results")
     assert results_resp.status_code == 200
     scores = [TraceEvalScore(**row) for row in results_resp.json()]
-    assert len(scores) == 2
-    assert scores[0].trace_id == "t1"
+    assert [s.trace_id for s in scores] == ["t1", "t2"]
+
+    # Single trace when filtered
+    single_resp = await async_client.get("/workshops/w1/eval-results", params={"trace_id": "t1"})
+    assert single_resp.status_code == 200
+    single = [TraceEvalScore(**row) for row in single_resp.json()]
+    assert [s.trace_id for s in single] == ["t1"]
+    assert single[0].criteria_results[0].rationale == "met"

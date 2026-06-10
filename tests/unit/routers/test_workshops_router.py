@@ -5,8 +5,6 @@ import pytest
 from server.models import JudgePrompt, Workshop, WorkshopMode, WorkshopPhase, WorkshopStatus
 
 
-@pytest.mark.spec("DISCOVERY_TRACE_ASSIGNMENT_SPEC")
-@pytest.mark.req("Phase/round context properly scoped in database")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_workshop_404_when_missing(async_client, override_get_db, monkeypatch):
@@ -27,8 +25,6 @@ async def test_get_workshop_404_when_missing(async_client, override_get_db, monk
     assert resp.json()["detail"] == "Workshop not found"
 
 
-@pytest.mark.spec("DISCOVERY_TRACE_ASSIGNMENT_SPEC")
-@pytest.mark.req("Annotation traces randomized per (user_id, trace_set) pair")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_traces_requires_user_id(async_client, override_get_db):
@@ -37,8 +33,6 @@ async def test_get_traces_requires_user_id(async_client, override_get_db):
     assert "user_id is required" in resp.json()["detail"]
 
 
-@pytest.mark.spec("DISCOVERY_TRACE_ASSIGNMENT_SPEC")
-@pytest.mark.req("Switching between discovery rounds hides/shows appropriate traces")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_workshop_success(async_client, override_get_db, monkeypatch):

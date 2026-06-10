@@ -1,11 +1,13 @@
 """Tests for BUILD_AND_DEPLOY_SPEC.
 
-Verifies build configuration, database bootstrap, file locking,
-and release workflow exclusions as meta-tests (parsing config files
-and asserting their contents).
+Mixes behavior tests (real Alembic migration runs, real ASGI app serving the
+frontend, bootstrap + file locking) with meta-tests that parse config files
+(vite.config.ts, app.yaml, release workflow) and assert their contents.
 """
 
 import os
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -67,6 +69,45 @@ class TestDbBootstrapCreatesDatabase:
 @pytest.mark.req("Migrations apply without errors")
 class TestAlembicMigrations:
     """SC: Migrations apply without errors on fresh DB."""
+
+    def test_alembic_upgrade_head_applies_cleanly_on_fresh_db(self, tmp_path, monkeypatch):
+        """`alembic upgrade head` really runs the full migration graph on a fresh SQLite DB.
+
+        This is the genuine behavior test for the criterion: no mocks — the
+        actual migration scripts (including merge revisions) are executed.
+        """
+        import sqlite3
+
+        monkeypatch.chdir(PROJECT_ROOT)  # Config("alembic.ini") is cwd-relative
+        db_file = tmp_path / "fresh_migrations.db"
+        db_url = f"sqlite:///{db_file}"
+
+        # migrations/env.py prefers DATABASE_URL / PG* env vars over the
+        # alembic config URL for sqlite targets, and bootstrap_database()
+        # leaks DATABASE_URL into os.environ (server/db_bootstrap.py),
+        # so pin the env to this test's fresh DB.
+        monkeypatch.setenv("DATABASE_URL", db_url)
+        for var in ("PGHOST", "PGDATABASE", "PGUSER"):
+            monkeypatch.delenv(var, raising=False)
+
+        from server.db_bootstrap import _run_alembic_upgrade_head
+
+        _run_alembic_upgrade_head(db_url)
+
+        conn = sqlite3.connect(str(db_file))
+        try:
+            tables = {
+                row[0]
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
+            versions = conn.execute("SELECT version_num FROM alembic_version").fetchall()
+        finally:
+            conn.close()
+
+        assert "alembic_version" in tables, "Alembic must record the applied revision"
+        assert versions, "alembic_version must contain at least one head revision"
+        for expected in ("workshops", "users", "traces", "annotations", "rubrics"):
+            assert expected in tables, f"Migrated schema must contain the {expected!r} table"
 
     def test_migrations_directory_exists(self):
         """Migration versions directory exists with baseline."""
@@ -397,9 +438,16 @@ class TestBuildDirectoryContents:
 
 
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
-@pytest.mark.req("API endpoints respond correctly")
+@pytest.mark.req("Pending Alembic migrations are applied automatically before workers accept traffic")
 class TestApiEndpointConfiguration:
-    """SC: API is configured with proper endpoints."""
+    """Production wiring for the pre-fork migration hook.
+
+    These are meta-tests on app.yaml: they verify the deployed command is
+    gunicorn with gunicorn_conf.py, which is what makes the on_starting
+    migration hook (behavior-tested in test_gunicorn_conf.py) actually run on
+    Databricks Apps. The 'API endpoints respond correctly' criterion is
+    covered by integration tests (tests/integration/test_build_deploy_runtime.py).
+    """
 
     def test_app_yaml_specifies_gunicorn(self):
         """app.yaml uses gunicorn as the server."""
@@ -426,9 +474,15 @@ class TestApiEndpointConfiguration:
 
 
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
-@pytest.mark.req("Database connection established")
 class TestDatabaseConnectionConfig:
-    """SC: Database connection is properly configured."""
+    """Database connection configuration helpers.
+
+    Supporting config-level tests. The 'Database connection established'
+    criterion itself is covered by integration tests that open a real
+    connection (tests/integration/test_build_deploy_runtime.py); the Lakebase
+    schema-name tests below back the Lakebase persistence criterion because a
+    stable schema name is what lets a redeployed app find its existing data.
+    """
 
     def test_database_url_has_default(self):
         """Database URL defaults to sqlite:///workshop.db."""
@@ -448,6 +502,10 @@ class TestDatabaseConnectionConfig:
                 backend = _detect_backend()
                 assert backend.value == "sqlite"
 
+    @pytest.mark.req(
+        "Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap "
+        "provisions the app schema and reuses existing data across restarts"
+    )
     def test_lakebase_schema_name_defaults_to_stable_app_schema(self):
         """Lakebase schema names stay stable so migrations apply across deployments."""
         from server.db_config import get_lakebase_schema_name
@@ -462,6 +520,10 @@ class TestDatabaseConnectionConfig:
         ):
             assert get_lakebase_schema_name() == "human_eval_workshop"
 
+    @pytest.mark.req(
+        "Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap "
+        "provisions the app schema and reuses existing data across restarts"
+    )
     def test_lakebase_schema_name_can_be_overridden(self):
         """Operators can choose a schema explicitly when reusing an existing Lakebase schema."""
         from server.db_config import get_lakebase_schema_name
@@ -499,3 +561,66 @@ class TestDeploymentStatusGate:
         status = self._get_status()
         assert status["lakebase_configured"] is False
         assert status["setup_required"] is True
+
+
+_SERVE_FRONTEND_SCRIPT = r'''
+from pathlib import Path
+
+root = Path(__ROOT__)
+build_dir = root / "client" / "build"
+index = build_dir / "index.html"
+created = not index.exists()
+if created:
+    build_dir.mkdir(parents=True, exist_ok=True)
+    index.write_text(
+        "<!doctype html><html><body><div id=\"root\"></div></body></html>"
+    )
+try:
+    from starlette.testclient import TestClient
+
+    from server.app import app
+
+    client = TestClient(app)
+
+    resp = client.get("/")
+    assert resp.status_code == 200, f"GET / returned {resp.status_code}"
+    assert "text/html" in resp.headers.get("content-type", ""), resp.headers
+    assert 'id="root"' in resp.text, "index.html must contain the SPA root element"
+
+    health = client.get("/health")
+    assert health.status_code == 200, f"GET /health returned {health.status_code}"
+    assert health.json() == {"status": "healthy"}
+finally:
+    if created:
+        index.unlink()
+        try:
+            build_dir.rmdir()
+        except OSError:
+            pass
+'''
+
+
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req("Server starts and serves frontend")
+class TestServerServesFrontend:
+    """SC: Server starts and serves frontend.
+
+    Boots the real ASGI app in a fresh subprocess so the static mount in
+    server/app.py sees a client build at import time, then asserts `/` serves
+    index.html (the SPA entry point) and `/health` responds. If no build is
+    present (CI), a minimal index.html is created and cleaned up afterwards.
+    """
+
+    def test_root_serves_index_html_and_health_responds(self):
+        script = _SERVE_FRONTEND_SCRIPT.replace("__ROOT__", repr(str(PROJECT_ROOT)))
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert result.returncode == 0, (
+            "Frontend-serving smoke failed:\n"
+            f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )

@@ -1,26 +1,26 @@
 {
-  "generated": "2026-03-23T12:37:49.380444",
+  "generated": "2026-06-10T18:21:07.551007",
   "summary": {
-    "total_requirements": 283,
-    "covered_requirements": 185,
-    "coverage_percent": 65
+    "total_requirements": 407,
+    "covered_requirements": 280,
+    "coverage_percent": 68
   },
   "pyramid": {
-    "unit": 591,
-    "integration": 50,
-    "e2e-mocked": 17,
-    "e2e-real": 94
+    "unit": 1103,
+    "integration": 61,
+    "e2e-mocked": 22,
+    "e2e-real": 67
   },
   "specs": {
     "ANNOTATION_SPEC": {
-      "total_requirements": 21,
-      "covered_requirements": 9,
-      "coverage_percent": 42,
+      "total_requirements": 26,
+      "covered_requirements": 19,
+      "coverage_percent": 73,
       "by_type": {
-        "unit": 47,
+        "unit": 57,
         "integration": 0,
         "e2e-mocked": 0,
-        "e2e-real": 6
+        "e2e-real": 17
       },
       "requirements": [
         {
@@ -32,20 +32,16 @@
           "covered": true
         },
         {
-          "text": "Toast shows \"Annotation saved!\" for new submissions",
-          "covered": false
+          "text": "Annotated traces show a persistent Saved indicator instead of a success toast",
+          "covered": true
         },
         {
-          "text": "Toast shows \"Annotation updated!\" only when changes detected",
-          "covered": false
-        },
-        {
-          "text": "No toast when navigating without changes",
+          "text": "Save success is silent; toasts appear only for save failures, retries, and bulk-recovery outcomes",
           "covered": false
         },
         {
           "text": "Multi-line comments preserved throughout the stack",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Comments display with proper line breaks",
@@ -53,10 +49,18 @@
         },
         {
           "text": "Next button enabled for annotated traces (allows re-navigation)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Annotation count reflects unique submissions (not re-submissions)",
+          "covered": true
+        },
+        {
+          "text": "Annotation upsert persists every trace submission, including the final trace in a session",
+          "covered": true
+        },
+        {
+          "text": "Completing the final trace shows a terminal completion state",
           "covered": true
         },
         {
@@ -77,7 +81,7 @@
         },
         {
           "text": "Duplicate feedback entries are detected and skipped",
-          "covered": true
+          "covered": false
         },
         {
           "text": "Bulk resync re-exports all annotations when rubric titles change",
@@ -85,7 +89,7 @@
         },
         {
           "text": "Failed saves are queued and retried automatically with exponential backoff",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Navigation is optimistic (UI advances immediately, save completes in background)",
@@ -93,7 +97,23 @@
         },
         {
           "text": "Navigation debounced at 300ms to prevent duplicate saves",
-          "covered": false
+          "covered": true
+        },
+        {
+          "text": "Facilitator annotation stats poll every 15 seconds while the tab is in the foreground",
+          "covered": true
+        },
+        {
+          "text": "Participants can create, retrieve, and delete notes during discovery and annotation phases",
+          "covered": true
+        },
+        {
+          "text": "Participant notes always append as new entries; existing notes are never overwritten",
+          "covered": true
+        },
+        {
+          "text": "Facilitators can toggle participant notes visibility per workshop",
+          "covered": true
         },
         {
           "text": "Freeform question responses are optional (not required for navigation)",
@@ -109,105 +129,148 @@
         }
       ]
     },
-    "ASSISTED_FACILITATION_SPEC": {
-      "total_requirements": 7,
-      "covered_requirements": 7,
-      "coverage_percent": 100,
-      "by_type": {
-        "unit": 30,
-        "integration": 0,
-        "e2e-mocked": 0,
-        "e2e-real": 42
-      },
-      "requirements": [
-        {
-          "text": "Findings are classified in real-time as participants submit them",
-          "covered": true
-        },
-        {
-          "text": "Facilitators see per-trace structured view with category breakdown",
-          "covered": true
-        },
-        {
-          "text": "Facilitators can generate targeted questions that broadcast to all participants",
-          "covered": true
-        },
-        {
-          "text": "Disagreements are auto-detected and surfaced",
-          "covered": true
-        },
-        {
-          "text": "Participants see only fuzzy progress (no category bias)",
-          "covered": true
-        },
-        {
-          "text": "Findings can be promoted to draft rubric staging area",
-          "covered": true
-        },
-        {
-          "text": "Thresholds are configurable per category per trace",
-          "covered": true
-        }
-      ]
-    },
     "AUTHENTICATION_SPEC": {
-      "total_requirements": 7,
-      "covered_requirements": 5,
-      "coverage_percent": 71,
+      "total_requirements": 29,
+      "covered_requirements": 4,
+      "coverage_percent": 13,
       "by_type": {
-        "unit": 11,
+        "unit": 9,
         "integration": 0,
-        "e2e-mocked": 2,
+        "e2e-mocked": 3,
         "e2e-real": 0
       },
       "requirements": [
         {
           "text": "No \"permission denied\" errors on normal login",
-          "covered": true
+          "covered": false
         },
         {
           "text": "No page refresh required after login",
-          "covered": true
+          "covered": false
         },
         {
           "text": "Slow network: Loading indicator shown until ready",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Permission API failure: User can log in with defaults",
-          "covered": true
+          "covered": false
         },
         {
           "text": "404 on validation: Session cleared, fresh login allowed",
-          "covered": true
+          "covered": false
         },
         {
           "text": "Rapid navigation: Components wait for `isLoading = false`",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Error recovery: Errors cleared on new login attempt",
           "covered": true
+        },
+        {
+          "text": "Invalid login credentials are rejected with HTTP 401 and an explanatory error message",
+          "covered": true
+        },
+        {
+          "text": "All Databricks API calls use SDK-resolved tokens (no user-provided PATs)",
+          "covered": false
+        },
+        {
+          "text": "MLflow operations use SDK auth without `os.environ[\"DATABRICKS_TOKEN\"]` mutation",
+          "covered": false
+        },
+        {
+          "text": "No token input fields exist in the frontend UI",
+          "covered": false
+        },
+        {
+          "text": "No token persistence in memory (`TokenStorageService` for Databricks) or database (`databricks_tokens` table)",
+          "covered": false
+        },
+        {
+          "text": "Local development works via `databricks auth login` CLI profile",
+          "covered": false
+        },
+        {
+          "text": "Databricks Apps deployment works via platform-injected service principal",
+          "covered": false
+        },
+        {
+          "text": "`DATABRICKS_TOKEN` env var works as fallback for CI/containers",
+          "covered": false
+        },
+        {
+          "text": "`resolve_databricks_token()` raises `RuntimeError` with actionable message when no auth available",
+          "covered": false
+        },
+        {
+          "text": "No user-configurable `databricks_host` \u2014 app always uses its own workspace",
+          "covered": false
+        },
+        {
+          "text": "`DATABRICKS_HOST` comes from environment (Databricks Apps platform or developer), not stored config",
+          "covered": false
+        },
+        {
+          "text": "`MLFLOW_EXPERIMENT_ID` comes from app.yaml resource declaration",
+          "covered": false
+        },
+        {
+          "text": "`DatabricksService` does not accept `workspace_url` parameter \u2014 uses env-based host only",
+          "covered": false
+        },
+        {
+          "text": "MemAlign embedding model is selectable with default to `databricks-gte-large-en`",
+          "covered": false
+        },
+        {
+          "text": "No dead `OPENAI_API_KEY` code paths in alignment service",
+          "covered": false
+        },
+        {
+          "text": "Token injection uses `do_connect` event listener, not `creator` callable or baked-in URL",
+          "covered": false
+        },
+        {
+          "text": "Tokens generated via `generate_database_credential(endpoint=...)` for Lakebase Autoscaling",
+          "covered": false
+        },
+        {
+          "text": "Token refresh only when creating new physical connections (not on every checkout)",
+          "covered": false
+        },
+        {
+          "text": "`pool_recycle=3600` (not shorter \u2014 avoids unnecessary connection churn)",
+          "covered": false
+        },
+        {
+          "text": "`pool_pre_ping=False` (conflicts with `do_connect` token injection)",
+          "covered": false
+        },
+        {
+          "text": "`max_overflow` \u2264 5 (caps total connections at 20 across 2 gunicorn workers)",
+          "covered": false
+        },
+        {
+          "text": "`ENDPOINT_NAME` environment variable required for Lakebase Autoscaling deployments",
+          "covered": false
         }
       ]
     },
     "BUILD_AND_DEPLOY_SPEC": {
-      "total_requirements": 15,
-      "covered_requirements": 12,
-      "coverage_percent": 80,
+      "total_requirements": 19,
+      "covered_requirements": 17,
+      "coverage_percent": 89,
       "by_type": {
-        "unit": 56,
-        "integration": 0,
+        "unit": 87,
+        "integration": 2,
         "e2e-mocked": 0,
         "e2e-real": 0
       },
       "requirements": [
         {
           "text": "Production build completes without errors",
-          "covered": false
-        },
-        {
-          "text": "Console statements removed in production",
           "covered": false
         },
         {
@@ -235,8 +298,20 @@
           "covered": true
         },
         {
+          "text": "Pending Alembic migrations are applied automatically before workers accept traffic",
+          "covered": true
+        },
+        {
+          "text": "Lakebase schema privilege grants are best-effort",
+          "covered": true
+        },
+        {
           "text": "Full deployment completes successfully",
           "covered": false
+        },
+        {
+          "text": "App serves setup docs and gates the UI until Lakebase is configured (postgres targets only; sqlite deployments are fully operable without setup)",
+          "covered": true
         },
         {
           "text": "Server starts and serves frontend",
@@ -251,6 +326,10 @@
           "covered": true
         },
         {
+          "text": "Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap provisions the app schema and reuses existing data across restarts",
+          "covered": true
+        },
+        {
           "text": "Release workflow creates zip artifact",
           "covered": true
         },
@@ -261,105 +340,81 @@
         {
           "text": "No sensitive files in artifact",
           "covered": true
+        },
+        {
+          "text": "Lockfiles resolve against public registries (no internal proxy URLs)",
+          "covered": true
         }
       ]
     },
     "CUSTOM_LLM_PROVIDER_SPEC": {
-      "total_requirements": 15,
-      "covered_requirements": 0,
-      "coverage_percent": 0,
+      "total_requirements": 11,
+      "covered_requirements": 11,
+      "coverage_percent": 100,
       "by_type": {
-        "unit": 13,
+        "unit": 17,
         "integration": 0,
-        "e2e-mocked": 1,
+        "e2e-mocked": 8,
         "e2e-real": 0
       },
       "requirements": [
         {
           "text": "Users can configure custom LLM provider via UI",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Base URL, API key, and model name are captured",
-          "covered": false
+          "covered": true
         },
         {
           "text": "API key is stored securely in memory (not database)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Configuration persists across page refreshes (except API key which requires re-entry after 24h)",
-          "covered": false
-        },
-        {
-          "text": "\"Test Connection\" button verifies endpoint is reachable",
-          "covered": false
-        },
-        {
-          "text": "Clear error messages for common failures (auth, timeout, invalid URL)",
-          "covered": false
-        },
-        {
-          "text": "Response time is displayed on success",
-          "covered": false
-        },
-        {
-          "text": "When custom provider is enabled, judge evaluation uses the custom endpoint",
-          "covered": false
-        },
-        {
-          "text": "`proxy_url` parameter is correctly passed to MLflow",
-          "covered": false
-        },
-        {
-          "text": "Evaluation results are identical in format to Databricks FMAPI results",
-          "covered": false
-        },
-        {
-          "text": "Errors from custom provider are properly surfaced to UI",
-          "covered": false
-        },
-        {
-          "text": "Custom provider option appears in model selector when configured",
-          "covered": false
-        },
-        {
-          "text": "Clear indication of which provider is being used",
-          "covered": false
-        },
-        {
-          "text": "Easy to switch between Databricks and custom provider",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Configuration can be updated without losing other workshop data",
-          "covered": false
+          "covered": true
+        },
+        {
+          "text": "Configuration can be deleted, removing both the stored config and the in-memory API key",
+          "covered": true
+        },
+        {
+          "text": "Test Connection button verifies endpoint is reachable",
+          "covered": true
+        },
+        {
+          "text": "Clear error messages for common failures (auth, timeout, invalid URL)",
+          "covered": true
+        },
+        {
+          "text": "Response time is displayed on success",
+          "covered": true
+        },
+        {
+          "text": "Custom provider option appears in the Discovery model selector when configured and enabled",
+          "covered": true
+        },
+        {
+          "text": "When the Discovery follow-up model is set to custom, follow-up questions are generated through the configured endpoint via build_custom_llm",
+          "covered": true
         }
       ]
     },
     "DATASETS_SPEC": {
-      "total_requirements": 9,
-      "covered_requirements": 9,
+      "total_requirements": 5,
+      "covered_requirements": 5,
       "coverage_percent": 100,
       "by_type": {
-        "unit": 27,
+        "unit": 31,
         "integration": 0,
         "e2e-mocked": 0,
-        "e2e-real": 1
+        "e2e-real": 2
       },
       "requirements": [
-        {
-          "text": "Datasets can be created with arbitrary trace lists",
-          "covered": true
-        },
-        {
-          "text": "Union operation combines traces from multiple datasets",
-          "covered": true
-        },
-        {
-          "text": "Subtract operation removes specified traces",
-          "covered": true
-        },
         {
           "text": "Same user sees same order for same dataset (deterministic)",
           "covered": true
@@ -377,10 +432,6 @@
           "covered": true
         },
         {
-          "text": "Dataset lineage tracked (source datasets, operations)",
-          "covered": true
-        },
-        {
           "text": "Facilitators see chronological order (no randomization)",
           "covered": true
         }
@@ -388,12 +439,12 @@
     },
     "DESIGN_SYSTEM_SPEC": {
       "total_requirements": 7,
-      "covered_requirements": 0,
-      "coverage_percent": 0,
+      "covered_requirements": 2,
+      "coverage_percent": 28,
       "by_type": {
-        "unit": 4,
+        "unit": 40,
         "integration": 0,
-        "e2e-mocked": 1,
+        "e2e-mocked": 2,
         "e2e-real": 0
       },
       "requirements": [
@@ -402,8 +453,8 @@
           "covered": false
         },
         {
-          "text": "Dark mode fully functional",
-          "covered": false
+          "text": "`cn()` utility merges class names and resolves Tailwind conflicts (later value wins)",
+          "covered": true
         },
         {
           "text": "All text meets WCAG AA contrast",
@@ -415,7 +466,7 @@
         },
         {
           "text": "No hardcoded colors in components",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Badges use secondary color scheme",
@@ -428,14 +479,14 @@
       ]
     },
     "DISCOVERY_SPEC": {
-      "total_requirements": 59,
-      "covered_requirements": 48,
-      "coverage_percent": 81,
+      "total_requirements": 79,
+      "covered_requirements": 76,
+      "coverage_percent": 96,
       "by_type": {
-        "unit": 138,
+        "unit": 309,
         "integration": 4,
-        "e2e-mocked": 11,
-        "e2e-real": 17
+        "e2e-mocked": 6,
+        "e2e-real": 22
       },
       "requirements": [
         {
@@ -464,11 +515,11 @@
         },
         {
           "text": "Previous Q&A visible while answering new questions",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Loading spinner during LLM generation (1-3s)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Error handling with retry for LLM failures",
@@ -579,6 +630,54 @@
           "covered": true
         },
         {
+          "text": "Facilitator can switch Discovery workspace between `analysis` mode and `social` mode",
+          "covered": true
+        },
+        {
+          "text": "In social mode, users can create trace-level comments",
+          "covered": true
+        },
+        {
+          "text": "In social mode, users can create milestone-level comments",
+          "covered": true
+        },
+        {
+          "text": "Users can reply to comments in-thread",
+          "covered": true
+        },
+        {
+          "text": "Users can upvote/downvote comments (single vote per user per comment with toggle behavior)",
+          "covered": true
+        },
+        {
+          "text": "Thread updates appear live in the workspace while participants collaborate",
+          "covered": true
+        },
+        {
+          "text": "Facilitator can moderate social discussion threads by deleting comments",
+          "covered": true
+        },
+        {
+          "text": "Only facilitator can delete social thread comments",
+          "covered": true
+        },
+        {
+          "text": "Non-facilitator mentions do not trigger assistant/agent execution (treated as plain text mentions)",
+          "covered": true
+        },
+        {
+          "text": "Facilitator `@assistant` mentions post an automated assistant reply in-thread (deterministic template stub)",
+          "covered": true
+        },
+        {
+          "text": "Facilitator can invoke `@agent` to run a bounded tool loop and receive a persisted agent reply in-thread with clear success/failure status",
+          "covered": true
+        },
+        {
+          "text": "`@agent` run lifecycle is visible (`running`, `completed`, `failed`, `timeout`) with final persisted reply",
+          "covered": true
+        },
+        {
           "text": "One feedback record per (workshop, trace, user) \u2014 upsert behavior",
           "covered": true
         },
@@ -595,8 +694,36 @@
           "covered": true
         },
         {
+          "text": "Participants only see traces in the current active discovery trace list",
+          "covered": true
+        },
+        {
+          "text": "Traces outside the active discovery selection are hidden from participants but not deleted",
+          "covered": true
+        },
+        {
+          "text": "Annotation trace order is deterministic per user and persists across page reloads",
+          "covered": true
+        },
+        {
+          "text": "Annotators see the same trace set in different per-user orders, enabling inter-rater reliability measurement",
+          "covered": true
+        },
+        {
+          "text": "Adding annotation traces mid-round appends them without reshuffling a user's existing order",
+          "covered": true
+        },
+        {
+          "text": "Changing the annotation trace set produces a fresh randomized order",
+          "covered": true
+        },
+        {
+          "text": "DSPy MLflow autologging activates only when MLFLOW_DSPY_DEV_EXPERIMENT_ID is set",
+          "covered": true
+        },
+        {
           "text": "LLM failures show error toast with retry",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Fallback question if LLM unavailable after retries",
@@ -604,7 +731,7 @@
         },
         {
           "text": "Fallback warning banner shown only to facilitators, never to participants/SMEs",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Analysis shows warning (not error) if < 2 participants",
@@ -620,7 +747,7 @@
         },
         {
           "text": "Submit buttons disabled until required fields filled",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Clear progress indication (X of Y traces completed)",
@@ -628,15 +755,19 @@
         },
         {
           "text": "Smooth transitions between feedback states",
-          "covered": false
+          "covered": true
+        },
+        {
+          "text": "When follow-up questions are disabled, participant flow is GOOD/BAD + comment only",
+          "covered": true
         },
         {
           "text": "Single two-panel workspace replaces multi-page flow (no FacilitatorDashboard discovery tabs, no FindingsReviewPage)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Trace feed shows actual trace content (input/output), not trace ID badges",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Trace-specific analysis findings appear on the trace card, pinned above feedback (collapsible)",
@@ -644,11 +775,11 @@
         },
         {
           "text": "Cross-trace analysis findings appear in collapsible summary section above the feed",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Overview bar shows stats inline + compact controls (Run Analysis, Add Traces, Pause, Model selector)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Draft rubric sidebar is always visible while browsing traces",
@@ -656,19 +787,19 @@
         },
         {
           "text": "Promote action visibly moves items from trace feed/summary into the sidebar",
-          "covered": true
-        },
-        {
-          "text": "Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll)",
-          "covered": true
-        },
-        {
-          "text": "Draft rubric items do NOT show source-type badges (Finding, Disagreement, etc.)",
           "covered": false
         },
         {
-          "text": "Disagreements color-coded by priority (red/yellow/blue) on trace cards",
+          "text": "Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll)",
+          "covered": false
+        },
+        {
+          "text": "Draft rubric items do NOT show source-type badges (Finding, Disagreement, etc.)",
           "covered": true
+        },
+        {
+          "text": "Disagreements color-coded by priority (red/yellow/blue) on trace cards",
+          "covered": false
         },
         {
           "text": "\"Create Rubric \u2192\" in sidebar transitions to rubric creation with groups pre-populated as criteria",
@@ -676,80 +807,15 @@
         }
       ]
     },
-    "DISCOVERY_TRACE_ASSIGNMENT_SPEC": {
-      "total_requirements": 13,
-      "covered_requirements": 12,
-      "coverage_percent": 92,
-      "by_type": {
-        "unit": 20,
-        "integration": 0,
-        "e2e-mocked": 1,
-        "e2e-real": 1
-      },
-      "requirements": [
-        {
-          "text": "Participants only see traces in current active discovery dataset",
-          "covered": true
-        },
-        {
-          "text": "When new discovery round starts, old traces hidden (not deleted)",
-          "covered": false
-        },
-        {
-          "text": "Switching between discovery rounds hides/shows appropriate traces",
-          "covered": true
-        },
-        {
-          "text": "Phase/round context properly scoped in database",
-          "covered": true
-        },
-        {
-          "text": "Annotation traces randomized per (user_id, trace_set) pair",
-          "covered": true
-        },
-        {
-          "text": "Randomization persistent across page reloads for same trace set",
-          "covered": true
-        },
-        {
-          "text": "When annotation dataset changes mid-round, new traces appended",
-          "covered": true
-        },
-        {
-          "text": "When annotation round changes, full re-randomization applied",
-          "covered": true
-        },
-        {
-          "text": "Randomization context includes phase and round info",
-          "covered": true
-        },
-        {
-          "text": "Dataset operations (union, subtract) work correctly and maintain audit trail",
-          "covered": true
-        },
-        {
-          "text": "Multiple participants can see same trace with different orders",
-          "covered": true
-        },
-        {
-          "text": "Assignment metadata properly tracks all context",
-          "covered": true
-        },
-        {
-          "text": "Inter-rater reliability (IRR) can be measured (same traces, different orders)",
-          "covered": true
-        }
-      ]
-    },
     "JUDGE_EVALUATION_SPEC": {
-      "total_requirements": 25,
-      "covered_requirements": 25,
-      "coverage_percent": 100,
+      "total_requirements": 30,
+      "covered_requirements": 28,
+      "coverage_percent": 93,
       "by_type": {
-        "unit": 60,
-        "integration": 0,
+        "unit": 108,
+        "integration": 7,
         "e2e-mocked": 0,
-        "e2e-real": 10
+        "e2e-real": 11
       },
       "requirements": [
         {
@@ -797,6 +863,14 @@
           "covered": true
         },
         {
+          "text": "Facilitator can toggle auto-evaluation and select a model at annotation start",
+          "covered": true
+        },
+        {
+          "text": "Annotation phase can start with auto-evaluation disabled",
+          "covered": true
+        },
+        {
           "text": "Re-evaluate loads registered judge with aligned instructions",
           "covered": true
         },
@@ -806,7 +880,7 @@
         },
         {
           "text": "Spinner stops when re-evaluation completes",
-          "covered": true
+          "covered": false
         },
         {
           "text": "Results stored against correct prompt version",
@@ -822,10 +896,18 @@
         },
         {
           "text": "MemAlign distills semantic memory (guidelines)",
-          "covered": true
+          "covered": false
         },
         {
           "text": "Aligned judge registered to MLflow",
+          "covered": true
+        },
+        {
+          "text": "Episodic trace IDs persist on the registered judge across alignment runs",
+          "covered": true
+        },
+        {
+          "text": "Re-alignment skips traces already in the judge's episodic memory",
           "covered": true
         },
         {
@@ -851,6 +933,10 @@
         {
           "text": "Updates when new annotations added",
           "covered": true
+        },
+        {
+          "text": "Traces with extreme disagreement surfaced in IRR diagnostics",
+          "covered": true
         }
       ]
     },
@@ -859,7 +945,7 @@
       "covered_requirements": 16,
       "coverage_percent": 100,
       "by_type": {
-        "unit": 24,
+        "unit": 30,
         "integration": 0,
         "e2e-mocked": 0,
         "e2e-real": 0
@@ -906,7 +992,7 @@
           "covered": true
         },
         {
-          "text": "Only facilitators can advance workshop phases",
+          "text": "Phase advancement is gated client-side: non-facilitators are blocked from the facilitator dashboard that hosts the advance-phase control",
           "covered": true
         },
         {
@@ -922,7 +1008,7 @@
           "covered": true
         },
         {
-          "text": "SMEs and participants authenticate via database credentials",
+          "text": "SMEs and participants authenticate via database email lookup (no password verification)",
           "covered": true
         },
         {
@@ -932,13 +1018,13 @@
       ]
     },
     "RUBRIC_SPEC": {
-      "total_requirements": 25,
-      "covered_requirements": 25,
+      "total_requirements": 26,
+      "covered_requirements": 26,
       "coverage_percent": 100,
       "by_type": {
-        "unit": 63,
+        "unit": 98,
         "integration": 0,
-        "e2e-mocked": 1,
+        "e2e-mocked": 2,
         "e2e-real": 6
       },
       "requirements": [
@@ -955,11 +1041,15 @@
           "covered": true
         },
         {
-          "text": "Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format",
+          "text": "Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter",
           "covered": true
         },
         {
-          "text": "Parsed questions have stable UUIDs within session",
+          "text": "Parsed questions get sequential `q_N` ids",
+          "covered": true
+        },
+        {
+          "text": "Legacy `freeform` judge type coerces to likert at the parse boundary",
           "covered": true
         },
         {
@@ -1045,12 +1135,12 @@
       ]
     },
     "TESTING_SPEC": {
-      "total_requirements": 30,
-      "covered_requirements": 0,
-      "coverage_percent": 0,
+      "total_requirements": 25,
+      "covered_requirements": 16,
+      "coverage_percent": 64,
       "by_type": {
-        "unit": 35,
-        "integration": 46,
+        "unit": 65,
+        "integration": 48,
         "e2e-mocked": 0,
         "e2e-real": 0
       },
@@ -1069,23 +1159,23 @@
         },
         {
           "text": "Workshop CRUD tested end-to-end through HTTP \u2192 DB \u2192 response",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Trace ingestion tested: bulk upload, retrieval, metadata persistence",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Phase transition prerequisites enforced: no discovery without traces, no annotation without rubric",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Annotation upsert semantics verified: same user+trace updates (not duplicates), different users create separate records",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Discovery finding upsert semantics verified at DB level",
-          "covered": false
+          "covered": true
         },
         {
           "text": "All integration tests tagged with `@pytest.mark.integration` and `@pytest.mark.spec()`",
@@ -1096,20 +1186,16 @@
           "covered": false
         },
         {
-          "text": "Connection resilience tested (Postgres-only): pool reset disposes + refreshes OAuth, `get_db()` retries with backoff, stale connections detected via `pool_pre_ping`",
-          "covered": false
+          "text": "Connection resilience tested: connection errors classified as transient vs not, `_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff and gives up after 3 attempts",
+          "covered": true
         },
         {
           "text": "Tests are hermetic: no shared state, runnable in any order",
           "covered": false
         },
         {
-          "text": "Contract shapes documented for all 5 MLflow domains (trace ops, feedback, evaluation, alignment, experiment management)",
-          "covered": false
-        },
-        {
           "text": "Mock shape tests verify test mocks match real MLflow response structures",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Call-site tests verify services pass correct parameter types to MLflow methods",
@@ -1117,72 +1203,56 @@
         },
         {
           "text": "Error classification tested: retryable vs non-retryable errors handled correctly",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Feedback value types validated: binary (0.0/1.0 float), likert (1.0-5.0 float)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Assessment limit (50 per trace) handling tested",
-          "covered": false
-        },
-        {
-          "text": "Contract tests tagged with `@pytest.mark.spec(\"TESTING_SPEC\")`",
-          "covered": false
-        },
-        {
-          "text": "Server unit tests pass with >20% coverage",
-          "covered": false
-        },
-        {
-          "text": "Client unit tests pass with >20% coverage",
-          "covered": false
-        },
-        {
-          "text": "Integration tests pass against real database (SQLite + Postgres)",
-          "covered": false
-        },
-        {
-          "text": "Contract tests verify MLflow integration boundaries",
-          "covered": false
-        },
-        {
-          "text": "E2E tests pass for critical flows",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Tests run in CI on every PR",
-          "covered": false
+          "covered": true
         },
         {
-          "text": "Coverage reports generated and accessible",
-          "covered": false
+          "text": "pytest `--spec` option filters collection to tests tagged for the requested spec",
+          "covered": true
         },
         {
-          "text": "No flaky tests (consistent pass/fail)",
+          "text": "pytest emits coverage reports (term, HTML, XML) via `addopts` in `pyproject.toml`",
           "covered": false
         },
         {
           "text": "Test isolation (no shared state between tests)",
-          "covered": false
-        },
-        {
-          "text": "`just test-integration` recipe works",
-          "covered": false
+          "covered": true
         },
         {
           "text": "`just test-contract` recipe works",
           "covered": false
+        },
+        {
+          "text": "Coverage analyzer excludes skipped and xfail tests from requirement coverage and annotates skipped-only criteria",
+          "covered": true
+        },
+        {
+          "text": "Coverage analyzer excludes roadmap criteria from the coverage denominator and lists them separately",
+          "covered": true
+        },
+        {
+          "text": "Coverage analyzer reports unknown spec tags with tagged test counts without crashing",
+          "covered": true
         }
       ]
     },
     "TRACE_DISPLAY_SPEC": {
-      "total_requirements": 18,
-      "covered_requirements": 17,
-      "coverage_percent": 94,
+      "total_requirements": 19,
+      "covered_requirements": 19,
+      "coverage_percent": 100,
       "by_type": {
-        "unit": 63,
+        "unit": 94,
         "integration": 0,
         "e2e-mocked": 0,
         "e2e-real": 7
@@ -1226,7 +1296,7 @@
         },
         {
           "text": "Attribute value input is disabled until attribute key has a value",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Span filter preview shows match status and filtered inputs/outputs against first trace",
@@ -1249,6 +1319,10 @@
           "covered": true
         },
         {
+          "text": "Copy Output copies the representation currently displayed (formatted vs raw)",
+          "covered": true
+        },
+        {
           "text": "JSONPath evaluation does not noticeably slow down trace display",
           "covered": true
         },
@@ -1262,20 +1336,366 @@
         }
       ]
     },
-    "UI_COMPONENTS_SPEC": {
+    "TRACE_INGESTION_SPEC": {
       "total_requirements": 16,
       "covered_requirements": 0,
       "coverage_percent": 0,
       "by_type": {
-        "unit": 0,
+        "unit": 16,
         "integration": 0,
         "e2e-mocked": 0,
-        "e2e-real": 4
+        "e2e-real": 0
+      },
+      "requirements": [
+        {
+          "text": "Traces are deduplicated by `(workshop_id, mlflow_trace_id)` \u2014 re-ingest updates, not duplicates",
+          "covered": false
+        },
+        {
+          "text": "`mlflow_url`, `mlflow_host`, and `mlflow_experiment_id` are persisted on ingest",
+          "covered": false
+        },
+        {
+          "text": "MLflow link in TraceViewer opens the correct trace in the correct experiment",
+          "covered": false
+        },
+        {
+          "text": "Traces without `mlflow_trace_id` get a generated UUID and insert normally",
+          "covered": false
+        },
+        {
+          "text": "Input extraction prefers the last user-role message from the request payload",
+          "covered": false
+        },
+        {
+          "text": "Output extraction prefers the last assistant-role message from the response payload",
+          "covered": false
+        },
+        {
+          "text": "Each trace gets its own unique extracted input (no shared-prefix duplication)",
+          "covered": false
+        },
+        {
+          "text": "Extraction handles: `{\"messages\": [...]}`, `{\"request\": {\"input\": [...]}}`, list-of-items, and `{\"object\": \"response\"}` formats",
+          "covered": false
+        },
+        {
+          "text": "Extraction falls back to cleaned raw text when no structured format matches",
+          "covered": false
+        },
+        {
+          "text": "Re-ingesting traces preserves existing `DiscoveryFeedbackDB` FK references",
+          "covered": false
+        },
+        {
+          "text": "Re-ingesting traces preserves existing `AnnotationDB` FK references",
+          "covered": false
+        },
+        {
+          "text": "Re-ingesting traces preserves existing `DiscoveryFindingDB` FK references",
+          "covered": false
+        },
+        {
+          "text": "`active_discovery_trace_ids` remain valid after re-ingestion",
+          "covered": false
+        },
+        {
+          "text": "Preview format (`request_preview`/`response_preview`) uses column values directly",
+          "covered": false
+        },
+        {
+          "text": "Raw format (`request`/`response`) applies content extraction with role-aware logic",
+          "covered": false
+        },
+        {
+          "text": "`mlflow_trace_id` from CSV `trace_id` column is used for deduplication",
+          "covered": false
+        }
+      ]
+    },
+    "TRACE_SUMMARIZATION_SPEC": {
+      "total_requirements": 64,
+      "covered_requirements": 21,
+      "coverage_percent": 32,
+      "by_type": {
+        "unit": 58,
+        "integration": 0,
+        "e2e-mocked": 0,
+        "e2e-real": 0
+      },
+      "requirements": [
+        {
+          "text": "Facilitator can enable/disable trace summarization per workshop",
+          "covered": false
+        },
+        {
+          "text": "Facilitator can select a model for summarization from available Databricks endpoints",
+          "covered": true
+        },
+        {
+          "text": "Facilitator can provide optional free-text guidance for the summarization prompt",
+          "covered": true
+        },
+        {
+          "text": "Settings are persisted per workshop",
+          "covered": false
+        },
+        {
+          "text": "Summarization runs at ingestion time when enabled and model is configured",
+          "covered": false
+        },
+        {
+          "text": "Agent accesses trace data through inspection tools (not a full-text dump)",
+          "covered": false
+        },
+        {
+          "text": "Agent produces an executive summary as the first pass",
+          "covered": true
+        },
+        {
+          "text": "Agent extracts milestones with relevant span data as the second pass",
+          "covered": true
+        },
+        {
+          "text": "Each milestone includes span data references resolved to actual trace values",
+          "covered": true
+        },
+        {
+          "text": "Span data references are resolved in a post-processing step (not LLM-generated values)",
+          "covered": false
+        },
+        {
+          "text": "Agent uses trace inspection tools to selectively examine spans (not a full-text dump)",
+          "covered": true
+        },
+        {
+          "text": "Agent tools include: get_trace_overview, list_spans, get_span_detail, get_root_span, search_spans",
+          "covered": true
+        },
+        {
+          "text": "Milestone summaries contain substantive content from spans (actual queries, results, decisions)",
+          "covered": false
+        },
+        {
+          "text": "Milestone summaries avoid mechanical flow narration (not \"query received\", \"results returned\")",
+          "covered": false
+        },
+        {
+          "text": "Summarization failure does not block trace ingestion",
+          "covered": true
+        },
+        {
+          "text": "Summary is stored as JSON on the trace record",
+          "covered": false
+        },
+        {
+          "text": "Each milestone has a number, title, and summary",
+          "covered": true
+        },
+        {
+          "text": "Each milestone has zero or more input span data references (span_name, field, optional jsonpath)",
+          "covered": true
+        },
+        {
+          "text": "Each milestone has zero or more output span data references (span_name, field, optional jsonpath)",
+          "covered": true
+        },
+        {
+          "text": "Span data references are resolved to actual values from the trace after agent output",
+          "covered": true
+        },
+        {
+          "text": "When jsonpath is null, the entire span inputs or outputs field is included",
+          "covered": true
+        },
+        {
+          "text": "Invalid span references (nonexistent span or path) resolve to null without failing the milestone",
+          "covered": true
+        },
+        {
+          "text": "The agent determines the number of milestones based on trace complexity",
+          "covered": false
+        },
+        {
+          "text": "Milestone view is the default display when a summary exists",
+          "covered": false
+        },
+        {
+          "text": "User can toggle between milestone view and the existing trace viewer",
+          "covered": false
+        },
+        {
+          "text": "Milestone view shows executive summary at the top",
+          "covered": false
+        },
+        {
+          "text": "Milestones are numbered and show title, summary, and resolved span data (inputs \u2192 outputs)",
+          "covered": false
+        },
+        {
+          "text": "When no summary exists, the existing trace viewer is shown (no toggle)",
+          "covered": false
+        },
+        {
+          "text": "Re-ingesting with summarization enabled regenerates summaries",
+          "covered": false
+        },
+        {
+          "text": "Re-ingesting with summarization disabled preserves existing summaries",
+          "covered": false
+        },
+        {
+          "text": "Facilitator can trigger re-summarization without full re-ingestion",
+          "covered": false
+        },
+        {
+          "text": "Multiple traces are summarized concurrently up to a configurable concurrency limit",
+          "covered": true
+        },
+        {
+          "text": "Ingestion API returns immediately; summarization runs in the background",
+          "covered": false
+        },
+        {
+          "text": "A `SummarizationJob` database row is created when summarization starts",
+          "covered": true
+        },
+        {
+          "text": "The ingestion response includes `summarization_job_id` when summarization is triggered",
+          "covered": false
+        },
+        {
+          "text": "The job row is updated as each trace completes (trace ID appended to `completed_traces` or `failed_traces`)",
+          "covered": true
+        },
+        {
+          "text": "Failed individual traces are retried up to 2 times with exponential backoff",
+          "covered": false
+        },
+        {
+          "text": "Partial failures do not block the batch \u2014 failed traces are ingested with `summary = null`",
+          "covered": true
+        },
+        {
+          "text": "Rate limit responses (429) trigger backoff, not failure",
+          "covered": false
+        },
+        {
+          "text": "A batch of 100 traces completes summarization within a reasonable wall-clock time given the concurrency limit and model latency",
+          "covered": false
+        },
+        {
+          "text": "Concurrent LLM calls do not exceed the serving endpoint's rate limit",
+          "covered": false
+        },
+        {
+          "text": "Summarization does not block the ingestion API response",
+          "covered": false
+        },
+        {
+          "text": "Individual trace summarization errors are logged with trace ID, error type, and retry count",
+          "covered": false
+        },
+        {
+          "text": "`GET /workshops/{id}/summarization-job/{job_id}` returns job status with completed/total/failed counts",
+          "covered": true
+        },
+        {
+          "text": "`GET /workshops/{id}/summarization-status` returns summary coverage stats and last job info",
+          "covered": true
+        },
+        {
+          "text": "SummarizationSettings shows a progress indicator while a summarization job is running",
+          "covered": false
+        },
+        {
+          "text": "Progress indicator shows completed/total/failed counts (e.g., \"Summarizing... 45/80 complete, 2 failed\")",
+          "covered": false
+        },
+        {
+          "text": "Progress updates automatically via polling while the job is active",
+          "covered": false
+        },
+        {
+          "text": "On completion, succeeded/failed counts are displayed in SummarizationSettings",
+          "covered": false
+        },
+        {
+          "text": "Failed traces are listed with their error descriptions",
+          "covered": false
+        },
+        {
+          "text": "Facilitator can retry failed traces from the completion view (creates a new job for just those traces)",
+          "covered": false
+        },
+        {
+          "text": "Re-summarize button exists in SummarizationSettings (disabled while a job is running)",
+          "covered": false
+        },
+        {
+          "text": "Facilitator can choose to re-summarize all traces or only unsummarized traces",
+          "covered": false
+        },
+        {
+          "text": "Confirmation dialog is shown before starting re-summarization",
+          "covered": false
+        },
+        {
+          "text": "`POST /resummarize` accepts a `mode` parameter: \"all\", \"unsummarized\", or \"failed\"",
+          "covered": false
+        },
+        {
+          "text": "Re-summarization creates a tracked `SummarizationJob` with the same progress UI",
+          "covered": false
+        },
+        {
+          "text": "Trace list in FacilitatorDashboard shows a visual indicator for traces that have summaries",
+          "covered": false
+        },
+        {
+          "text": "Aggregate count of summarized vs. unsummarized traces is visible (e.g., \"45/80 traces summarized\")",
+          "covered": false
+        },
+        {
+          "text": "Last summarization timestamp is visible in SummarizationSettings",
+          "covered": false
+        },
+        {
+          "text": "`summarization-status` endpoint provides the data for these indicators without requiring a job",
+          "covered": true
+        },
+        {
+          "text": "DiscoveryTraceCard defaults to summary view when a summary exists",
+          "covered": false
+        },
+        {
+          "text": "Facilitator can toggle between summary view and raw user/assistant content",
+          "covered": false
+        },
+        {
+          "text": "Summary view shows the executive summary text",
+          "covered": false
+        },
+        {
+          "text": "Summary view has expandable milestones with titles and descriptions",
+          "covered": false
+        }
+      ]
+    },
+    "UI_COMPONENTS_SPEC": {
+      "total_requirements": 16,
+      "covered_requirements": 2,
+      "coverage_percent": 12,
+      "by_type": {
+        "unit": 57,
+        "integration": 0,
+        "e2e-mocked": 0,
+        "e2e-real": 2
       },
       "requirements": [
         {
           "text": "Page navigation works correctly (first, prev, next, last)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Items per page selector updates page size",
@@ -1299,7 +1719,7 @@
         },
         {
           "text": "JSON arrays render as tables",
-          "covered": false
+          "covered": true
         },
         {
           "text": "SQL queries formatted with line breaks",
@@ -1336,6 +1756,95 @@
         {
           "text": "Color contrast meets WCAG AA",
           "covered": false
+        }
+      ]
+    },
+    "EVAL_MODE_SPEC": {
+      "total_requirements": 19,
+      "covered_requirements": 18,
+      "coverage_percent": 94,
+      "by_type": {
+        "unit": 27,
+        "integration": 0,
+        "e2e-mocked": 1,
+        "e2e-real": 0
+      },
+      "requirements": [
+        {
+          "text": "Workshop can be created with `mode: \"eval\"`",
+          "covered": true
+        },
+        {
+          "text": "Mode is immutable after creation",
+          "covered": true
+        },
+        {
+          "text": "Eval-mode workshops do not use the global rubric system",
+          "covered": true
+        },
+        {
+          "text": "Existing workshop-mode behavior is unchanged",
+          "covered": true
+        },
+        {
+          "text": "Facilitator can create criteria on a specific trace",
+          "covered": true
+        },
+        {
+          "text": "Each criterion has a type (standard or hurdle) and weight (-10 to +10)",
+          "covered": true
+        },
+        {
+          "text": "Criteria can be promoted from discovery findings",
+          "covered": true
+        },
+        {
+          "text": "Criteria can be authored directly (without discovery)",
+          "covered": true
+        },
+        {
+          "text": "Criteria are editable and deletable",
+          "covered": true
+        },
+        {
+          "text": "Per-trace rubric is rendered as markdown",
+          "covered": true
+        },
+        {
+          "text": "Discovery analysis uses trace summaries when available",
+          "covered": true
+        },
+        {
+          "text": "Discovery analysis can run agent loops over trace spans as alternative to summaries",
+          "covered": false
+        },
+        {
+          "text": "Hurdle criteria gate the entire trace \u2014 any hurdle failure \u2192 score 0",
+          "covered": true
+        },
+        {
+          "text": "Standard criteria scored as met (1) or not met (0) \u00d7 weight",
+          "covered": true
+        },
+        {
+          "text": "Negative-weight criteria penalize when met",
+          "covered": true
+        },
+        {
+          "text": "Normalized score = raw / max_possible, clipped to [0, 1]",
+          "covered": true
+        },
+        {
+          "text": "Scoring handles edge cases: no criteria, all hurdles, all negative weights",
+          "covered": true
+        },
+        {
+          "text": "Results stored per-criterion with rationale",
+          "covered": true
+        },
+        {
+          "text": "Aggregated eval scores are available per trace or for all workshop traces",
+          "covered": true
         }
       ]
     }

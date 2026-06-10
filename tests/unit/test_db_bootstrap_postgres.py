@@ -142,8 +142,18 @@ def _make_plan(url: str = "postgresql://test") -> BootstrapPlan:
     )
 
 
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req(
+    "Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap "
+    "provisions the app schema and reuses existing data across restarts"
+)
 class TestBootstrapIfMissingPostgres:
-    """Tests for _bootstrap_if_missing_postgres covering all code paths."""
+    """Tests for _bootstrap_if_missing_postgres covering all code paths.
+
+    Persistence-critical behavior: when tables already exist (data from a
+    previous deployment), bootstrap must NOT recreate them — it reuses or
+    stamps, so app restarts keep existing Lakebase data.
+    """
 
     @patch("server.db_bootstrap._widen_alembic_version_column")
     @patch("server.db_bootstrap._list_postgres_tables")
@@ -247,6 +257,11 @@ class TestBootstrapIfMissingPostgres:
 # ---------------------------------------------------------------------------
 # _bootstrap_full_postgres
 # ---------------------------------------------------------------------------
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req(
+    "Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap "
+    "provisions the app schema and reuses existing data across restarts"
+)
 class TestBootstrapFullPostgres:
     """Tests for _bootstrap_full_postgres covering all code paths."""
 

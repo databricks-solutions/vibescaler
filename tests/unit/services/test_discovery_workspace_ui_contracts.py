@@ -107,7 +107,10 @@ class TestTraceSpecificFindings:
     """Findings with evidence_trace_ids enable the UI to pin trace-specific
     findings on the correct trace card."""
 
-    @pytest.mark.req("Trace-specific analysis findings appear on the trace card, pinned above feedback (collapsible)")
+    # AUDIT (2026-06): previously tagged to the UI criterion "Trace-specific analysis
+    # findings appear on the trace card, pinned above feedback (collapsible)". This test
+    # asserts only the backend data shape, not the UI behavior, so the tag was removed.
+    # The UI criterion is now carried by DiscoveryTraceCard.findings.test.tsx.
     def test_findings_have_evidence_trace_ids_for_card_pinning(self, test_db, analysis_with_findings):
         """Analysis findings include evidence_trace_ids so the UI can filter
         and pin trace-specific findings to the correct trace card."""
@@ -130,7 +133,7 @@ class TestTraceSpecificFindings:
         cross_trace = [f for f in findings if len(f["evidence_trace_ids"]) > 1]
         assert len(cross_trace) == 2
 
-    @pytest.mark.req("Trace-specific analysis findings appear on the trace card, pinned above feedback (collapsible)")
+    # AUDIT (2026-06): UI-criterion tag removed — data-shape assertion only (see note above).
     def test_finding_model_validates_evidence_trace_ids(self):
         """The Finding model validates evidence_trace_ids as a list of strings."""
         finding = Finding(
@@ -153,7 +156,10 @@ class TestPromoteAction:
     """The promote action creates a draft rubric item from a finding/disagreement,
     which the UI renders as moving an item from the trace feed into the sidebar."""
 
-    @pytest.mark.req("Promote action visibly moves items from trace feed/summary into the sidebar")
+    # AUDIT (2026-06): retagged — this verifies the backend promote mechanics, not the
+    # UI criterion "Promote action visibly moves items from trace feed/summary into the
+    # sidebar" it previously claimed.
+    @pytest.mark.req("Facilitator can promote distilled criteria to draft rubric")
     def test_promote_creates_draft_item_with_source_tracing(self, db_service, workshop, traces):
         """Promoting a finding creates a draft rubric item that carries source info,
         enabling the UI to show the item in the sidebar with trace references."""
@@ -172,7 +178,7 @@ class TestPromoteAction:
         assert items[0].source_type == "finding"
         assert items[0].source_trace_ids == ["t-1", "t-2"]
 
-    @pytest.mark.req("Promote action visibly moves items from trace feed/summary into the sidebar")
+    @pytest.mark.req("Facilitator can promote disagreement insights to draft rubric")
     def test_promote_disagreement_creates_draft_item(self, db_service, workshop, traces):
         """Promoting a disagreement from the trace card also creates a sidebar item."""
         data = DraftRubricItemCreate(
@@ -199,7 +205,11 @@ class TestTraceReferenceBadges:
     """Draft rubric items include source_trace_ids which the UI renders as
     interactive trace reference badges."""
 
-    @pytest.mark.req("Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll)")
+    # AUDIT (2026-06): retagged — these verify that source_trace_ids round-trip through the
+    # backend, not the UI criterion "Draft rubric items show trace reference badges
+    # (interactive: hover for preview, click to scroll)" they previously claimed (no
+    # TraceReferenceBadge exists in the live sidebar).
+    @pytest.mark.req("Source traceability maintained (which traces support each item)")
     def test_draft_items_carry_source_trace_ids_for_badges(self, db_service, workshop, traces):
         """Draft rubric items include source_trace_ids, providing the data
         the UI needs to render trace reference badges."""
@@ -232,7 +242,7 @@ class TestTraceReferenceBadges:
         # Manual item has no trace references (no badges to show)
         assert by_text["Manual criterion"].source_trace_ids == []
 
-    @pytest.mark.req("Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll)")
+    @pytest.mark.req("Source traceability maintained (which traces support each item)")
     def test_source_trace_ids_preserved_through_group_assignment(self, db_service, workshop, traces):
         """Trace reference data survives group assignment operations."""
         item = db_service.add_draft_rubric_item(

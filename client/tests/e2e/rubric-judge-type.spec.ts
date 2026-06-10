@@ -1,148 +1,97 @@
 /**
  * E2E Tests for Per-Question Judge Type in Rubrics
  *
- * Spec: RUBRIC_SPEC (Per-Question Judge Type, lines 71-91)
+ * Spec: RUBRIC_SPEC (Per-Question Judge Type / Scale Rendering)
  *
  * Tests that binary vs likert questions render the correct UI controls
- * during annotation.
+ * during annotation. AnnotationDemo renders:
+ * - Likert questions as five div[role="button"] controls labeled 1-5
+ * - Binary questions as two div[role="button"] controls labeled Pass / Fail
  */
 
 import { test, expect } from '@playwright/test';
 import { TestScenario } from '../lib';
+import { waitForAnnotationInterface } from '../lib/actions/annotation';
 
 // Declare process.env for TypeScript
 declare const process: { env: Record<string, string | undefined> };
 
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000';
 
+/** Likert rating controls: role=button elements whose text is exactly 1-5. */
+const likertControl = (page: import('@playwright/test').Page, value: number) =>
+  page.locator('[role="button"]').filter({ hasText: new RegExp(`^${value}$`) }).first();
+
+/** Binary rating controls: role=button elements labeled Pass / Fail. */
+const binaryControl = (page: import('@playwright/test').Page, label: 'Pass' | 'Fail') =>
+  page.locator('[role="button"]').filter({ hasText: new RegExp(`^${label}$`) }).first();
+
 test.describe('Per-Question Judge Type', () => {
-  test('likert questions show 1-5 star rating controls', {
+  test('likert questions show 1-5 rating controls', {
     tag: ['@spec:RUBRIC_SPEC', '@req:Likert scale shows 1-5 rating options'],
   }, async ({ page }) => {
-    // Spec: RUBRIC_SPEC lines 71-91
-    // Likert questions should display 1-5 rating options
+    // Spec: RUBRIC_SPEC (Scale Rendering)
+    // Likert questions must display all five rating options, and no Pass/Fail buttons.
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Likert Rating Test' })
       .withFacilitator()
-      .withParticipants(1)
+      .withSMEs(1)
       .withTraces(2)
-      .withDiscoveryFinding({ insight: 'Test finding' })
-      .withDiscoveryComplete()
       .withRubric({
         question: 'Quality: Rate the response quality from 1-5',
         judgeType: 'likert',
       })
-      .withRealApi()
       .inPhase('annotation')
+      .withRealApi()
       .build();
 
-    await page.goto('/');
-    await scenario.loginAs(scenario.facilitator);
+    await page.goto(`/?workshop=${scenario.workshop.id}`);
+    await scenario.loginAs(scenario.users.sme[0]);
+    await waitForAnnotationInterface(page);
 
-    // Navigate to the workshop
-    await expect(page.getByRole('heading', { name: 'Likert Rating Test' })).toBeVisible({
-      timeout: 10000,
-    });
-
-    // Go to annotation phase
-    const annotationTab = page.getByRole('tab', { name: /Annotation|Rating/i });
-    if (await annotationTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await annotationTab.click();
-      await page.waitForTimeout(500);
-
-      // Look for likert-style rating controls (stars or number buttons)
-      // Common patterns: star icons, numbered buttons 1-5, radio buttons
-      const ratingControls = page.locator('[role="radiogroup"]').or(
-        page.locator('.star-rating')
-      ).or(
-        page.locator('[data-rating]')
-      ).or(
-        page.locator('button').filter({ hasText: /^[1-5]$/ })
-      );
-
-      // If rating controls are visible, verify they have 5 options
-      if (await ratingControls.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-        // Look for 5 rating options
-        const ratingButtons = page.locator('button').filter({ hasText: /^[1-5]$/ });
-        const buttonCount = await ratingButtons.count();
-
-        // For likert scale, expect multiple rating options
-        if (buttonCount > 0) {
-          expect(buttonCount).toBe(5);
-        }
-      }
+    // All five likert rating controls must be present
+    for (const value of [1, 2, 3, 4, 5]) {
+      await expect(likertControl(page, value)).toBeVisible({ timeout: 10000 });
     }
+
+    // And a likert-only rubric must NOT render binary Pass/Fail controls
+    await expect(page.locator('[role="button"]').filter({ hasText: /^Pass$/ })).toHaveCount(0);
+    await expect(page.locator('[role="button"]').filter({ hasText: /^Fail$/ })).toHaveCount(0);
 
     await scenario.cleanup();
   });
 
   test('binary questions show Pass/Fail buttons (not stars)', {
     tag: ['@spec:RUBRIC_SPEC', '@req:Binary scale shows Pass/Fail buttons (not star ratings)'],
-  }, async ({ page, request }) => {
-    // Spec: RUBRIC_SPEC lines 329-339 (Test 3)
-    // Binary questions should show Pass/Fail buttons, not star ratings
-    const runId = `${Date.now()}`;
-
-    // Create workshop with binary rubric using API directly
-    // (since withRubric might not fully support binary_labels)
+  }, async ({ page }) => {
+    // Spec: RUBRIC_SPEC (Scale Rendering, Test 3)
+    // Binary questions must show Pass/Fail buttons and no 1-5 rating controls.
     const scenario = await TestScenario.create(page)
-      .withWorkshop({ name: `Binary Rating Test ${runId}` })
+      .withWorkshop({ name: 'Binary Rating Test' })
       .withFacilitator()
-      .withParticipants(1)
+      .withSMEs(1)
       .withTraces(2)
-      .withDiscoveryFinding({ insight: 'Test finding' })
-      .withDiscoveryComplete()
+      .withRubric({
+        question: 'Accuracy: Is the response correct?|||JUDGE_TYPE|||binary',
+        judgeType: 'binary',
+      })
+      .inPhase('annotation')
       .withRealApi()
-      .inPhase('rubric')
       .build();
 
-    const workshopId = scenario.workshop.id;
-    const facilitatorId = scenario.facilitator.id;
+    await page.goto(`/?workshop=${scenario.workshop.id}`);
+    await scenario.loginAs(scenario.users.sme[0]);
+    await waitForAnnotationInterface(page);
 
-    // Create a binary rubric via API
-    const rubricResponse = await request.post(`${API_URL}/workshops/${workshopId}/rubric`, {
-      data: {
-        question: 'Accuracy: Is the response correct?|||JUDGE_TYPE|||binary',
-        created_by: facilitatorId,
-        judge_type: 'binary',
-        binary_labels: { pass: 'Correct', fail: 'Incorrect' },
-      },
-    });
+    // Pass and Fail controls must be present
+    await expect(binaryControl(page, 'Pass')).toBeVisible({ timeout: 10000 });
+    await expect(binaryControl(page, 'Fail')).toBeVisible();
 
-    if (rubricResponse.ok()) {
-      // Advance to annotation phase
-      await request.post(`${API_URL}/workshops/${workshopId}/advance-to-annotation`);
-      await request.post(`${API_URL}/workshops/${workshopId}/begin-annotation`, {
-        data: { trace_limit: 2, evaluation_model_name: null },
-      });
-
-      // Navigate to workshop
-      await page.goto(`/?workshop=${workshopId}`);
-      await scenario.loginAs(scenario.facilitator);
-
-      // Look for binary-style controls
-      // Binary should show Pass/Fail buttons, not star ratings
-      await page.waitForTimeout(1000);
-
-      // Look for Pass/Fail or the custom labels (Correct/Incorrect)
-      const passButton = page.getByRole('button', { name: /Pass|Correct|Good/i });
-      const failButton = page.getByRole('button', { name: /Fail|Incorrect|Bad/i });
-
-      // Either pass/fail buttons should be visible OR we should NOT see 5 star buttons
-      const hasPassFail = (
-        await passButton.isVisible({ timeout: 2000 }).catch(() => false) ||
-        await failButton.isVisible({ timeout: 2000 }).catch(() => false)
-      );
-
-      // If pass/fail visible, that's correct for binary
-      if (hasPassFail) {
-        // Verify we don't have 5 number buttons (that would be likert)
-        const likerButtons = page.locator('button').filter({ hasText: /^[3-5]$/ });
-        const likertCount = await likerButtons.count();
-
-        // Binary should not show buttons 3, 4, 5
-        expect(likertCount).toBeLessThanOrEqual(0);
-      }
+    // A binary-only rubric must NOT render likert numeric rating controls
+    for (const value of [1, 2, 3, 4, 5]) {
+      await expect(
+        page.locator('[role="button"]').filter({ hasText: new RegExp(`^${value}$`) })
+      ).toHaveCount(0);
     }
 
     await scenario.cleanup();
@@ -150,75 +99,49 @@ test.describe('Per-Question Judge Type', () => {
 
   test('mixed rubric renders correct controls per question', {
     tag: ['@spec:RUBRIC_SPEC', '@req:Mixed rubrics support different scales per question'],
-  }, async ({ page, request }) => {
-    // Spec: RUBRIC_SPEC lines 341-365 (Test 4 & 5)
-    // Mixed rubrics should show different controls per question
-    const runId = `${Date.now()}`;
-
-    const scenario = await TestScenario.create(page)
-      .withWorkshop({ name: `Mixed Rubric Test ${runId}` })
-      .withFacilitator()
-      .withParticipants(1)
-      .withTraces(2)
-      .withDiscoveryFinding({ insight: 'Test finding' })
-      .withDiscoveryComplete()
-      .withRealApi()
-      .inPhase('rubric')
-      .build();
-
-    const workshopId = scenario.workshop.id;
-    const facilitatorId = scenario.facilitator.id;
-
-    // Create a mixed rubric with binary AND likert questions
-    const rubricQuestion = [
+  }, async ({ page }) => {
+    // Spec: RUBRIC_SPEC (Tests 4 & 5)
+    // A mixed rubric must render binary controls for the binary question AND
+    // likert controls for the likert question on the same page.
+    const mixedQuestion = [
       'Accuracy: Is the response factually correct?|||JUDGE_TYPE|||binary',
       'Helpfulness: Rate helpfulness 1-5|||JUDGE_TYPE|||likert',
     ].join('|||QUESTION_SEPARATOR|||');
 
-    const rubricResponse = await request.post(`${API_URL}/workshops/${workshopId}/rubric`, {
-      data: {
-        question: rubricQuestion,
-        created_by: facilitatorId,
-        judge_type: 'likert', // Default at rubric level
-      },
-    });
+    const scenario = await TestScenario.create(page)
+      .withWorkshop({ name: 'Mixed Rubric Test' })
+      .withFacilitator()
+      .withSMEs(1)
+      .withTraces(2)
+      .withRubric({ question: mixedQuestion, judgeType: 'likert' })
+      .inPhase('annotation')
+      .withRealApi()
+      .build();
 
-    if (rubricResponse.ok()) {
-      // Advance to annotation
-      await request.post(`${API_URL}/workshops/${workshopId}/advance-to-annotation`);
-      await request.post(`${API_URL}/workshops/${workshopId}/begin-annotation`, {
-        data: { trace_limit: 2, evaluation_model_name: null },
-      });
+    await page.goto(`/?workshop=${scenario.workshop.id}`);
+    await scenario.loginAs(scenario.users.sme[0]);
+    await waitForAnnotationInterface(page);
 
-      await page.goto(`/?workshop=${workshopId}`);
-      await scenario.loginAs(scenario.facilitator);
+    // Both question titles render
+    await expect(page.getByText('Accuracy').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Helpfulness').first()).toBeVisible();
 
-      // Navigate to annotation
-      const annotationTab = page.getByRole('tab', { name: /Annotation|Rating/i });
-      if (await annotationTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await annotationTab.click();
-        await page.waitForTimeout(1000);
+    // The binary question contributes Pass/Fail controls
+    await expect(binaryControl(page, 'Pass')).toBeVisible();
+    await expect(binaryControl(page, 'Fail')).toBeVisible();
 
-        // The page should render multiple questions
-        // Question 1 should have binary controls (Pass/Fail)
-        // Question 2 should have likert controls (1-5)
-        const questionHeadings = page.locator('h3, h4, .question-title, [data-question]');
-        const questionCount = await questionHeadings.count();
-
-        // We created 2 questions, so expect at least some question UI
-        // (exact count depends on UI implementation)
-        expect(questionCount).toBeGreaterThanOrEqual(0);
-      }
+    // The likert question contributes all five 1-5 controls
+    for (const value of [1, 2, 3, 4, 5]) {
+      await expect(likertControl(page, value)).toBeVisible();
     }
 
     await scenario.cleanup();
   });
 
   test('default judge type is likert when not specified', {
-    tag: ['@spec:RUBRIC_SPEC', '@req:Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format'],
+    tag: ['@spec:RUBRIC_SPEC', '@req:Rubric persists and is retrievable via GET after creation'],
   }, async ({ page, request }) => {
-    // Spec: RUBRIC_SPEC lines 86-89
-    // Default to 'likert' if not specified
+    // Spec: RUBRIC_SPEC (Per-Question Judge Type: default to likert; CRUD Lifecycle)
     const runId = `${Date.now()}`;
 
     const scenario = await TestScenario.create(page)
@@ -246,87 +169,68 @@ test.describe('Per-Question Judge Type', () => {
 
     expect(rubricResponse.ok()).toBeTruthy();
 
-    // Fetch the rubric back and verify it defaults to likert
+    // Fetch the rubric back and verify it persisted with the likert default
     const getRubricResponse = await request.get(`${API_URL}/workshops/${workshopId}/rubric`);
     expect(getRubricResponse.ok()).toBeTruthy();
 
-    const rubric = await getRubricResponse.json() as { judge_type?: string };
-
-    // Should default to likert
-    expect(rubric.judge_type || 'likert').toBe('likert');
+    const rubric = await getRubricResponse.json() as { question?: string; judge_type?: string };
+    expect(rubric.question).toBe('Quality: Is the response high quality?');
+    expect(rubric.judge_type).toBe('likert');
 
     await scenario.cleanup();
   });
 });
 
-test.describe('Binary Scale Feedback to MLflow', () => {
-  test('binary rubric annotation logs 0/1 values (not 3)', {
-    tag: ['@spec:RUBRIC_SPEC', '@req:Binary feedback logged as 0/1 to MLflow (not 3)'],
+test.describe('Binary Scale Feedback Storage', () => {
+  // NOTE: deliberately NOT tagged to "Binary feedback logged as 0/1 to MLflow (not 3)".
+  // This test never inspects MLflow — it verifies the workshop API stores binary
+  // ratings as 0/1. The MLflow side of that criterion is covered by
+  // tests/unit/services/test_rubric_lifecycle.py::TestBinaryFeedbackLoggedAsZeroOne,
+  // which asserts the value passed to mlflow.log_feedback.
+  test('binary annotation rating stored as 0/1 via workshop API', {
+    tag: ['@spec:RUBRIC_SPEC'],
   }, async ({ page, request }) => {
-    // Spec: RUBRIC_SPEC lines 329-339 (Test 3)
-    // "MLflow feedback logged: 0 or 1 (NOT 3 for neutral)"
-    const runId = `${Date.now()}`;
-
     const scenario = await TestScenario.create(page)
-      .withWorkshop({ name: `Binary Feedback Test ${runId}` })
+      .withWorkshop({ name: 'Binary Feedback Test' })
       .withFacilitator()
-      .withParticipants(1)
+      .withSMEs(1)
       .withTraces(1)
-      .withDiscoveryFinding({ insight: 'Test' })
-      .withDiscoveryComplete()
+      .withRubric({
+        question: 'Correct: Is this correct?|||JUDGE_TYPE|||binary',
+        judgeType: 'binary',
+      })
+      .inPhase('annotation')
       .withRealApi()
-      .inPhase('rubric')
       .build();
 
     const workshopId = scenario.workshop.id;
-    const facilitatorId = scenario.facilitator.id;
+    const smeId = scenario.users.sme[0].id;
 
-    // Create binary rubric
-    await request.post(`${API_URL}/workshops/${workshopId}/rubric`, {
+    // Get traces assigned to the SME
+    const tracesResp = await request.get(`${API_URL}/workshops/${workshopId}/traces?user_id=${smeId}`);
+    expect(tracesResp.ok()).toBeTruthy();
+    const traces = await tracesResp.json() as Array<{ id: string }>;
+    expect(traces.length).toBeGreaterThan(0);
+
+    // Submit a binary annotation (Pass = 1)
+    const annotationResp = await request.post(`${API_URL}/workshops/${workshopId}/annotations`, {
       data: {
-        question: 'Correct: Is this correct?|||JUDGE_TYPE|||binary',
-        created_by: facilitatorId,
-        judge_type: 'binary',
+        trace_id: traces[0].id,
+        user_id: smeId,
+        rating: 1,
+        ratings: { q_1: 1 },
       },
     });
+    expect(annotationResp.ok()).toBeTruthy();
 
-    // Advance to annotation
-    await request.post(`${API_URL}/workshops/${workshopId}/advance-to-annotation`);
-    const beginResp = await request.post(`${API_URL}/workshops/${workshopId}/begin-annotation`, {
-      data: { trace_limit: 1, evaluation_model_name: null },
-    });
-
-    if (beginResp.ok()) {
-      // Get traces
-      const tracesResp = await request.get(`${API_URL}/workshops/${workshopId}/traces?user_id=${scenario.users.participant[0].id}`);
-      const traces = await tracesResp.json() as Array<{ id: string }>;
-
-      if (traces.length > 0) {
-        // Submit a binary annotation (rating should be 0 or 1)
-        const annotationResp = await request.post(`${API_URL}/workshops/${workshopId}/annotations`, {
-          data: {
-            trace_id: traces[0].id,
-            user_id: scenario.users.participant[0].id,
-            rating: 1, // Pass = 1, Fail = 0
-            ratings: { 'q_1': 1 },
-          },
-        });
-
-        expect(annotationResp.ok()).toBeTruthy();
-
-        // Fetch annotations to verify rating is 0 or 1
-        const getAnnotationsResp = await request.get(`${API_URL}/workshops/${workshopId}/annotations`);
-        const annotations = await getAnnotationsResp.json() as Array<{ rating: number }>;
-
-        if (annotations.length > 0) {
-          const rating = annotations[0].rating;
-          // Binary ratings should only be 0 or 1
-          expect([0, 1]).toContain(rating);
-          // Should NOT be 3 (the old "neutral" default)
-          expect(rating).not.toBe(3);
-        }
-      }
-    }
+    // Fetch annotations and verify the per-question binary rating is stored verbatim
+    const getAnnotationsResp = await request.get(`${API_URL}/workshops/${workshopId}/annotations`);
+    expect(getAnnotationsResp.ok()).toBeTruthy();
+    const annotations = await getAnnotationsResp.json() as Array<{
+      ratings?: Record<string, number>;
+    }>;
+    expect(annotations.length).toBeGreaterThan(0);
+    expect(annotations[0].ratings?.q_1).toBe(1);
 
     await scenario.cleanup();
   });

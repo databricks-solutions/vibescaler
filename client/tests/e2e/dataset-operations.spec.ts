@@ -18,9 +18,11 @@ declare const process: { env: Record<string, string | undefined> };
 test.describe('Dataset Operations', {
   tag: ['@spec:DATASETS_SPEC'],
 }, () => {
-  test('facilitator creates dataset, traces appear', {
-    tag: ['@req:Datasets can be created with arbitrary trace lists'],
-  }, async ({ page }) => {
+  // NOTE: untagged from "@req:Datasets can be created with arbitrary trace
+  // lists" — that DATASETS_SPEC criterion is a roadmap item (composable
+  // dataset entities are not implemented). This test verifies workshop trace
+  // ingestion, not dataset creation, so it must not claim that coverage.
+  test('facilitator creates dataset, traces appear', async ({ page }) => {
     // Use a real API scenario so data is persisted
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Dataset Creation Test' })

@@ -407,6 +407,7 @@ export const JsonPathSettings: React.FC = () => {
           </Button>
           <Button
             size="sm"
+            data-testid="jsonpath-save-settings"
             onClick={handleSave}
             disabled={updateSettings.isPending || !hasJsonPathChanges}
           >

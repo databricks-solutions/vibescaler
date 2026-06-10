@@ -1,4 +1,9 @@
 // @spec UI_COMPONENTS_SPEC
+// @req Page navigation works correctly (first, prev, next, last)
+// NOTE: the analyzer supports only ONE file-level @req per Vitest file. This file
+// also genuinely exercises items-per-page, quick jump, keyboard shortcuts,
+// disabled states, and page info — those criteria stay uncovered until the
+// analyzer supports per-test @req for Vitest.
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

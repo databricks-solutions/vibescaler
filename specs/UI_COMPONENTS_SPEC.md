@@ -345,6 +345,13 @@ const debouncedSearch = useDebouncedCallback(
 
 <SpecCoverage spec="UI_COMPONENTS_SPEC" />
 
+> Coverage note: `Pagination.test.tsx` and `TraceDataViewer.test.tsx` genuinely
+> exercise most pagination/viewer criteria, but the coverage analyzer reads only
+> ONE file-level `// @req` per Vitest file — so each file is linked to its
+> single strongest criterion and the rest show as uncovered. The e2e tests in
+> `ui-components.spec.ts` are visibility-guarded smoke tests and are intentionally
+> not linked to any criterion. The accessibility criteria are currently untested.
+
 ### Pagination
 - [ ] Page navigation works correctly (first, prev, next, last)
 - [ ] Items per page selector updates page size

@@ -11,7 +11,7 @@ import SpecCoverage from '@site/src/components/SpecCoverage';
 
 This specification defines the role-based permission system for the Human Evaluation Workshop. It establishes the three participant roles (facilitator, SME, participant), the permissions each role grants or denies, and the rules governing role protection, phase advancement, and role-specific operations.
 
-**Boundary**: This spec defines *what each role can do*. [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md) defines *how users authenticate and how permissions are loaded/fallback*. [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md) defines *how trace assignment works* once the `can_assign_annotations` permission is granted.
+**Boundary**: This spec defines *what each role can do*. [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md) defines *how users authenticate and how permissions are loaded/fallback*. [DISCOVERY_SPEC](./DISCOVERY_SPEC.md) (“Trace Assignment & Ordering”) defines *how trace assignment works* once the `can_assign_annotations` permission is granted.
 
 ## Core Concepts
 
@@ -108,19 +108,26 @@ POST /users/
 Facilitators and other roles authenticate through different paths:
 
 ```
-POST /auth/login
+POST /users/auth/login
   1. Attempt facilitator auth via YAML config
   2. If YAML match:
      - Get or create facilitator user record
      - Return AuthResponse with is_preconfigured_facilitator=true
   3. If no YAML match:
-     - Authenticate via database (email/password)
+     - Look up user by email in the database (case-insensitive)
+     - SMEs/participants: NO password verification — email lookup only.
+       Workshop access is controlled by invitation: logging into a
+       workshop they are not invited to returns 403.
+     - Facilitator users stored in the database: password verified
+     - No user / failed verification: HTTP 401
      - Return AuthResponse with is_preconfigured_facilitator=false
 ```
 
-### Phase Advancement (Facilitator Only)
+### Phase Advancement
 
-Only facilitators can advance the workshop through phases. Each transition has prerequisites:
+Phase advancement is intended to be facilitator-only, but enforcement is **client-side only**: the facilitator dashboard that hosts the advance-phase control blocks non-facilitators ("Facilitator Access Required"), and the workflow sidebar marks phase-control steps accessible only to facilitators. The `advance-to-*` endpoints themselves perform **no role check** — server-side role enforcement is explicitly out of scope for now (the app runs inside a trusted workshop session).
+
+Each transition has prerequisites, validated server-side:
 
 | Transition | Endpoint | Prerequisites |
 |-----------|----------|---------------|
@@ -138,7 +145,7 @@ The following operations require the facilitator role:
 | Operation | Enforcement |
 |-----------|-------------|
 | Create invitation | Checks `inviter.role == FACILITATOR`, returns 403 otherwise |
-| Advance workshop phase | Documented as facilitator-only |
+| Advance workshop phase | Client-side gating only (facilitator dashboard blocks non-facilitators); endpoints perform no role check |
 | Assign traces to user | Requires `can_assign_annotations` permission (facilitator-only) |
 | Auto-assign annotations | Requires `can_assign_annotations` permission (facilitator-only) |
 | Create/edit rubrics | Requires `can_create_rubric` permission (facilitator-only) |
@@ -173,8 +180,9 @@ Permissions control what data users see:
 | `server/models.py` | `UserRole` enum, `UserPermissions` model with `for_role()` classmethod |
 | `server/database.py` | `UserDB` and `WorkshopParticipantDB` models (store role as string) |
 | `server/routers/users.py` | Permission endpoint, role checks on invitation/delete/role-change |
-| `server/routers/workshops.py` | Phase advancement endpoints (facilitator-only) |
+| `server/routers/workshops.py` | Phase advancement endpoints (prerequisite validation; no role check) |
 | `client/src/context/UserContext.tsx` | Client-side permission loading and state |
+| `client/src/components/FacilitatorDashboard.tsx` | Client-side role gate on the advance-phase control |
 
 ### Permission Endpoint
 
@@ -206,19 +214,19 @@ Returns the permission set derived from the user's role. Called by the frontend 
 
 ### Phase Advancement
 
-- [ ] Only facilitators can advance workshop phases
+- [ ] Phase advancement is gated client-side: non-facilitators are blocked from the facilitator dashboard that hosts the advance-phase control
 - [ ] Phase advancement validates prerequisites before transitioning
 - [ ] Phase advancement returns 400 if prerequisites not met
 
 ### Login by Role
 
 - [ ] Facilitators authenticate via YAML config (preconfigured credentials)
-- [ ] SMEs and participants authenticate via database credentials
+- [ ] SMEs and participants authenticate via database email lookup (no password verification)
 - [ ] Login response includes is_preconfigured_facilitator flag for facilitator logins
 
 ## Related Specs
 
 - [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md) — Login flow, session management, permission loading/fallback, error recovery
-- [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md) — Trace assignment behavior (uses `can_assign_annotations` permission)
+- [DISCOVERY_SPEC](./DISCOVERY_SPEC.md) — Trace assignment & ordering (uses `can_assign_annotations` permission)
 - [ANNOTATION_SPEC](./ANNOTATION_SPEC.md) — Annotation submission (uses `can_annotate` permission)
 - [RUBRIC_SPEC](./RUBRIC_SPEC.md) — Rubric creation (uses `can_create_rubric` permission)

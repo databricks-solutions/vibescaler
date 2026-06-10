@@ -50,50 +50,47 @@ Rubric:
 
 ### Question Format (Serialized)
 
-Questions are stored as a delimited string in the database:
+Each question is serialized as `Title: Description|||JUDGE_TYPE|||judgeType`, and questions
+are joined with `|||QUESTION_SEPARATOR|||` (no surrounding newlines). The title is everything
+before the **first** colon; the description is everything after it and may contain newlines
+and further colons:
 
 ```
-Title 1
-Description for question 1 that can span
-multiple lines without breaking parsing
-|||QUESTION_SEPARATOR|||
-Title 2
-Description for question 2
-|||QUESTION_SEPARATOR|||
-Title 3
-Description for question 3
+Accuracy: Is the response factually correct?|||JUDGE_TYPE|||binary|||QUESTION_SEPARATOR|||Helpfulness: Does the response address the user's need?
+It may span multiple lines.|||JUDGE_TYPE|||likert
 ```
 
 ### Question Object (Parsed)
 
 ```typescript
 interface RubricQuestion {
-  id: string;           // Generated UUID
-  title: string;        // First line of question block
-  description: string;  // Remaining lines of question block
-  judgeType: 'likert' | 'binary';  // Per-question judge type (legacy 'freeform' parses as likert)
+  id: string;           // Sequential, position-based: "q_1", "q_2", ... (re-derived on every parse)
+  title: string;        // Text before the first colon
+  description: string;  // Text after the first colon (may span multiple lines)
+  judgeType: 'likert' | 'binary';  // Per-question judge type (legacy 'freeform' coerces to likert)
 }
 ```
 
+Question ids are **not** stored UUIDs — they are regenerated from list position on every
+parse, which is why annotation `ratings` keys use the `q_N` format and why deletions
+re-index the remaining questions.
+
 ### Per-Question Judge Type
 
-Each question can specify its own judge type using a delimiter:
+Each question can specify its own judge type by appending the `|||JUDGE_TYPE|||` delimiter
+to its serialized content:
 
 ```
-Question Title [JUDGE_TYPE:binary]
-Question description here
-|||QUESTION_SEPARATOR|||
-Another Question [JUDGE_TYPE:likert]
-Description for likert scale question
+Accuracy: Is the response correct?|||JUDGE_TYPE|||binary|||QUESTION_SEPARATOR|||Helpfulness: Rate helpfulness 1-5|||JUDGE_TYPE|||likert
 ```
 
-**Delimiter**: `|||JUDGE_TYPE_DELIMITER|||` or `[JUDGE_TYPE:xxx]` format
+**Delimiter**: `|||JUDGE_TYPE|||`
 
 **Parsing Logic**:
-1. Check for `[JUDGE_TYPE:xxx]` in title
-2. Extract judge type (binary or likert; the legacy freeform type coerces to likert)
-3. Remove delimiter from title for display
-4. Default to 'likert' if not specified
+1. Split each question part on `|||JUDGE_TYPE|||`
+2. Accept `binary` or `likert`; the legacy `freeform` type coerces to `likert`
+3. Split the remaining content at the first colon into title and description
+4. Default to `likert` if no judge type is specified
 
 This enables mixed rubrics where some questions use Pass/Fail and others use 1-5 scale.
 
@@ -101,7 +98,7 @@ This enables mixed rubrics where some questions use Pass/Fail and others use 1-5
 
 ### The Problem
 
-Previous implementations used double newlines (`\n\n`) as the question delimiter. This broke when users included blank lines in question descriptions.
+Previous implementations used `---` as the question delimiter. This broke when users included horizontal rules or dashes in question descriptions, and plain-newline schemes broke on blank lines.
 
 ### The Solution
 
@@ -123,84 +120,84 @@ Use a unique delimiter that won't appear in user input:
 ### Shared Utility: `client/src/utils/rubricUtils.ts`
 
 ```typescript
-const QUESTION_DELIMITER = '|||QUESTION_SEPARATOR|||';
-const JUDGE_TYPE_DELIMITER = '|||JUDGE_TYPE_DELIMITER|||';
+export const QUESTION_DELIMITER = '|||QUESTION_SEPARATOR|||';
+const JUDGE_TYPE_DELIMITER = '|||JUDGE_TYPE|||';
 
-interface RubricQuestion {
-  id: string;
-  title: string;
-  description: string;
-  judgeType: 'likert' | 'binary';
-}
+export const parseRubricQuestions = (questionText: string): RubricQuestion[] => {
+  if (!questionText) return [];
 
-function parseRubricQuestions(raw: string): RubricQuestion[] {
-  if (!raw || !raw.trim()) return [];
+  return questionText
+    .split(QUESTION_DELIMITER)
+    .map((part, index): RubricQuestion | null => {
+      const trimmedText = part.trim();
+      if (!trimmedText) return null;
 
-  const parts = raw.split(QUESTION_DELIMITER);
-
-  return parts
-    .map(part => part.trim())
-    .filter(part => part.length > 0)
-    .map(part => {
-      const lines = part.split('\n');
-      let title = lines[0]?.trim() || '';
-      const description = lines.slice(1).join('\n').trim();
-
-      // Parse judge type from title
-      let judgeType: 'likert' | 'binary' = 'likert';
-      const judgeTypeMatch = title.match(/\[JUDGE_TYPE:(\w+)\]/i);
-      if (judgeTypeMatch) {
-        const parsed = judgeTypeMatch[1].toLowerCase();
-        // Legacy 'freeform' criteria are no longer creatable; render them as likert.
-        judgeType = parsed === 'binary' ? 'binary' : 'likert';
-        title = title.replace(/\s*\[JUDGE_TYPE:\w+\]/i, '').trim();
+      // Extract judge type (binary | likert; anything else — incl. legacy 'freeform' — coerces to likert)
+      let content = trimmedText;
+      let judgeType: QuestionJudgeType = JudgeType.LIKERT;
+      if (trimmedText.includes(JUDGE_TYPE_DELIMITER)) {
+        const [contentPart, typePart] = trimmedText.split(JUDGE_TYPE_DELIMITER);
+        content = contentPart.trim();
+        const parsedType = typePart?.trim() as JudgeType;
+        if (parsedType === JudgeType.LIKERT || parsedType === JudgeType.BINARY) {
+          judgeType = parsedType;
+        }
       }
 
-      return {
-        id: generateUUID(),
-        title,
-        description,
-        judgeType,
-      };
-    });
-}
+      // Split at the FIRST colon only; no colon means title-only with empty description
+      const colonIndex = content.indexOf(':');
+      const title = colonIndex === -1 ? content.trim() : content.substring(0, colonIndex).trim();
+      const description = colonIndex === -1 ? '' : content.substring(colonIndex + 1).trim();
 
-function formatRubricQuestions(questions: RubricQuestion[]): string {
-  return questions
-    .map(q => `${q.title}${JUDGE_TYPE_DELIMITER}${q.judgeType}\n${q.description}`)
-    .join(`\n${QUESTION_DELIMITER}\n`);
-}
+      return { id: `q_${index + 1}`, title, description, judgeType };
+    })
+    .filter((q): q is RubricQuestion => q !== null);
+};
+
+export const formatRubricQuestions = (questions: RubricQuestion[]): string =>
+  questions
+    .map(q => `${q.title}: ${q.description}${JUDGE_TYPE_DELIMITER}${q.judgeType}`)
+    .join(QUESTION_DELIMITER);
 ```
 
 ### Backend Parsing: `server/services/database_service.py`
 
+`DatabaseService._parse_rubric_questions` mirrors the frontend parser (same delimiters,
+same first-colon split, same sequential `q_N` ids, same freeform→likert coercion), with
+one difference: parts **without a colon are skipped** by the backend, while the frontend
+keeps them as title-only questions.
+
 ```python
-QUESTION_DELIMITER = '|||QUESTION_SEPARATOR|||'
-
-def _parse_rubric_questions(raw: str) -> List[Dict]:
-    if not raw or not raw.strip():
-        return []
-
-    parts = raw.split(QUESTION_DELIMITER)
-
+def _parse_rubric_questions(self, question_text: str) -> list:
+    QUESTION_DELIMITER = '|||QUESTION_SEPARATOR|||'
+    JUDGE_TYPE_DELIMITER = '|||JUDGE_TYPE|||'
     questions = []
-    for part in parts:
+    for i, part in enumerate((question_text or '').split(QUESTION_DELIMITER)):
         part = part.strip()
         if not part:
             continue
-
-        lines = part.split('\n')
-        title = lines[0].strip() if lines else ''
-        description = '\n'.join(lines[1:]).strip()
-
-        questions.append({
-            'id': str(uuid.uuid4()),
-            'title': title,
-            'description': description,
-        })
-
+        content, judge_type = part, 'likert'
+        if JUDGE_TYPE_DELIMITER in part:
+            content_part, type_part = part.split(JUDGE_TYPE_DELIMITER, 1)
+            content = content_part.strip()
+            parsed_type = type_part.strip()
+            if parsed_type in ('likert', 'binary'):
+                judge_type = parsed_type
+            # legacy 'freeform' (and anything else) coerces to the 'likert' default
+        if ':' in content:
+            title, description = content.split(':', 1)
+            questions.append({
+                'id': f'q_{i + 1}',
+                'title': title.strip(),
+                'description': description.strip(),
+                'judge_type': judge_type,
+            })
     return questions
 ```
+
+`_reconstruct_rubric_questions` is the inverse: it re-indexes ids to `q_1..q_N` and
+re-joins `f'{title}: {description}|||JUDGE_TYPE|||{judge_type}'` parts with the
+question delimiter.
 
 ## Judge Type Integration
 
@@ -226,15 +223,14 @@ def _parse_rubric_questions(raw: str) -> List[Dict]:
   binary_labels: { pass: 'Good', fail: 'Bad' }
 }
 
-// Rating UI shows: [Bad] [Good]
-// Rating values: 0 (Bad) or 1 (Good)
+// Rating UI shows: [Fail] [Pass]
+// Rating values: 0 (Fail) or 1 (Pass)
 ```
 
-### Default Binary Labels
+### Binary Labels
 
-If no custom labels provided:
-- Pass: "Pass"
-- Fail: "Fail"
+`binary_labels` are stored on the rubric and accepted by the API, but the annotation
+UI currently renders the fixed labels "Pass" and "Fail" for binary questions.
 
 ## Files Using Rubric Parsing
 
@@ -245,8 +241,11 @@ All these files import from `rubricUtils.ts`:
 | `RubricCreationDemo.tsx` | Create/edit rubric questions |
 | `AnnotationDemo.tsx` | Display questions for rating |
 | `AnnotationReviewPage.tsx` | Show questions in review |
+| `AnnotationStartPage.tsx` | Preview questions before annotation |
 | `IRRResultsDemo.tsx` | Display questions in IRR analysis |
 | `RubricViewPage.tsx` | Read-only rubric display |
+| `FacilitatorDashboard.tsx` | Rubric summary for facilitators |
+| `JudgeTuningPage.tsx` | Criteria shown during judge tuning |
 
 ## API Endpoints
 
@@ -255,8 +254,8 @@ All these files import from `rubricUtils.ts`:
 ```
 POST /workshops/{workshop_id}/rubric
 {
-  "name": "Quality Assessment",
-  "questions": "Accuracy\nIs the response factually correct?\n|||QUESTION_SEPARATOR|||\nHelpfulness\nDoes the response address the user's need?",
+  "question": "Accuracy: Is the response factually correct?|||JUDGE_TYPE|||binary|||QUESTION_SEPARATOR|||Helpfulness: Does the response address the user's need?|||JUDGE_TYPE|||likert",
+  "created_by": "user-id",
   "judge_type": "likert"
 }
 ```
@@ -269,16 +268,19 @@ GET /workshops/{workshop_id}/rubric
 Response:
 {
   "id": "uuid",
-  "name": "Quality Assessment",
-  "questions": "...",
+  "workshop_id": "uuid",
+  "question": "Accuracy: Is the response factually correct?|||JUDGE_TYPE|||binary|||QUESTION_SEPARATOR|||...",
   "judge_type": "likert",
   "binary_labels": null,
-  "parsed_questions": [
-    { "id": "uuid", "title": "Accuracy", "description": "..." },
-    { "id": "uuid", "title": "Helpfulness", "description": "..." }
-  ]
+  "rating_scale": 5,
+  "created_by": "user-id",
+  "created_at": "timestamp"
 }
 ```
+
+The API returns only the raw serialized `question` string — there is **no**
+`parsed_questions` field. Clients parse the string themselves via
+`parseRubricQuestions` in `rubricUtils.ts`.
 
 ## Rubric Lifecycle
 
@@ -340,7 +342,7 @@ Facilitators can generate rubric suggestions using an AI model that analyzes dis
 - Suggestions with title < 3 characters are filtered out
 - Suggestions with description < 10 characters are filtered out
 - Title truncated at 100 characters, description at 1000
-- Invalid `judgeType` values default to `'likert'`
+- Invalid `judgeType` values default to `'likert'`; the legacy `freeform` type coerces to `'likert'`
 - If zero suggestions pass validation, the request fails
 
 ### No Phase Restriction
@@ -349,17 +351,16 @@ AI generation is allowed at any workshop phase — facilitators can regenerate o
 
 ## Migration Considerations
 
-### Existing Data
+### Legacy Data
 
-Rubrics created before the delimiter change use `\n\n` as separator:
-- Questions without internal newlines: Parse correctly
-- Questions with internal newlines: May split incorrectly
-
-### Migration Options
-
-1. **Re-create through UI**: Delete and recreate rubric
-2. **Database update**: Run script to replace `\n\n` with new delimiter
-3. **Graceful parsing**: Try new delimiter first, fall back to old
+- Rubrics created before the delimiter change used `---` as the question separator.
+  The canonical parser (`_parse_rubric_questions` / `parseRubricQuestions`) does **not**
+  split on `---`; only a few read paths (e.g., MLflow sync judge-name mapping) fall back
+  to the legacy separator when the new delimiter is absent.
+- Rubrics containing the legacy `freeform` judge type remain readable: the type
+  coerces to `likert` at the parse boundary on both client and server. Free-form
+  criteria are no longer creatable.
+- The recommended migration for old-format rubrics is to re-create them through the UI.
 
 ## Success Criteria
 
@@ -370,8 +371,9 @@ Rubrics created before the delimiter change use `\n\n` as separator:
 - [ ] Questions with multi-line descriptions parse correctly
 - [ ] Delimiter never appears in user input (by design)
 - [ ] Frontend and backend use same delimiter constant
-- [ ] Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format
-- [ ] Parsed questions have stable UUIDs within session
+- [ ] Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter
+- [ ] Parsed questions get sequential `q_N` ids
+- [ ] Legacy `freeform` judge type coerces to likert at the parse boundary
 - [ ] Empty/whitespace-only parts filtered out
 
 ### Scale Rendering
@@ -413,23 +415,24 @@ Rubrics created before the delimiter change use `\n\n` as separator:
 ### Test 1: Simple Questions
 ```
 Input:
-"Question 1\nDescription 1|||QUESTION_SEPARATOR|||Question 2\nDescription 2"
+"Question 1: Description 1|||QUESTION_SEPARATOR|||Question 2: Description 2"
 
 Expected:
 [
-  { title: "Question 1", description: "Description 1" },
-  { title: "Question 2", description: "Description 2" }
+  { id: "q_1", title: "Question 1", description: "Description 1" },
+  { id: "q_2", title: "Question 2", description: "Description 2" }
 ]
 ```
 
 ### Test 2: Multi-line Description
 ```
 Input:
-"Question 1\nLine 1 of description\nLine 2 of description\n\nLine 3 after blank"
+"Question 1: Line 1 of description\nLine 2 of description\n\nLine 3 after blank"
 
 Expected:
 [
   {
+    id: "q_1",
     title: "Question 1",
     description: "Line 1 of description\nLine 2 of description\n\nLine 3 after blank"
   }
@@ -438,12 +441,12 @@ Expected:
 
 ### Test 3: Binary Scale
 ```
-Rubric:
-{ judge_type: 'binary', binary_labels: { pass: 'Acceptable', fail: 'Unacceptable' } }
+Rubric question:
+"Correct: Is this correct?|||JUDGE_TYPE|||binary"
 
-UI shows: [Unacceptable] [Acceptable]  (Pass/Fail buttons, not star ratings)
-Rating value for Acceptable: 1
-Rating value for Unacceptable: 0
+UI shows: [Pass] [Fail] buttons (not star ratings)
+Rating value for Pass: 1
+Rating value for Fail: 0
 
 MLflow feedback logged: 0 or 1 (NOT 3 for neutral)
 ```
@@ -451,17 +454,17 @@ MLflow feedback logged: 0 or 1 (NOT 3 for neutral)
 ### Test 4: Per-Question Judge Type
 ```
 Input:
-"Accuracy [JUDGE_TYPE:binary]\nIs the response factually correct?|||QUESTION_SEPARATOR|||Helpfulness [JUDGE_TYPE:likert]\nRate helpfulness 1-5"
+"Accuracy: Is the response factually correct?|||JUDGE_TYPE|||binary|||QUESTION_SEPARATOR|||Helpfulness: Rate helpfulness 1-5|||JUDGE_TYPE|||likert"
 
 Expected:
 [
-  { title: "Accuracy", description: "Is the response factually correct?", judgeType: "binary" },
-  { title: "Helpfulness", description: "Rate helpfulness 1-5", judgeType: "likert" }
+  { id: "q_1", title: "Accuracy", description: "Is the response factually correct?", judgeType: "binary" },
+  { id: "q_2", title: "Helpfulness", description: "Rate helpfulness 1-5", judgeType: "likert" }
 ]
 
 UI shows:
 - Question 1: Pass/Fail buttons
-- Question 2: 1-5 star rating
+- Question 2: 1-5 rating controls
 ```
 
 ### Test 5: Mixed Rubric Evaluation
@@ -476,7 +479,7 @@ When evaluating:
 
 ## Backwards Compatibility
 
-- Existing rubrics with old delimiter continue to work if no internal newlines
-- New rubrics use new delimiter automatically
-- API response includes both raw and parsed questions
+- New rubrics use the `|||QUESTION_SEPARATOR|||` delimiter automatically
+- Legacy `freeform` questions remain readable (coerced to likert on parse)
+- The API returns only the raw serialized question string; parsing happens client-side
 - Legacy single-rating annotations supported alongside multi-rating

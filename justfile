@@ -14,7 +14,10 @@
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 set dotenv-filename := ".env.local"
 set dotenv-load
-set script-interpreter := ['uv', 'run', 'python']
+set script-interpreter := ['uv', 'run', '--no-sync', 'python']
+
+# Never let recipe-level `uv run` rewrite uv.lock (registry portability guard)
+export UV_FROZEN := "1"
 export PATH := "./{{client-dir}}/node_modules/.bin:" + env_var('PATH')
 client-dir := "client"
 docs-dir := "docs"

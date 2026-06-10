@@ -1,8 +1,9 @@
+// @spec ANNOTATION_SPEC
+// @req Facilitator annotation stats poll every 15 seconds while the tab is in the foreground
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { UseQueryOptions } from '@tanstack/react-query';
 import { useFacilitatorAnnotations, useFacilitatorAnnotationsWithUserDetails } from './useWorkshopApi';
 
-// @spec ANNOTATION_SPEC
 const { useQueryMock } = vi.hoisted(() => ({
   useQueryMock: vi.fn(() => ({ data: undefined })),
 }));

@@ -1,56 +1,63 @@
 # Spec Test Coverage Map
 
-**Generated**: 2026-06-10 15:11:46
+**Generated**: 2026-06-10 18:20:53
 
 This report shows test coverage for each specification's success criteria.
+
+## :rotating_light: Unknown Spec Tags
+
+**3 test tag(s) reference specs not registered in `KNOWN_SPECS`.**
+These tests earn ZERO coverage credit until the spec is registered or the tag is fixed:
+
+| Unknown Spec | Tagged Tests |
+|--------------|--------------|
+| SQLITE_CONCURRENCY | 3 |
 
 ## Test Pyramid Summary
 
 | Type | Count | Description |
 |------|-------|-------------|
-| Unit | 988 | pytest unit tests, Vitest tests |
-| Integration | 60 | pytest with real DB/API |
-| E2E (Mocked) | 23 | Playwright with mocked API |
-| E2E (Real) | 106 | Playwright with real API |
+| Unit | 1103 | pytest unit tests, Vitest tests |
+| Integration | 61 | pytest with real DB/API |
+| E2E (Mocked) | 22 | Playwright with mocked API |
+| E2E (Real) | 67 | Playwright with real API |
 
 ## Coverage Summary
 
 | Spec | Reqs | Covered | Cover% | Unit | Int | E2E-M | E2E-R | BE-only |
 |------|------|---------|--------|------|-----|-------|-------|---------|
-| [ANNOTATION_SPEC](#annotation-spec) | 21 | 12 | 57% | 54 | 0 | 0 | 12 | **4** |
-| [ASSISTED_FACILITATION_SPEC](#assisted-facilitation-spec) | 7 | 7 | 100% | 31 | 0 | 0 | 42 | 0 |
-| [AUTHENTICATION_SPEC](#authentication-spec) | 28 | 6 | 21% | 10 | 0 | 3 | 0 | **4** |
-| [BUILD_AND_DEPLOY_SPEC](#build-and-deploy-spec) | 17 | 14 | 82% | 66 | 0 | 0 | 0 | **14** |
-| [CUSTOM_LLM_PROVIDER_SPEC](#custom-llm-provider-spec) | 15 | 0 | 0% | 13 | 0 | 7 | 0 | 0 |
-| [DATASETS_SPEC](#datasets-spec) | 9 | 9 | 100% | 33 | 0 | 0 | 2 | **7** |
-| [DESIGN_SYSTEM_SPEC](#design-system-spec) | 7 | 0 | 0% | 40 | 0 | 0 | 0 | 0 |
-| [DISCOVERY_SPEC](#discovery-spec) | 72 | 62 | 86% | 288 | 5 | 8 | 19 | **26** |
-| [DISCOVERY_TRACE_ASSIGNMENT_SPEC](#discovery-trace-assignment-spec) | 13 | 13 | 100% | 21 | 0 | 2 | 3 | **9** |
-| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 25 | 24 | 96% | 107 | 7 | 0 | 13 | **15** |
-| [ROLE_PERMISSIONS_SPEC](#role-permissions-spec) | 16 | 16 | 100% | 24 | 0 | 0 | 0 | **16** |
-| [RUBRIC_SPEC](#rubric-spec) | 25 | 25 | 100% | 94 | 0 | 2 | 6 | **15** |
-| [TESTING_SPEC](#testing-spec) | 30 | 0 | 0% | 35 | 48 | 0 | 0 | 0 |
-| [TRACE_DISPLAY_SPEC](#trace-display-spec) | 19 | 19 | 100% | 92 | 0 | 0 | 7 | **10** |
-| [UI_COMPONENTS_SPEC](#ui-components-spec) | 16 | 0 | 0% | 57 | 0 | 0 | 2 | 0 |
-| [EVAL_MODE_SPEC](#eval-mode-spec) | 35 | 14 | 40% | 23 | 0 | 1 | 0 | **14** |
+| [ANNOTATION_SPEC](#annotation-spec) | 26 | 19 | 73% | 57 | 0 | 0 | 17 | **6** |
+| [AUTHENTICATION_SPEC](#authentication-spec) | 29 | 4 | 13% | 9 | 0 | 3 | 0 | **1** |
+| [BUILD_AND_DEPLOY_SPEC](#build-and-deploy-spec) | 19 | 17 | 89% | 87 | 2 | 0 | 0 | **17** |
+| [CUSTOM_LLM_PROVIDER_SPEC](#custom-llm-provider-spec) | 11 | 11 | 100% | 17 | 0 | 8 | 0 | **3** |
+| [DATASETS_SPEC](#datasets-spec) | 5 | 5 | 100% | 31 | 0 | 0 | 2 | **4** |
+| [DESIGN_SYSTEM_SPEC](#design-system-spec) | 7 | 2 | 28% | 40 | 0 | 2 | 0 | 0 |
+| [DISCOVERY_SPEC](#discovery-spec) | 79 | 76 | 96% | 309 | 4 | 6 | 22 | **41** |
+| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 30 | 28 | 93% | 108 | 7 | 0 | 11 | **19** |
+| [ROLE_PERMISSIONS_SPEC](#role-permissions-spec) | 16 | 16 | 100% | 30 | 0 | 0 | 0 | **15** |
+| [RUBRIC_SPEC](#rubric-spec) | 26 | 26 | 100% | 98 | 0 | 2 | 6 | **18** |
+| [TESTING_SPEC](#testing-spec) | 25 | 16 | 64% | 65 | 48 | 0 | 0 | **16** |
+| [TRACE_DISPLAY_SPEC](#trace-display-spec) | 19 | 19 | 100% | 94 | 0 | 0 | 7 | **9** |
+| [TRACE_INGESTION_SPEC](#trace-ingestion-spec) | 16 | 0 | 0% | 16 | 0 | 0 | 0 | 0 |
+| [TRACE_SUMMARIZATION_SPEC](#trace-summarization-spec) | 64 | 21 | 32% | 58 | 0 | 0 | 0 | **21** |
+| [UI_COMPONENTS_SPEC](#ui-components-spec) | 16 | 2 | 12% | 57 | 0 | 0 | 2 | 0 |
+| [EVAL_MODE_SPEC](#eval-mode-spec) | 19 | 18 | 94% | 27 | 0 | 1 | 0 | **17** |
 
-**Total**: 221/355 requirements covered (62%)
+**Total**: 280/407 requirements covered (68%)
 
 ---
 
 ## ANNOTATION_SPEC
 
-**Coverage**: 12/21 requirements (57%)
+**Coverage**: 19/26 requirements (73%)
 
 ### Uncovered Requirements
 
-- [ ] No toast when navigating without changes
+- [ ] Save success is silent; toasts appear only for save failures, retries, and bulk-recovery outcomes
 - [ ] Comments display with proper line breaks
 - [ ] Duplicate feedback entries are detected and skipped
 - [ ] Bulk resync re-exports all annotations when rubric titles change
-- [ ] Failed saves are queued and retried automatically with exponential backoff
 - [ ] Navigation is optimistic (UI advances immediately, save completes in background)
-- [ ] Navigation debounced at 300ms to prevent duplicate saves
 - [ ] Freeform question responses are optional (not required for navigation)
 - [ ] Freeform responses are encoded in the comment field as JSON
 
@@ -58,24 +65,33 @@ This report shows test coverage for each specification's success criteria.
 
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
-- :warning: Users can edit previously submitted annotations (unit)
 - :warning: MLflow trace tagged with `label: "align"` and `workshop_id` on annotation (unit)
 - :warning: Annotation comment maps to MLflow feedback rationale (unit)
+- :warning: Participants can create, retrieve, and delete notes during discovery and annotation phases (unit)
+- :warning: Participant notes always append as new entries; existing notes are never overwritten (unit)
+- :warning: Facilitators can toggle participant notes visibility per workshop (unit)
 - :warning: Legacy single-rating format loads correctly alongside multi-rating format (unit)
 
 ### Covered Requirements
 
-- [x] Users can edit previously submitted annotations (unit) **[BE-only]**
-- [x] Changes automatically save on navigation (Next/Previous) (e2e-real, unit)
-- [x] Toast shows "Annotation saved!" for new submissions (e2e-real)
-- [x] Toast shows "Annotation updated!" only when changes detected (e2e-real)
+- [x] Users can edit previously submitted annotations (e2e-real, unit)
+- [x] Changes automatically save on navigation (Next/Previous) (e2e-real)
+- [x] Annotated traces show a persistent Saved indicator instead of a success toast (e2e-real)
 - [x] Multi-line comments preserved throughout the stack (e2e-real)
 - [x] Next button enabled for annotated traces (allows re-navigation) (e2e-real)
 - [x] Annotation count reflects unique submissions (not re-submissions) (e2e-real, unit)
+- [x] Annotation upsert persists every trace submission, including the final trace in a session (e2e-real, unit)
+- [x] Completing the final trace shows a terminal completion state (e2e-real, unit)
 - [x] Annotations sync to MLflow as feedback on save (one entry per rubric question) (e2e-real, unit)
 - [x] MLflow trace tagged with `label: "align"` and `workshop_id` on annotation (unit) **[BE-only]**
 - [x] Feedback source is HUMAN with annotator's user_id (e2e-real, unit)
 - [x] Annotation comment maps to MLflow feedback rationale (unit) **[BE-only]**
+- [x] Failed saves are queued and retried automatically with exponential backoff (unit)
+- [x] Navigation debounced at 300ms to prevent duplicate saves (unit)
+- [x] Facilitator annotation stats poll every 15 seconds while the tab is in the foreground (unit)
+- [x] Participants can create, retrieve, and delete notes during discovery and annotation phases (unit) **[BE-only]**
+- [x] Participant notes always append as new entries; existing notes are never overwritten (unit) **[BE-only]**
+- [x] Facilitators can toggle participant notes visibility per workshop (unit) **[BE-only]**
 - [x] Legacy single-rating format loads correctly alongside multi-rating format (unit) **[BE-only]**
 
 ### Tests Without Requirement Links
@@ -83,30 +99,6 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 These tests are tagged with the spec but don't link to specific requirements:
 
 - `tests/unit/routers/test_annotation_crud.py` (test_upsert_creates_new_annotation) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_create_discovery_note) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_create_annotation_note) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_create_note_defaults_to_discovery_phase) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_create_note_without_trace_id) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_create_note_missing_workshop_returns_404) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_create_note_service_error_returns_500) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_get_all_notes) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_get_notes_filtered_by_user) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_get_notes_filtered_by_discovery_phase) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_get_notes_filtered_by_annotation_phase) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_get_notes_filtered_by_user_and_phase) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_get_notes_missing_workshop_returns_404) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_delete_note_success) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_delete_nonexistent_note_returns_404) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_delete_note_missing_workshop_returns_404) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_multiple_notes_same_user_same_trace_append) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_notes_from_both_phases_coexist) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_toggle_participant_notes_enables) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_toggle_participant_notes_disables) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_toggle_missing_workshop_returns_404) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_multiple_annotators_notes_during_annotation) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_participant_note_create_model_defaults) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_participant_note_create_model_with_annotation_phase) [unit]
-- `tests/unit/routers/test_participant_notes.py` (test_participant_note_model_serialization) [unit]
 - `tests/unit/services/test_annotation_mlflow_sync.py` (test_same_value_resync_skipped) [unit]
 - `tests/unit/services/test_annotation_mlflow_sync.py` (test_different_value_edit_overwrites) [unit]
 - `tests/unit/services/test_annotation_mlflow_sync.py` (test_update_failure_does_not_log_duplicate) [unit]
@@ -122,46 +114,16 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_database_service_participant_notes.py` (test_get_participant_notes_empty_result) [unit]
 - `tests/unit/services/test_database_service_participant_notes.py` (test_delete_participant_note_success) [unit]
 - `tests/unit/services/test_database_service_participant_notes.py` (test_delete_participant_note_not_found) [unit]
-- `client/src/pages/AnnotationDemo.completionState.test.tsx` (replaces the trace UI with a terminal completion screen after completing the last trace) [unit]
-- `client/src/pages/AnnotationDemo.completionState.test.tsx` (allows returning to the annotation view to review, then completes back to the terminal state) [unit]
-- `client/src/hooks/useWorkshopApi.facilitatorPolling.test.ts` (useFacilitatorAnnotations polls every 15s in the foreground only) [unit]
-- `client/src/hooks/useWorkshopApi.facilitatorPolling.test.ts` (useFacilitatorAnnotationsWithUserDetails polls every 15s in the foreground only) [unit]
-
-## ASSISTED_FACILITATION_SPEC
-
-**Coverage**: 7/7 requirements (100%)
-
-### Covered Requirements
-
-- [x] Findings are classified in real-time as participants submit them (e2e-real, unit)
-- [x] Facilitators see per-trace structured view with category breakdown (e2e-real, unit)
-- [x] Facilitators can generate targeted questions that broadcast to all participants (e2e-real, unit)
-- [x] Disagreements are auto-detected and surfaced (e2e-real, unit)
-- [x] Participants see only fuzzy progress (no category bias) (e2e-real, unit)
-- [x] Findings can be promoted to draft rubric staging area (e2e-real, unit)
-- [x] Thresholds are configurable per category per trace (e2e-real, unit)
-
-### Tests Without Requirement Links
-
-These tests are tagged with the spec but don't link to specific requirements:
-
-- `tests/unit/services/test_discovery_dspy_mlflow_autolog.py` (test_dspy_mlflow_autolog_is_noop_when_env_var_unset) [unit]
-- `tests/unit/services/test_discovery_dspy_mlflow_autolog.py` (test_dspy_mlflow_autolog_uses_experiment_id_from_env) [unit]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (facilitator login with mocked API) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (workshop with multiple participants) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (workshop setup for rubric phase) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (named users for multi-browser tests) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (mixed mock and real API calls) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (full real API mode) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (annotation phase setup) [e2e-real]
-- `client/tests/e2e/example-new-infrastructure.spec.ts` (pre-created annotations) [e2e-real]
 
 ## AUTHENTICATION_SPEC
 
-**Coverage**: 6/28 requirements (21%)
+**Coverage**: 4/29 requirements (13%)
 
 ### Uncovered Requirements
 
+- [ ] No "permission denied" errors on normal login
+- [ ] No page refresh required after login
+- [ ] Permission API failure: User can log in with defaults
 - [ ] 404 on validation: Session cleared, fresh login allowed
 - [ ] All Databricks API calls use SDK-resolved tokens (no user-provided PATs)
 - [ ] MLflow operations use SDK auth without `os.environ["DATABRICKS_TOKEN"]` mutation
@@ -189,19 +151,14 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
-- :warning: No "permission denied" errors on normal login (unit)
-- :warning: No page refresh required after login (unit)
-- :warning: Permission API failure: User can log in with defaults (unit)
-- :warning: Error recovery: Errors cleared on new login attempt (unit)
+- :warning: Invalid login credentials are rejected with HTTP 401 and an explanatory error message (unit)
 
 ### Covered Requirements
 
-- [x] No "permission denied" errors on normal login (unit) **[BE-only]**
-- [x] No page refresh required after login (unit) **[BE-only]**
 - [x] Slow network: Loading indicator shown until ready (e2e-mocked)
-- [x] Permission API failure: User can log in with defaults (unit) **[BE-only]**
 - [x] Rapid navigation: Components wait for `isLoading = false` (unit)
-- [x] Error recovery: Errors cleared on new login attempt (unit) **[BE-only]**
+- [x] Error recovery: Errors cleared on new login attempt (e2e-mocked)
+- [x] Invalid login credentials are rejected with HTTP 401 and an explanatory error message (unit) **[BE-only]**
 
 ### Tests Without Requirement Links
 
@@ -209,20 +166,19 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 - `tests/unit/routers/test_auth_edge_cases.py` (test_permission_api_failure_returns_defaults_when_user_not_found) [unit]
 - `tests/unit/routers/test_auth_edge_cases.py` (test_permission_api_returns_role_based_defaults_for_valid_user) [unit]
+- `tests/unit/routers/test_auth_edge_cases.py` (test_permission_api_failure_when_db_service_raises) [unit]
 - `tests/unit/test_db_config.py` (test_get_password_rejects_unset_or_empty_endpoint[None]) [unit]
 - `tests/unit/test_db_config.py` (test_get_password_rejects_unset_or_empty_endpoint[]) [unit]
 - `tests/unit/test_db_config.py` (test_postgresql_engine_raises_without_endpoint_name) [unit]
-- `client/tests/e2e/authentication.spec.ts` (error clears on new login attempt) [e2e-mocked]
 - `client/tests/e2e/facilitator-create-workshop.spec.ts` (facilitator can log in and create a workshop) [e2e-mocked]
 
 ## BUILD_AND_DEPLOY_SPEC
 
-**Coverage**: 14/17 requirements (82%)
+**Coverage**: 17/19 requirements (89%)
 
 ### Uncovered Requirements
 
 - [ ] Production build completes without errors
-- [ ] Console statements removed in production
 - [ ] Full deployment completes successfully
 
 ### Backend-Only Requirements (no frontend tests)
@@ -236,13 +192,16 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: Batch mode works for SQLite ALTER TABLE (unit)
 - :warning: File lock prevents race conditions with multiple workers (unit)
 - :warning: Pending Alembic migrations are applied automatically before workers accept traffic (unit)
+- :warning: Lakebase schema privilege grants are best-effort (unit)
 - :warning: App serves setup docs and gates the UI until Lakebase is configured (postgres targets only; sqlite deployments are fully operable without setup) (unit)
 - :warning: Server starts and serves frontend (unit)
-- :warning: API endpoints respond correctly (unit)
-- :warning: Database connection established (unit)
+- :warning: API endpoints respond correctly (integration, unit)
+- :warning: Database connection established (integration)
+- :warning: Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap provisions the app schema and reuses existing data across restarts (unit)
 - :warning: Release workflow creates zip artifact (unit)
 - :warning: Pre-built client included in release (unit)
 - :warning: No sensitive files in artifact (unit)
+- :warning: Lockfiles resolve against public registries (no internal proxy URLs) (unit)
 
 ### Covered Requirements
 
@@ -253,21 +212,29 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Batch mode works for SQLite ALTER TABLE (unit) **[BE-only]**
 - [x] File lock prevents race conditions with multiple workers (unit) **[BE-only]**
 - [x] Pending Alembic migrations are applied automatically before workers accept traffic (unit) **[BE-only]**
+- [x] Lakebase schema privilege grants are best-effort (unit) **[BE-only]**
 - [x] App serves setup docs and gates the UI until Lakebase is configured (postgres targets only; sqlite deployments are fully operable without setup) (unit) **[BE-only]**
 - [x] Server starts and serves frontend (unit) **[BE-only]**
-- [x] API endpoints respond correctly (unit) **[BE-only]**
-- [x] Database connection established (unit) **[BE-only]**
+- [x] API endpoints respond correctly (integration, unit) **[BE-only]**
+- [x] Database connection established (integration) **[BE-only]**
+- [x] Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap provisions the app schema and reuses existing data across restarts (unit) **[BE-only]**
 - [x] Release workflow creates zip artifact (unit) **[BE-only]**
 - [x] Pre-built client included in release (unit) **[BE-only]**
 - [x] No sensitive files in artifact (unit) **[BE-only]**
+- [x] Lockfiles resolve against public registries (no internal proxy URLs) (unit) **[BE-only]**
+
+### Roadmap (not shipping)
+
+These criteria are roadmap-only and excluded from the coverage denominator:
+
+- Console statements removed in production (roadmap)
 
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
-- `tests/unit/test_build_deploy.py` (test_migration_schema_grant_is_best_effort) [unit]
-- `tests/unit/test_build_deploy.py` (test_migration_version_table_is_created_wide_enough) [unit]
-- `tests/unit/test_build_deploy.py` (test_boolean_migration_defaults_are_postgres_safe) [unit]
+- `tests/unit/test_build_deploy.py` (test_database_url_has_default) [unit]
+- `tests/unit/test_build_deploy.py` (test_detect_backend_defaults_to_sqlite) [unit]
 - `tests/unit/test_sqlite_rescue.py` (test_default_database_url) [unit]
 - `tests/unit/test_sqlite_rescue.py` (test_sqlite_triple_slash_url) [unit]
 - `tests/unit/test_sqlite_rescue.py` (test_sqlite_double_slash_url) [unit]
@@ -294,93 +261,90 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 ## CUSTOM_LLM_PROVIDER_SPEC
 
-**Coverage**: 0/15 requirements (0%)
-
-### Uncovered Requirements
-
-- [ ] Users can configure custom LLM provider via UI
-- [ ] Base URL, API key, and model name are captured
-- [ ] API key is stored securely in memory (not database)
-- [ ] Configuration persists across page refreshes (except API key which requires re-entry after 24h)
-- [ ] "Test Connection" button verifies endpoint is reachable
-- [ ] Clear error messages for common failures (auth, timeout, invalid URL)
-- [ ] Response time is displayed on success
-- [ ] When custom provider is enabled, judge evaluation uses the custom endpoint
-- [ ] `proxy_url` parameter is correctly passed to MLflow
-- [ ] Evaluation results are identical in format to Databricks FMAPI results
-- [ ] Errors from custom provider are properly surfaced to UI
-- [ ] Custom provider option appears in model selector when configured
-- [ ] Clear indication of which provider is being used
-- [ ] Easy to switch between Databricks and custom provider
-- [ ] Configuration can be updated without losing other workshop data
-
-### Tests Without Requirement Links
-
-These tests are tagged with the spec but don't link to specific requirements:
-
-- `tests/unit/routers/test_custom_llm_provider_router.py` (test_get_custom_llm_provider_not_configured) [unit]
-- `tests/unit/routers/test_custom_llm_provider_router.py` (test_get_custom_llm_provider_configured) [unit]
-- `tests/unit/routers/test_custom_llm_provider_router.py` (test_create_custom_llm_provider) [unit]
-- `tests/unit/routers/test_custom_llm_provider_router.py` (test_delete_custom_llm_provider) [unit]
-- `tests/unit/routers/test_custom_llm_provider_router.py` (test_test_custom_llm_provider_success) [unit]
-- `tests/unit/routers/test_custom_llm_provider_router.py` (test_test_custom_llm_provider_auth_failure) [unit]
-- `tests/unit/routers/test_custom_llm_provider_router.py` (test_test_custom_llm_provider_no_config) [unit]
-- `tests/unit/routers/test_custom_llm_provider_router.py` (test_test_custom_llm_provider_no_api_key) [unit]
-- `tests/unit/services/test_judge_custom_provider.py` (test_custom_provider_sets_proxy_url_in_mlflow_configuration) [unit]
-- `tests/unit/services/test_judge_custom_provider.py` (test_build_chat_completions_url_with_v1_suffix) [unit]
-- `tests/unit/services/test_judge_custom_provider.py` (test_build_chat_completions_url_already_has_suffix) [unit]
-- `tests/unit/services/test_judge_custom_provider.py` (test_build_chat_completions_url_strips_trailing_slash) [unit]
-- `tests/unit/services/test_judge_custom_provider.py` (test_custom_provider_api_key_stored_with_correct_key_format) [unit]
-- `client/tests/e2e/custom-llm-provider.spec.ts` (facilitator can access custom LLM provider config in judge tuning) [e2e-mocked]
-- `client/tests/e2e/custom-llm-provider.spec.ts` (facilitator can configure and test custom LLM provider) [e2e-mocked]
-- `client/tests/e2e/custom-llm-provider.spec.ts` (facilitator can delete custom LLM provider configuration) [e2e-mocked]
-- `client/tests/e2e/custom-llm-provider.spec.ts` (shows stored badge after saving API key) [e2e-mocked]
-- `client/tests/e2e/custom-llm-provider.spec.ts` (validation requires all fields) [e2e-mocked]
-- `client/tests/e2e/custom-llm-provider.spec.ts` (custom provider appears in model selector when configured) [e2e-mocked]
-- `client/tests/e2e/custom-llm-provider.spec.ts` (switch between providers works) [e2e-mocked]
-
-## DATASETS_SPEC
-
-**Coverage**: 9/9 requirements (100%)
+**Coverage**: 11/11 requirements (100%)
 
 ### Backend-Only Requirements (no frontend tests)
 
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
-- :warning: Union operation combines traces from multiple datasets (unit)
-- :warning: Subtract operation removes specified traces (unit)
+- :warning: Configuration persists across page refreshes (except API key which requires re-entry after 24h) (unit)
+- :warning: Clear error messages for common failures (auth, timeout, invalid URL) (unit)
+- :warning: When the Discovery follow-up model is set to custom, follow-up questions are generated through the configured endpoint via build_custom_llm (unit)
+
+### Covered Requirements
+
+- [x] Users can configure custom LLM provider via UI (e2e-mocked)
+- [x] Base URL, API key, and model name are captured (e2e-mocked)
+- [x] API key is stored securely in memory (not database) (e2e-mocked, unit)
+- [x] Configuration persists across page refreshes (except API key which requires re-entry after 24h) (unit) **[BE-only]**
+- [x] Configuration can be updated without losing other workshop data (e2e-mocked)
+- [x] Configuration can be deleted, removing both the stored config and the in-memory API key (e2e-mocked, unit)
+- [x] Test Connection button verifies endpoint is reachable (e2e-mocked, unit)
+- [x] Clear error messages for common failures (auth, timeout, invalid URL) (unit) **[BE-only]**
+- [x] Response time is displayed on success (e2e-mocked)
+- [x] Custom provider option appears in the Discovery model selector when configured and enabled (unit)
+- [x] When the Discovery follow-up model is set to custom, follow-up questions are generated through the configured endpoint via build_custom_llm (unit) **[BE-only]**
+
+### Roadmap (not shipping)
+
+These criteria are roadmap-only and excluded from the coverage denominator:
+
+- When custom provider is enabled, judge evaluation uses the custom endpoint (roadmap)
+- proxy_url parameter is correctly passed to MLflow (roadmap)
+- Evaluation results are identical in format to Databricks FMAPI results (roadmap)
+- Errors from custom provider are properly surfaced to UI (roadmap)
+- Custom provider option appears in the judge model selector when configured (roadmap)
+- Easy to switch between Databricks and custom provider for judge evaluation (roadmap)
+
+## DATASETS_SPEC
+
+**Coverage**: 5/5 requirements (100%)
+
+### Backend-Only Requirements (no frontend tests)
+
+These requirements are covered by backend tests only. UI regressions won't be caught:
+
 - :warning: Same user sees same order for same dataset (deterministic) (unit)
 - :warning: Adding traces preserves existing order (incremental) (unit)
 - :warning: New round triggers fresh randomization (unit)
-- :warning: Dataset lineage tracked (source datasets, operations) (unit)
 - :warning: Facilitators see chronological order (no randomization) (unit)
 
 ### Covered Requirements
 
-- [x] Datasets can be created with arbitrary trace lists (e2e-real, unit)
-- [x] Union operation combines traces from multiple datasets (unit) **[BE-only]**
-- [x] Subtract operation removes specified traces (unit) **[BE-only]**
 - [x] Same user sees same order for same dataset (deterministic) (unit) **[BE-only]**
 - [x] Different users see different orders (per-user randomization) (e2e-real, unit)
 - [x] Adding traces preserves existing order (incremental) (unit) **[BE-only]**
 - [x] New round triggers fresh randomization (unit) **[BE-only]**
-- [x] Dataset lineage tracked (source datasets, operations) (unit) **[BE-only]**
 - [x] Facilitators see chronological order (no randomization) (unit) **[BE-only]**
+
+### Roadmap (not shipping)
+
+These criteria are roadmap-only and excluded from the coverage denominator:
+
+- Datasets can be created with arbitrary trace lists (roadmap)
+- Union operation combines traces from multiple datasets (roadmap)
+- Subtract operation removes specified traces (roadmap)
+- Dataset lineage tracked (source datasets, operations) (roadmap)
 
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
+- `tests/unit/services/test_dataset_operations.py` (test_union_two_disjoint_datasets) [unit]
+- `tests/unit/services/test_dataset_operations.py` (test_union_overlapping_datasets_deduplicates) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_union_preserves_first_occurrence_order) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_union_three_datasets) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_union_with_empty_dataset) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_union_identical_datasets) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_union_result_has_no_duplicates) [unit]
+- `tests/unit/services/test_dataset_operations.py` (test_subtract_removes_specified_traces) [unit]
+- `tests/unit/services/test_dataset_operations.py` (test_subtract_preserves_order_of_remaining) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_subtract_empty_removal_set) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_subtract_all_traces) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_subtract_nonexistent_traces_ignored) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_subtract_single_trace) [unit]
 - `tests/unit/services/test_dataset_operations.py` (test_subtract_result_has_correct_length) [unit]
+- `client/tests/e2e/dataset-operations.spec.ts` (facilitator creates dataset, traces appear) [e2e-real]
 - `client/src/utils/traceUtils.test.ts` (converts basic API trace fields) [unit]
 - `client/src/utils/traceUtils.test.ts` (normalizes null optional fields to undefined) [unit]
 - `client/src/utils/traceUtils.test.ts` (normalizes empty string optional fields to undefined) [unit]
@@ -392,79 +356,43 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 ## DESIGN_SYSTEM_SPEC
 
-**Coverage**: 0/7 requirements (0%)
+**Coverage**: 2/7 requirements (28%)
 
 ### Uncovered Requirements
 
 - [ ] Primary purple consistent across all components
-- [ ] Dark mode fully functional
 - [ ] All text meets WCAG AA contrast
 - [ ] Focus indicators visible
-- [ ] No hardcoded colors in components
 - [ ] Badges use secondary color scheme
 - [ ] Buttons use appropriate variants
+
+### Covered Requirements
+
+- [x] `cn()` utility merges class names and resolves Tailwind conflicts (later value wins) (unit)
+- [x] No hardcoded colors in components (unit)
+
+### Roadmap (not shipping)
+
+These criteria are roadmap-only and excluded from the coverage denominator:
+
+- Dark mode fully functional (roadmap)
 
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
-- `client/src/lib/utils.test.ts` (combines multiple class strings) [unit]
-- `client/src/lib/utils.test.ts` (handles single class) [unit]
-- `client/src/lib/utils.test.ts` (handles empty input) [unit]
-- `client/src/lib/utils.test.ts` (handles empty strings) [unit]
-- `client/src/lib/utils.test.ts` (resolves padding conflicts (later wins)) [unit]
-- `client/src/lib/utils.test.ts` (resolves margin conflicts) [unit]
-- `client/src/lib/utils.test.ts` (resolves text size conflicts) [unit]
-- `client/src/lib/utils.test.ts` (resolves background color conflicts) [unit]
-- `client/src/lib/utils.test.ts` (resolves text color conflicts) [unit]
-- `client/src/lib/utils.test.ts` (allows different utility categories to coexist) [unit]
-- `client/src/lib/utils.test.ts` (resolves directional padding conflicts) [unit]
-- `client/src/lib/utils.test.ts` (keeps non-conflicting directional utilities) [unit]
-- `client/src/lib/utils.test.ts` (filters out falsy values) [unit]
-- `client/src/lib/utils.test.ts` (filters out undefined values) [unit]
-- `client/src/lib/utils.test.ts` (filters out null values) [unit]
-- `client/src/lib/utils.test.ts` (handles conditional expression with true) [unit]
-- `client/src/lib/utils.test.ts` (handles conditional expression with false) [unit]
-- `client/src/lib/utils.test.ts` (handles ternary expressions) [unit]
-- `client/src/lib/utils.test.ts` (handles array of classes) [unit]
-- `client/src/lib/utils.test.ts` (handles mixed array and string inputs) [unit]
-- `client/src/lib/utils.test.ts` (filters falsy values from arrays) [unit]
-- `client/src/lib/utils.test.ts` (handles object with boolean values) [unit]
-- `client/src/lib/utils.test.ts` (handles object with all true values) [unit]
-- `client/src/lib/utils.test.ts` (handles empty object) [unit]
-- `client/src/lib/utils.test.ts` (combines object and string inputs) [unit]
-- `client/src/lib/utils.test.ts` (handles button variant pattern) [unit]
-- `client/src/lib/utils.test.ts` (handles disabled state override) [unit]
-- `client/src/lib/utils.test.ts` (handles responsive classes) [unit]
-- `client/src/lib/utils.test.ts` (handles dark mode classes) [unit]
-- `client/src/test/design-system.test.ts` (has a :root block) [unit]
-- `client/src/test/design-system.test.ts` (defines --primary CSS variable) [unit]
-- `client/src/test/design-system.test.ts` (defines --primary-foreground CSS variable) [unit]
-- `client/src/test/design-system.test.ts` (defines --background CSS variable) [unit]
-- `client/src/test/design-system.test.ts` (defines --foreground CSS variable) [unit]
-- `client/src/test/design-system.test.ts` (has a .dark block) [unit]
-- `client/src/test/design-system.test.ts` (overrides --primary in dark mode) [unit]
-- `client/src/test/design-system.test.ts` (overrides --background in dark mode) [unit]
-- `client/src/test/design-system.test.ts` (overrides --foreground in dark mode) [unit]
-- `client/src/test/design-system.test.ts` (dark mode --primary differs from light mode --primary) [unit]
-- `client/src/test/design-system.test.ts` (component .tsx files avoid hardcoded hex colors) [unit]
+- `client/tests/e2e/design-system.spec.ts` (adding .dark class to html element switches CSS variables (no product toggle ships)) [e2e-mocked]
+- `client/tests/e2e/design-system.spec.ts` (focus indicators visible when tabbing through interactive elements) [e2e-mocked]
 
 ## DISCOVERY_SPEC
 
-**Coverage**: 62/72 requirements (86%)
+**Coverage**: 76/79 requirements (96%)
 
 ### Uncovered Requirements
 
-- [ ] Facilitator can switch Discovery workspace between `analysis` mode and `social` mode
-- [ ] In social mode, users can create trace-level comments
-- [ ] In social mode, users can create milestone-level comments
-- [ ] Users can reply to comments in-thread
-- [ ] Thread updates appear live in the workspace while participants collaborate
-- [ ] Facilitator `@assistant` tool-availability questions for a milestone return grounded context as a thread reply
-- [ ] Facilitator `@agent` starts a bounded tool-calling run and posts streamed partial output in the thread
-- [ ] `@agent` run lifecycle is visible (`running`, `completed`, `failed`, `timeout`) with final persisted reply
-- [ ] Non-facilitator mentions do not trigger assistant/agent execution (treated as plain text mentions)
-- [ ] Social mode provides a modern live collaboration experience with streamed in-thread updates for assistant/agent responses
+- [ ] Promote action visibly moves items from trace feed/summary into the sidebar
+- [ ] Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll)
+- [ ] Disagreements color-coded by priority (red/yellow/blue) on trace cards
 
 ### Backend-Only Requirements (no frontend tests)
 
@@ -482,26 +410,41 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: LLM distills evaluation criteria with evidence from trace IDs (unit)
 - :warning: LLM analyzes disagreements with follow-up questions and suggestions (unit)
 - :warning: Analysis record stores which template was used (unit)
+- :warning: Each analysis run creates a new record (history preserved) (unit)
 - :warning: Re-runnable — new analysis as more feedback comes in, prior analyses retained (unit)
+- :warning: Warning if < 2 participants (not an error) (unit)
+- :warning: Results organized by priority (HIGH → MEDIUM → LOWER) (unit)
+- :warning: Facilitator can switch Discovery workspace between `analysis` mode and `social` mode (unit)
+- :warning: In social mode, users can create trace-level comments (unit)
+- :warning: In social mode, users can create milestone-level comments (unit)
+- :warning: Users can reply to comments in-thread (unit)
 - :warning: Users can upvote/downvote comments (single vote per user per comment with toggle behavior) (unit)
-- :warning: Facilitator `@assistant summarize this thread` returns a grounded summary as a thread reply (unit)
+- :warning: Thread updates appear live in the workspace while participants collaborate (unit)
+- :warning: Facilitator can moderate social discussion threads by deleting comments (unit)
+- :warning: Only facilitator can delete social thread comments (unit)
+- :warning: Non-facilitator mentions do not trigger assistant/agent execution (treated as plain text mentions) (unit)
+- :warning: Facilitator `@assistant` mentions post an automated assistant reply in-thread (deterministic template stub) (unit)
+- :warning: Facilitator can invoke `@agent` to run a bounded tool loop and receive a persisted agent reply in-thread with clear success/failure status (unit)
+- :warning: `@agent` run lifecycle is visible (`running`, `completed`, `failed`, `timeout`) with final persisted reply (unit)
 - :warning: One feedback record per (workshop, trace, user) — upsert behavior (integration, unit)
 - :warning: Q&A pairs appended in order to JSON array (integration, unit)
 - :warning: Multiple analysis records per workshop allowed (history preserved) (unit)
 - :warning: Draft rubric items track promotion source and promoter (unit)
+- :warning: Annotators see the same trace set in different per-user orders, enabling inter-rater reliability measurement (unit)
+- :warning: Adding annotation traces mid-round appends them without reshuffling a user's existing order (unit)
+- :warning: Changing the annotation trace set produces a fresh randomized order (unit)
+- :warning: DSPy MLflow autologging activates only when MLFLOW_DSPY_DEV_EXPERIMENT_ID is set (unit)
 - :warning: Fallback question if LLM unavailable after retries (unit)
+- :warning: Analysis shows warning (not error) if < 2 participants (unit)
 - :warning: Form validation prevents empty submissions (unit)
 - :warning: When follow-up questions are disabled, participant flow is GOOD/BAD + comment only (unit)
-- :warning: Trace-specific analysis findings appear on the trace card, pinned above feedback (collapsible) (unit)
-- :warning: Promote action visibly moves items from trace feed/summary into the sidebar (unit)
-- :warning: Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll) (unit)
 - :warning: "Create Rubric →" in sidebar transitions to rubric creation with groups pre-populated as criteria (unit)
 
 ### Covered Requirements
 
 - [x] Facilitator can start Discovery phase with configurable trace limit (unit) **[BE-only]**
 - [x] Participants view traces and provide GOOD/BAD + comment (unit) **[BE-only]**
-- [x] Facilitator can select LLM model for follow-up question generation in Discovery dashboard (e2e-mocked, integration, unit)
+- [x] Facilitator can select LLM model for follow-up question generation in Discovery dashboard (e2e-mocked, unit)
 - [x] AI generates 3 follow-up questions per trace based on feedback (unit) **[BE-only]**
 - [x] Questions build progressively on prior answers (unit) **[BE-only]**
 - [x] All 3 questions required before moving to next trace (unit) **[BE-only]**
@@ -518,11 +461,11 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] LLM distills evaluation criteria with evidence from trace IDs (unit) **[BE-only]**
 - [x] LLM analyzes disagreements with follow-up questions and suggestions (unit) **[BE-only]**
 - [x] Analysis record stores which template was used (unit) **[BE-only]**
-- [x] Each analysis run creates a new record (history preserved) (e2e-mocked, unit)
+- [x] Each analysis run creates a new record (history preserved) (unit) **[BE-only]**
 - [x] Re-runnable — new analysis as more feedback comes in, prior analyses retained (unit) **[BE-only]**
-- [x] Warning if < 2 participants (not an error) (e2e-mocked, unit)
+- [x] Warning if < 2 participants (not an error) (unit) **[BE-only]**
 - [x] Data freshness banner (participant count, last run timestamp) (unit)
-- [x] Results organized by priority (HIGH → MEDIUM → LOWER) (unit)
+- [x] Results organized by priority (HIGH → MEDIUM → LOWER) (unit) **[BE-only]**
 - [x] Facilitator can promote distilled criteria to draft rubric (e2e-real, unit)
 - [x] Facilitator can promote disagreement insights to draft rubric (e2e-real, unit)
 - [x] Facilitator can promote raw participant feedback to draft rubric (e2e-real, unit)
@@ -534,16 +477,33 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Each group maps to one rubric question (group name = question title) (e2e-real, unit)
 - [x] Draft rubric items available during Rubric Creation phase (e2e-real, unit)
 - [x] Source traceability maintained (which traces support each item) (e2e-real, unit)
+- [x] Facilitator can switch Discovery workspace between `analysis` mode and `social` mode (unit) **[BE-only]**
+- [x] In social mode, users can create trace-level comments (unit) **[BE-only]**
+- [x] In social mode, users can create milestone-level comments (unit) **[BE-only]**
+- [x] Users can reply to comments in-thread (unit) **[BE-only]**
 - [x] Users can upvote/downvote comments (single vote per user per comment with toggle behavior) (unit) **[BE-only]**
-- [x] Facilitator `@assistant summarize this thread` returns a grounded summary as a thread reply (unit) **[BE-only]**
+- [x] Thread updates appear live in the workspace while participants collaborate (unit) **[BE-only]**
+- [x] Facilitator can moderate social discussion threads by deleting comments (unit) **[BE-only]**
+- [x] Only facilitator can delete social thread comments (unit) **[BE-only]**
+- [x] Non-facilitator mentions do not trigger assistant/agent execution (treated as plain text mentions) (unit) **[BE-only]**
+- [x] Facilitator `@assistant` mentions post an automated assistant reply in-thread (deterministic template stub) (unit) **[BE-only]**
+- [x] Facilitator can invoke `@agent` to run a bounded tool loop and receive a persisted agent reply in-thread with clear success/failure status (unit) **[BE-only]**
+- [x] `@agent` run lifecycle is visible (`running`, `completed`, `failed`, `timeout`) with final persisted reply (unit) **[BE-only]**
 - [x] One feedback record per (workshop, trace, user) — upsert behavior (integration, unit) **[BE-only]**
 - [x] Q&A pairs appended in order to JSON array (integration, unit) **[BE-only]**
 - [x] Multiple analysis records per workshop allowed (history preserved) (unit) **[BE-only]**
 - [x] Draft rubric items track promotion source and promoter (unit) **[BE-only]**
+- [x] Participants only see traces in the current active discovery trace list (e2e-real)
+- [x] Traces outside the active discovery selection are hidden from participants but not deleted (e2e-real)
+- [x] Annotation trace order is deterministic per user and persists across page reloads (e2e-real, unit)
+- [x] Annotators see the same trace set in different per-user orders, enabling inter-rater reliability measurement (unit) **[BE-only]**
+- [x] Adding annotation traces mid-round appends them without reshuffling a user's existing order (unit) **[BE-only]**
+- [x] Changing the annotation trace set produces a fresh randomized order (unit) **[BE-only]**
+- [x] DSPy MLflow autologging activates only when MLFLOW_DSPY_DEV_EXPERIMENT_ID is set (unit) **[BE-only]**
 - [x] LLM failures show error toast with retry (unit)
 - [x] Fallback question if LLM unavailable after retries (unit) **[BE-only]**
 - [x] Fallback warning banner shown only to facilitators, never to participants/SMEs (unit)
-- [x] Analysis shows warning (not error) if < 2 participants (unit)
+- [x] Analysis shows warning (not error) if < 2 participants (unit) **[BE-only]**
 - [x] Form validation prevents empty submissions (unit) **[BE-only]**
 - [x] Progressive disclosure (one question at a time) (e2e-real, unit)
 - [x] Submit buttons disabled until required fields filled (unit)
@@ -552,104 +512,122 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] When follow-up questions are disabled, participant flow is GOOD/BAD + comment only (unit) **[BE-only]**
 - [x] Single two-panel workspace replaces multi-page flow (no FacilitatorDashboard discovery tabs, no FindingsReviewPage) (unit)
 - [x] Trace feed shows actual trace content (input/output), not trace ID badges (unit)
-- [x] Trace-specific analysis findings appear on the trace card, pinned above feedback (collapsible) (unit) **[BE-only]**
+- [x] Trace-specific analysis findings appear on the trace card, pinned above feedback (collapsible) (unit)
 - [x] Cross-trace analysis findings appear in collapsible summary section above the feed (unit)
 - [x] Overview bar shows stats inline + compact controls (Run Analysis, Add Traces, Pause, Model selector) (unit)
 - [x] Draft rubric sidebar is always visible while browsing traces (e2e-mocked)
-- [x] Promote action visibly moves items from trace feed/summary into the sidebar (unit) **[BE-only]**
-- [x] Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll) (unit) **[BE-only]**
 - [x] Draft rubric items do NOT show source-type badges (Finding, Disagreement, etc.) (unit)
-- [x] Disagreements color-coded by priority (red/yellow/blue) on trace cards (unit)
 - [x] "Create Rubric →" in sidebar transitions to rubric creation with groups pre-populated as criteria (unit) **[BE-only]**
+
+### Roadmap (not shipping)
+
+These criteria are roadmap-only and excluded from the coverage denominator:
+
+- Facilitator `@assistant summarize this thread` returns a grounded summary as a thread reply (roadmap)
+- Facilitator `@assistant` tool-availability questions for a milestone return grounded context as a thread reply (roadmap)
+- Facilitator `@agent` starts a bounded tool-calling run and posts streamed partial output in the thread (roadmap)
+- Social mode provides a modern live collaboration experience with streamed in-thread updates for assistant/agent responses (roadmap)
 
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
-- `tests/unit/routers/test_discovery_feedback.py` (test_facilitator_can_delete_comment_tree) [unit]
-- `tests/unit/routers/test_discovery_feedback.py` (test_non_facilitator_cannot_delete_comment) [unit]
-- `tests/unit/routers/test_discovery_feedback.py` (test_agent_run_uses_trace_context_tools) [unit]
 - `tests/unit/services/test_discovery_analysis_service.py` (test_draft_items_expose_source_trace_ids_for_display) [unit]
+- `tests/unit/services/test_discovery_workspace_ui_contracts.py` (test_findings_have_evidence_trace_ids_for_card_pinning) [unit]
+- `tests/unit/services/test_discovery_workspace_ui_contracts.py` (test_finding_model_validates_evidence_trace_ids) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_ungrouped_items_each_become_question) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_no_items_raises_400) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_mixed_grouped_and_ungrouped) [unit]
+- `client/tests/e2e/discovery-analysis.spec.ts` (analysis results show participant warning when < 2 participants) [e2e-mocked] **[skipped — not counted]**
+- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (shows a warning (not destructive error) when < 2 participants) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (does not show any alert when >= 2 participants) [unit]
+- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (renders evidence trace IDs for findings (truncated to 8 chars)) [unit]
+- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (shows trace ID badge for each disagreement item) [unit]
+- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders disagreement sections in order: HIGH, MEDIUM, LOWER) [unit]
+- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders findings with priority badges) [unit]
+- `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (HIGH disagreement section uses red border) [unit]
+- `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (MEDIUM disagreement section uses yellow border) [unit]
+- `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (LOWER disagreement section uses blue border) [unit]
+- `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (HIGH items use red background) [unit]
+- `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (MEDIUM items use yellow background) [unit]
+- `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (LOWER items use blue background) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (renders trace ID badges for items with source_trace_ids) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (does not render trace badges for manual items with no trace IDs) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (renders source type badges for each item) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (shows item count in header) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (creates a new manual group from item controls) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (moves an item into an existing group from item controls) [unit]
-- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (renders evidence trace IDs for findings (truncated to 8 chars)) [unit]
-- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (shows trace ID badge for each disagreement item) [unit]
-
-## DISCOVERY_TRACE_ASSIGNMENT_SPEC
-
-**Coverage**: 13/13 requirements (100%)
-
-### Backend-Only Requirements (no frontend tests)
-
-These requirements are covered by backend tests only. UI regressions won't be caught:
-
-- :warning: Switching between discovery rounds hides/shows appropriate traces (unit)
-- :warning: Phase/round context properly scoped in database (unit)
-- :warning: Annotation traces randomized per (user_id, trace_set) pair (unit)
-- :warning: When annotation dataset changes mid-round, new traces appended (unit)
-- :warning: When annotation round changes, full re-randomization applied (unit)
-- :warning: Randomization context includes phase and round info (unit)
-- :warning: Dataset operations (union, subtract) work correctly and maintain audit trail (unit)
-- :warning: Multiple participants can see same trace with different orders (unit)
-- :warning: Inter-rater reliability (IRR) can be measured (same traces, different orders) (unit)
-
-### Covered Requirements
-
-- [x] Participants only see traces in current active discovery dataset (e2e-real, unit)
-- [x] When new discovery round starts, old traces hidden (not deleted) (e2e-real)
-- [x] Switching between discovery rounds hides/shows appropriate traces (unit) **[BE-only]**
-- [x] Phase/round context properly scoped in database (unit) **[BE-only]**
-- [x] Annotation traces randomized per (user_id, trace_set) pair (unit) **[BE-only]**
-- [x] Randomization persistent across page reloads for same trace set (e2e-real, unit)
-- [x] When annotation dataset changes mid-round, new traces appended (unit) **[BE-only]**
-- [x] When annotation round changes, full re-randomization applied (unit) **[BE-only]**
-- [x] Randomization context includes phase and round info (unit) **[BE-only]**
-- [x] Dataset operations (union, subtract) work correctly and maintain audit trail (unit) **[BE-only]**
-- [x] Multiple participants can see same trace with different orders (unit) **[BE-only]**
-- [x] Assignment metadata properly tracks all context (unit)
-- [x] Inter-rater reliability (IRR) can be measured (same traces, different orders) (unit) **[BE-only]**
-
-### Tests Without Requirement Links
-
-These tests are tagged with the spec but don't link to specific requirements:
-
-- `client/tests/e2e/discovery-invite-traces.spec.ts` (discovery blocks until multiple participants complete; facilitator-driven phase with trace-based discovery) [e2e-mocked]
-- `client/tests/e2e/facilitator-create-workshop.spec.ts` (facilitator can log in and create a workshop) [e2e-mocked]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 1) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 0) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (does NOT show warning when participant_count >= 2) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (warning uses default Alert variant (not destructive/error)) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays participant count) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays singular participant text when count is 1) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the analysis timestamp) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the template name) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the model used) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders template selector with Evaluation Criteria as the default selected value) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders a model selector alongside the template selector) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders the Run Analysis button) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (shows warning alert when participant_count is 1) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (shows warning alert when participant_count is 0) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (does NOT show warning when participant_count >= 2) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (warning is an Alert (not destructive variant), confirming it is a warning not an error) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (displays participant count in the freshness banner) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (displays singular participant text when count is 1) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (displays the analysis timestamp) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (displays the template name in the freshness banner) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (displays the model used in the freshness banner) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders disagreement sections in order: HIGH, MEDIUM, LOWER) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders findings with priority badges) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (HIGH disagreement section uses red color classes) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (MEDIUM disagreement section uses yellow color classes) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (LOWER disagreement section uses blue color classes) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (HIGH items use red background) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (MEDIUM items use yellow background) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (LOWER items use blue background) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders evidence trace IDs for findings) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (shows trace ID for each disagreement item) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (shows the findings count in the header) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (shows disagreement counts by priority level) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders disagreement summary and underlying theme) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders follow-up questions for disagreements) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders facilitator suggestions for disagreements) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (shows no-results message when no analyses exist) [unit]
+- `client/src/components/DiscoveryAnalysisTab.test.tsx` (hides disagreement section when that priority level has no items) [unit]
 
 ## JUDGE_EVALUATION_SPEC
 
-**Coverage**: 24/25 requirements (96%)
+**Coverage**: 28/30 requirements (93%)
 
 ### Uncovered Requirements
 
 - [ ] Spinner stops when re-evaluation completes
+- [ ] MemAlign distills semantic memory (guidelines)
 
 ### Backend-Only Requirements (no frontend tests)
 
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
 - :warning: Fallback conversion handles Likert-style returns for binary (unit)
+- :warning: Auto-evaluation runs in background when annotation phase starts (unit)
 - :warning: Judge prompt auto-derived from rubric questions (unit)
 - :warning: Per-question judge_type parsed from rubric (`[JUDGE_TYPE:xxx]`) (unit)
 - :warning: Binary rubrics evaluated with 0/1 scale (not 1-5) (unit)
+- :warning: Auto-evaluation model stored for re-evaluation consistency (unit)
 - :warning: Re-evaluate loads registered judge with aligned instructions (integration, unit)
 - :warning: Uses same model as initial auto-evaluation (unit)
 - :warning: Alignment jobs run asynchronously (unit)
-- :warning: MemAlign distills semantic memory (guidelines) (unit)
 - :warning: Aligned judge registered to MLflow (unit)
+- :warning: Episodic trace IDs persist on the registered judge across alignment runs (unit)
+- :warning: Re-alignment skips traces already in the judge's episodic memory (unit)
 - :warning: Metrics reported (guideline count, example count) (unit)
 - :warning: Works for both Likert and Binary scales (unit)
 - :warning: Krippendorff's Alpha calculated correctly (unit)
 - :warning: Cohen's Kappa calculated for rater pairs (unit)
 - :warning: Handles edge cases (no variation, single rater) (unit)
 - :warning: Updates when new annotations added (unit)
+- :warning: Traces with extreme disagreement surfaced in IRR diagnostics (unit)
 
 ### Covered Requirements
 
@@ -658,25 +636,29 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Fallback conversion handles Likert-style returns for binary (unit) **[BE-only]**
 - [x] Evaluation results persisted to database (e2e-real, integration, unit)
 - [x] Results reload correctly in UI (e2e-real, unit)
-- [x] Auto-evaluation runs in background when annotation phase starts (e2e-real, unit)
+- [x] Auto-evaluation runs in background when annotation phase starts (unit) **[BE-only]**
 - [x] Judge prompt auto-derived from rubric questions (unit) **[BE-only]**
 - [x] Per-question judge_type parsed from rubric (`[JUDGE_TYPE:xxx]`) (unit) **[BE-only]**
 - [x] Binary rubrics evaluated with 0/1 scale (not 1-5) (unit) **[BE-only]**
-- [x] Auto-evaluation model stored for re-evaluation consistency (e2e-real)
+- [x] Auto-evaluation model stored for re-evaluation consistency (unit) **[BE-only]**
 - [x] Results appear in Judge Tuning page (e2e-real)
+- [x] Facilitator can toggle auto-evaluation and select a model at annotation start (e2e-real)
+- [x] Annotation phase can start with auto-evaluation disabled (e2e-real)
 - [x] Re-evaluate loads registered judge with aligned instructions (integration, unit) **[BE-only]**
 - [x] Uses same model as initial auto-evaluation (unit) **[BE-only]**
 - [x] Results stored against correct prompt version (e2e-real, integration, unit)
 - [x] Pre-align and post-align scores directly comparable (e2e-real, integration, unit)
 - [x] Alignment jobs run asynchronously (unit) **[BE-only]**
-- [x] MemAlign distills semantic memory (guidelines) (unit) **[BE-only]**
 - [x] Aligned judge registered to MLflow (unit) **[BE-only]**
+- [x] Episodic trace IDs persist on the registered judge across alignment runs (unit) **[BE-only]**
+- [x] Re-alignment skips traces already in the judge's episodic memory (unit) **[BE-only]**
 - [x] Metrics reported (guideline count, example count) (unit) **[BE-only]**
 - [x] Works for both Likert and Binary scales (unit) **[BE-only]**
 - [x] Krippendorff's Alpha calculated correctly (unit) **[BE-only]**
 - [x] Cohen's Kappa calculated for rater pairs (unit) **[BE-only]**
 - [x] Handles edge cases (no variation, single rater) (unit) **[BE-only]**
 - [x] Updates when new annotations added (unit) **[BE-only]**
+- [x] Traces with extreme disagreement surfaced in IRR diagnostics (unit) **[BE-only]**
 
 ### Tests Without Requirement Links
 
@@ -684,10 +666,13 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 - `tests/integration/test_judge_evaluation_storage.py` (test_promote_finding_returns_500_on_db_error) [integration]
 - `tests/integration/test_judge_evaluation_storage.py` (test_promote_real_finding_succeeds) [integration]
+- `tests/unit/routers/test_databricks_router.py` (test_databricks_test_connection_success) [unit]
+- `tests/unit/routers/test_databricks_router.py` (test_databricks_judge_evaluate_without_workshop_id_uses_request_config) [unit]
 - `tests/unit/routers/test_workshops_begin_annotation.py` (test_begin_annotation_requires_rubric) [unit]
 - `tests/unit/routers/test_workshops_re_evaluate.py` (test_re_evaluate_tags_traces_before_evaluation) [unit]
 - `tests/unit/routers/test_workshops_re_evaluate.py` (test_re_evaluate_tags_traces_fallback_when_no_active_annotation_ids) [unit]
-- `tests/unit/services/test_alignment_service.py` (test_likert_agreement_metric_from_store_is_one_when_equal) [unit]
+- `tests/unit/services/test_alignment_service.py` (test_likert_agreement_metric_from_store_is_one_when_equal) [unit] **[skipped — not counted]**
+- `tests/unit/services/test_alignment_service.py` (test_episodic_log_shows_two_full_examples_without_truncation) [unit]
 - `tests/unit/services/test_cohens_kappa.py` (test_interpret_cohens_kappa_bucket_edges) [unit]
 - `tests/unit/services/test_cohens_kappa.py` (test_is_cohens_kappa_acceptable_default_threshold) [unit]
 - `tests/unit/services/test_discovery_dspy_litellm_interop.py` (test_get_sdk_token_normalizes_env_host_for_m2m_token_url) [unit]
@@ -696,6 +681,7 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_irr_service.py` (test_calculate_irr_for_workshop_sends_no_canned_suggestions_for_low_agreement) [unit]
 - `tests/unit/services/test_irr_service.py` (test_calculate_irr_for_workshop_sends_no_canned_suggestions_krippendorff_path) [unit]
 - `tests/unit/services/test_irr_service.py` (test_problematic_patterns_gated_per_metric_on_actual_agreement) [unit]
+- `tests/unit/services/test_irr_utils.py` (test_validate_annotations_for_irr_valid_case) [unit]
 - `tests/unit/services/test_irr_utils.py` (test_format_irr_result_rounding_and_ready_flag) [unit]
 - `tests/unit/services/test_irr_utils.py` (test_detect_problematic_patterns_question_id_scopes_to_that_metric) [unit]
 - `tests/unit/services/test_irr_utils.py` (test_detect_problematic_patterns_question_id_excludes_other_metric_ratings) [unit]
@@ -725,11 +711,10 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: Facilitator role cannot be changed via update endpoint (unit)
 - :warning: Facilitator accounts cannot be deleted via delete endpoint (unit)
 - :warning: Only facilitators can create invitations (unit)
-- :warning: Only facilitators can advance workshop phases (unit)
 - :warning: Phase advancement validates prerequisites before transitioning (unit)
 - :warning: Phase advancement returns 400 if prerequisites not met (unit)
 - :warning: Facilitators authenticate via YAML config (preconfigured credentials) (unit)
-- :warning: SMEs and participants authenticate via database credentials (unit)
+- :warning: SMEs and participants authenticate via database email lookup (no password verification) (unit)
 - :warning: Login response includes is_preconfigured_facilitator flag for facilitator logins (unit)
 
 ### Covered Requirements
@@ -744,24 +729,27 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Facilitator role cannot be changed via update endpoint (unit) **[BE-only]**
 - [x] Facilitator accounts cannot be deleted via delete endpoint (unit) **[BE-only]**
 - [x] Only facilitators can create invitations (unit) **[BE-only]**
-- [x] Only facilitators can advance workshop phases (unit) **[BE-only]**
+- [x] Phase advancement is gated client-side: non-facilitators are blocked from the facilitator dashboard that hosts the advance-phase control (unit)
 - [x] Phase advancement validates prerequisites before transitioning (unit) **[BE-only]**
 - [x] Phase advancement returns 400 if prerequisites not met (unit) **[BE-only]**
 - [x] Facilitators authenticate via YAML config (preconfigured credentials) (unit) **[BE-only]**
-- [x] SMEs and participants authenticate via database credentials (unit) **[BE-only]**
+- [x] SMEs and participants authenticate via database email lookup (no password verification) (unit) **[BE-only]**
 - [x] Login response includes is_preconfigured_facilitator flag for facilitator logins (unit) **[BE-only]**
 
 ## RUBRIC_SPEC
 
-**Coverage**: 25/25 requirements (100%)
+**Coverage**: 26/26 requirements (100%)
 
 ### Backend-Only Requirements (no frontend tests)
 
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
 - :warning: Delimiter never appears in user input (by design) (unit)
-- :warning: Parsed questions have stable UUIDs within session (unit)
+- :warning: Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter (unit)
+- :warning: Parsed questions get sequential `q_N` ids (unit)
+- :warning: Legacy `freeform` judge type coerces to likert at the parse boundary (unit)
 - :warning: Empty/whitespace-only parts filtered out (unit)
+- :warning: Binary feedback logged as 0/1 to MLflow (not 3) (unit)
 - :warning: Facilitator can edit an existing rubric question (unit)
 - :warning: Facilitator can delete a rubric question (unit)
 - :warning: Only one rubric exists per workshop (upsert semantics) (unit)
@@ -780,12 +768,13 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Questions with multi-line descriptions parse correctly (unit)
 - [x] Delimiter never appears in user input (by design) (unit) **[BE-only]**
 - [x] Frontend and backend use same delimiter constant (unit)
-- [x] Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format (e2e-real, unit)
-- [x] Parsed questions have stable UUIDs within session (unit) **[BE-only]**
+- [x] Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter (unit) **[BE-only]**
+- [x] Parsed questions get sequential `q_N` ids (unit) **[BE-only]**
+- [x] Legacy `freeform` judge type coerces to likert at the parse boundary (unit) **[BE-only]**
 - [x] Empty/whitespace-only parts filtered out (unit) **[BE-only]**
 - [x] Likert scale shows 1-5 rating options (e2e-real)
 - [x] Binary scale shows Pass/Fail buttons (not star ratings) (e2e-real)
-- [x] Binary feedback logged as 0/1 to MLflow (not 3) (e2e-real)
+- [x] Binary feedback logged as 0/1 to MLflow (not 3) (unit) **[BE-only]**
 - [x] Mixed rubrics support different scales per question (e2e-real, unit)
 - [x] Facilitator can create a rubric question with title and description (e2e-mocked, unit)
 - [x] Facilitator can edit an existing rubric question (unit) **[BE-only]**
@@ -803,130 +792,95 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Invalid judge type in suggestions defaults to likert (unit)
 - [x] Facilitator can accept, reject, or edit suggestions before adding to rubric (unit) **[BE-only]**
 
+### Tests Without Requirement Links
+
+These tests are tagged with the spec but don't link to specific requirements:
+
+- `client/tests/e2e/rubric-judge-type.spec.ts` (binary annotation rating stored as 0/1 via workshop API) [e2e-real]
+
 ## TESTING_SPEC
 
-**Coverage**: 0/30 requirements (0%)
+**Coverage**: 16/25 requirements (64%)
 
 ### Uncovered Requirements
 
 - [ ] `tests/integration/conftest.py` provides real-DB fixtures with transaction rollback isolation
 - [ ] Integration tests run against SQLite (default) and Postgres (via testcontainers)
 - [ ] `just test-integration` recipe exists and passes
-- [ ] Workshop CRUD tested end-to-end through HTTP → DB → response
-- [ ] Trace ingestion tested: bulk upload, retrieval, metadata persistence
-- [ ] Phase transition prerequisites enforced: no discovery without traces, no annotation without rubric
-- [ ] Annotation upsert semantics verified: same user+trace updates (not duplicates), different users create separate records
-- [ ] Discovery finding upsert semantics verified at DB level
 - [ ] All integration tests tagged with `@pytest.mark.integration` and `@pytest.mark.spec()`
 - [ ] External services (MLflow, Databricks) mocked — only database is real
-- [ ] Connection resilience tested (Postgres-only): pool reset disposes + refreshes OAuth, `get_db()` retries with backoff, stale connections detected via `pool_pre_ping`
 - [ ] Tests are hermetic: no shared state, runnable in any order
-- [ ] Contract shapes documented for all 5 MLflow domains (trace ops, feedback, evaluation, alignment, experiment management)
-- [ ] Mock shape tests verify test mocks match real MLflow response structures
 - [ ] Call-site tests verify services pass correct parameter types to MLflow methods
-- [ ] Error classification tested: retryable vs non-retryable errors handled correctly
-- [ ] Feedback value types validated: binary (0.0/1.0 float), likert (1.0-5.0 float)
-- [ ] Assessment limit (50 per trace) handling tested
-- [ ] Contract tests tagged with `@pytest.mark.spec("TESTING_SPEC")`
-- [ ] Server unit tests pass with >20% coverage
-- [ ] Client unit tests pass with >20% coverage
-- [ ] Integration tests pass against real database (SQLite + Postgres)
-- [ ] Contract tests verify MLflow integration boundaries
-- [ ] E2E tests pass for critical flows
-- [ ] Tests run in CI on every PR
-- [ ] Coverage reports generated and accessible
-- [ ] No flaky tests (consistent pass/fail)
-- [ ] Test isolation (no shared state between tests)
-- [ ] `just test-integration` recipe works
+- [ ] pytest emits coverage reports (term, HTML, XML) via `addopts` in `pyproject.toml`
 - [ ] `just test-contract` recipe works
+
+### Backend-Only Requirements (no frontend tests)
+
+These requirements are covered by backend tests only. UI regressions won't be caught:
+
+- :warning: Workshop CRUD tested end-to-end through HTTP → DB → response (integration)
+- :warning: Trace ingestion tested: bulk upload, retrieval, metadata persistence (integration)
+- :warning: Phase transition prerequisites enforced: no discovery without traces, no annotation without rubric (integration)
+- :warning: Annotation upsert semantics verified: same user+trace updates (not duplicates), different users create separate records (integration)
+- :warning: Discovery finding upsert semantics verified at DB level (integration)
+- :warning: Connection resilience tested: connection errors classified as transient vs not, `_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff and gives up after 3 attempts (integration)
+- :warning: Mock shape tests verify test mocks match real MLflow response structures (unit)
+- :warning: Error classification tested: retryable vs non-retryable errors handled correctly (unit)
+- :warning: Feedback value types validated: binary (0.0/1.0 float), likert (1.0-5.0 float) (unit)
+- :warning: Assessment limit (50 per trace) handling tested (unit)
+- :warning: Tests run in CI on every PR (unit)
+- :warning: pytest `--spec` option filters collection to tests tagged for the requested spec (unit)
+- :warning: Test isolation (no shared state between tests) (unit)
+- :warning: Coverage analyzer excludes skipped and xfail tests from requirement coverage and annotates skipped-only criteria (unit)
+- :warning: Coverage analyzer excludes roadmap criteria from the coverage denominator and lists them separately (unit)
+- :warning: Coverage analyzer reports unknown spec tags with tagged test counts without crashing (unit)
+
+### Covered Requirements
+
+- [x] Workshop CRUD tested end-to-end through HTTP → DB → response (integration) **[BE-only]**
+- [x] Trace ingestion tested: bulk upload, retrieval, metadata persistence (integration) **[BE-only]**
+- [x] Phase transition prerequisites enforced: no discovery without traces, no annotation without rubric (integration) **[BE-only]**
+- [x] Annotation upsert semantics verified: same user+trace updates (not duplicates), different users create separate records (integration) **[BE-only]**
+- [x] Discovery finding upsert semantics verified at DB level (integration) **[BE-only]**
+- [x] Connection resilience tested: connection errors classified as transient vs not, `_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff and gives up after 3 attempts (integration) **[BE-only]**
+- [x] Mock shape tests verify test mocks match real MLflow response structures (unit) **[BE-only]**
+- [x] Error classification tested: retryable vs non-retryable errors handled correctly (unit) **[BE-only]**
+- [x] Feedback value types validated: binary (0.0/1.0 float), likert (1.0-5.0 float) (unit) **[BE-only]**
+- [x] Assessment limit (50 per trace) handling tested (unit) **[BE-only]**
+- [x] Tests run in CI on every PR (unit) **[BE-only]**
+- [x] pytest `--spec` option filters collection to tests tagged for the requested spec (unit) **[BE-only]**
+- [x] Test isolation (no shared state between tests) (unit) **[BE-only]**
+- [x] Coverage analyzer excludes skipped and xfail tests from requirement coverage and annotates skipped-only criteria (unit) **[BE-only]**
+- [x] Coverage analyzer excludes roadmap criteria from the coverage denominator and lists them separately (unit) **[BE-only]**
+- [x] Coverage analyzer reports unknown spec tags with tagged test counts without crashing (unit) **[BE-only]**
+
+### Roadmap (not shipping)
+
+These criteria are roadmap-only and excluded from the coverage denominator:
+
+- Coverage thresholds (server >20%, client >20%) enforced by a CI gate (roadmap)
+- Flaky-test detection and quarantine process in place (roadmap)
 
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
-- `tests/contract/test_mlflow_contracts.py` (test_trace_info_has_required_fields) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_trace_data_has_required_fields) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_span_has_required_fields) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_assessment_has_required_fields) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_assessment_source_has_required_fields) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_experiment_has_required_fields) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_assessment_limit_not_retried) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_not_found_not_retried) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_404_error_not_retried) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_unauthorized_not_retried) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_transient_error_retried) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_retry_succeeds_on_second_attempt) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_exponential_backoff_delays) [unit]
 - `tests/contract/test_mlflow_contracts.py` (test_binary_values_are_float) [unit]
 - `tests/contract/test_mlflow_contracts.py` (test_likert_values_in_range) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_rating_normalization) [unit]
 - `tests/contract/test_mlflow_contracts.py` (test_log_feedback_parameter_types) [unit]
 - `tests/contract/test_mlflow_contracts.py` (test_log_feedback_ai_source_format) [unit]
 - `tests/contract/test_mlflow_contracts.py` (test_retry_wrapper_passes_through_return_value) [unit]
 - `tests/contract/test_mlflow_contracts.py` (test_set_trace_tag_receives_strings) [unit]
 - `tests/contract/test_mlflow_contracts.py` (test_search_traces_parameter_types) [unit]
-- `tests/contract/test_mlflow_contracts.py` (test_assessment_limit_error_returns_none) [unit]
 - `tests/contract/test_mlflow_contracts.py` (test_dedup_check_counts_existing_assessments) [unit]
 - `tests/integration/test_annotation_submission.py` (test_submit_annotation) [integration]
-- `tests/integration/test_annotation_submission.py` (test_annotation_upsert_same_user_same_trace) [integration]
-- `tests/integration/test_annotation_submission.py` (test_annotation_different_users_create_separate_records) [integration]
 - `tests/integration/test_annotation_submission.py` (test_annotation_with_multi_ratings) [integration]
 - `tests/integration/test_annotation_submission.py` (test_get_annotations_filtered_by_user) [integration]
-- `tests/integration/test_connection_resilience.py` (test_disconnection_error_is_connection_error) [integration]
-- `tests/integration/test_connection_resilience.py` (test_operational_error_is_connection_error) [integration]
-- `tests/integration/test_connection_resilience.py` (test_generic_exception_with_connection_message) [integration]
-- `tests/integration/test_connection_resilience.py` (test_generic_exception_without_connection_message) [integration]
-- `tests/integration/test_connection_resilience.py` (test_known_pg_error_messages[server closed the connection unexpectedly]) [integration]
-- `tests/integration/test_connection_resilience.py` (test_known_pg_error_messages[terminating connection]) [integration]
-- `tests/integration/test_connection_resilience.py` (test_known_pg_error_messages[connection reset]) [integration]
-- `tests/integration/test_connection_resilience.py` (test_known_pg_error_messages[ssl connection has been closed unexpectedly]) [integration]
-- `tests/integration/test_connection_resilience.py` (test_known_pg_error_messages[could not connect to server]) [integration]
-- `tests/integration/test_connection_resilience.py` (test_known_pg_error_messages[connection refused]) [integration]
-- `tests/integration/test_connection_resilience.py` (test_known_pg_error_messages[invalid authorization]) [integration]
-- `tests/integration/test_connection_resilience.py` (test_known_pg_error_messages[database is locked]) [integration]
-- `tests/integration/test_connection_resilience.py` (test_pool_exhaustion_timeout_is_not_connection_error) [integration]
-- `tests/integration/test_connection_resilience.py` (test_reset_disposes_engine) [integration]
-- `tests/integration/test_connection_resilience.py` (test_reset_disposes_engine_for_postgres) [integration]
-- `tests/integration/test_connection_resilience.py` (test_retries_on_connection_error_then_succeeds) [integration]
-- `tests/integration/test_connection_resilience.py` (test_gives_up_after_max_attempts) [integration]
-- `tests/integration/test_connection_resilience.py` (test_non_connection_error_raises_immediately) [integration]
 - `tests/integration/test_connection_resilience.py` (test_stream_discovery_comments_has_no_db_dependency) [integration]
 - `tests/integration/test_connection_resilience.py` (test_stream_discovery_agent_run_has_no_db_dependency) [integration]
 - `tests/integration/test_discovery_findings.py` (test_submit_finding) [integration]
-- `tests/integration/test_discovery_findings.py` (test_finding_upsert_same_user_same_trace) [integration]
-- `tests/integration/test_discovery_findings.py` (test_finding_different_users_create_separate_records) [integration]
 - `tests/integration/test_discovery_findings.py` (test_get_findings_filtered_by_user) [integration]
 - `tests/integration/test_discovery_findings.py` (test_findings_scoped_to_workshop) [integration]
-- `tests/integration/test_phase_transitions.py` (test_advance_to_discovery_requires_traces) [integration]
-- `tests/integration/test_phase_transitions.py` (test_advance_to_discovery_succeeds_with_traces) [integration]
-- `tests/integration/test_phase_transitions.py` (test_advance_to_discovery_wrong_phase) [integration]
-- `tests/integration/test_phase_transitions.py` (test_advance_to_rubric_requires_findings) [integration]
-- `tests/integration/test_phase_transitions.py` (test_advance_to_rubric_succeeds_with_findings) [integration]
-- `tests/integration/test_phase_transitions.py` (test_advance_to_annotation_requires_rubric) [integration]
-- `tests/integration/test_phase_transitions.py` (test_advance_to_annotation_succeeds_with_rubric) [integration]
-- `tests/integration/test_phase_transitions.py` (test_advance_to_discovery_workshop_not_found) [integration]
-- `tests/integration/test_trace_ingestion.py` (test_upload_traces) [integration]
-- `tests/integration/test_trace_ingestion.py` (test_upload_traces_with_metadata) [integration]
-- `tests/integration/test_trace_ingestion.py` (test_upload_traces_with_mlflow_fields) [integration]
-- `tests/integration/test_trace_ingestion.py` (test_get_all_traces) [integration]
-- `tests/integration/test_trace_ingestion.py` (test_traces_scoped_to_workshop) [integration]
-- `tests/integration/test_workshop_crud.py` (test_create_workshop) [integration]
-- `tests/integration/test_workshop_crud.py` (test_get_workshop) [integration]
-- `tests/integration/test_workshop_crud.py` (test_get_workshop_not_found) [integration]
-- `tests/integration/test_workshop_crud.py` (test_list_workshops) [integration]
-- `tests/integration/test_workshop_crud.py` (test_list_workshops_filtered_by_facilitator) [integration]
-- `tests/unit/test_testing_infrastructure.py` (test_mock_db_session_fixture_exists) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_mock_db_session_has_rollback) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_async_client_fixture_works) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_override_get_db_provides_session) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_conftest_has_spec_option) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_conftest_has_collection_modifier) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_spec_marker_filters_this_test) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_e2e_workflow_exists) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_workflow_runs_pytest) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_workflow_runs_playwright) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_workflow_installs_playwright_browsers) [unit]
-- `tests/unit/test_testing_infrastructure.py` (test_workflow_triggers_on_pull_request) [unit]
 
 ## TRACE_DISPLAY_SPEC
 
@@ -936,7 +890,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 These requirements are covered by backend tests only. UI regressions won't be caught:
 
-- :warning: JSONPath fields are optional and clearly labeled as such (unit)
 - :warning: Multiple JSONPath matches are concatenated with newlines (unit)
 - :warning: Facilitator can configure span attribute filter with span name, span type, attribute key, and attribute value (unit)
 - :warning: Filter criteria are AND-combined and first matching span wins (unit)
@@ -950,7 +903,7 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 ### Covered Requirements
 
 - [x] Facilitator can configure input/output JSONPath in settings panel (e2e-real)
-- [x] JSONPath fields are optional and clearly labeled as such (unit) **[BE-only]**
+- [x] JSONPath fields are optional and clearly labeled as such (unit)
 - [x] Preview shows extraction results against first workshop trace (e2e-real)
 - [x] TraceViewer applies JSONPath when configured (unit)
 - [x] Multiple JSONPath matches are concatenated with newlines (unit) **[BE-only]**
@@ -969,19 +922,174 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Preview responds within 500ms (unit) **[BE-only]**
 - [x] Invalid JSONPath syntax shows helpful error message in preview (e2e-real, unit)
 
-## UI_COMPONENTS_SPEC
+## TRACE_INGESTION_SPEC
 
 **Coverage**: 0/16 requirements (0%)
 
 ### Uncovered Requirements
 
-- [ ] Page navigation works correctly (first, prev, next, last)
+- [ ] Traces are deduplicated by `(workshop_id, mlflow_trace_id)` — re-ingest updates, not duplicates
+- [ ] `mlflow_url`, `mlflow_host`, and `mlflow_experiment_id` are persisted on ingest
+- [ ] MLflow link in TraceViewer opens the correct trace in the correct experiment
+- [ ] Traces without `mlflow_trace_id` get a generated UUID and insert normally
+- [ ] Input extraction prefers the last user-role message from the request payload
+- [ ] Output extraction prefers the last assistant-role message from the response payload
+- [ ] Each trace gets its own unique extracted input (no shared-prefix duplication)
+- [ ] Extraction handles: `{"messages": [...]}`, `{"request": {"input": [...]}}`, list-of-items, and `{"object": "response"}` formats
+- [ ] Extraction falls back to cleaned raw text when no structured format matches
+- [ ] Re-ingesting traces preserves existing `DiscoveryFeedbackDB` FK references
+- [ ] Re-ingesting traces preserves existing `AnnotationDB` FK references
+- [ ] Re-ingesting traces preserves existing `DiscoveryFindingDB` FK references
+- [ ] `active_discovery_trace_ids` remain valid after re-ingestion
+- [ ] Preview format (`request_preview`/`response_preview`) uses column values directly
+- [ ] Raw format (`request`/`response`) applies content extraction with role-aware logic
+- [ ] `mlflow_trace_id` from CSV `trace_id` column is used for deduplication
+
+### Tests Without Requirement Links
+
+These tests are tagged with the spec but don't link to specific requirements:
+
+- `tests/unit/services/test_content_extraction.py` (test_multi_turn_returns_last_user_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_multi_turn_does_not_return_assistant_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_single_user_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_multi_turn_returns_last_assistant_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_single_assistant_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_different_last_user_messages_produce_different_inputs) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_extracts_user_message) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_default_prefers_assistant) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_plain_string) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_none_returns_empty) [unit]
+- `tests/unit/services/test_content_extraction.py` (test_empty_string_returns_empty) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_mlflow_fields_persisted) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_upsert_same_mlflow_trace_id) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_different_mlflow_trace_ids) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_null_mlflow_trace_id_inserts) [unit]
+- `tests/unit/services/test_trace_upsert.py` (test_discovery_finding_fk_survives) [unit]
+
+## TRACE_SUMMARIZATION_SPEC
+
+**Coverage**: 21/64 requirements (32%)
+
+### Uncovered Requirements
+
+- [ ] Facilitator can enable/disable trace summarization per workshop
+- [ ] Settings are persisted per workshop
+- [ ] Summarization runs at ingestion time when enabled and model is configured
+- [ ] Agent accesses trace data through inspection tools (not a full-text dump)
+- [ ] Span data references are resolved in a post-processing step (not LLM-generated values)
+- [ ] Milestone summaries contain substantive content from spans (actual queries, results, decisions)
+- [ ] Milestone summaries avoid mechanical flow narration (not "query received", "results returned")
+- [ ] Summary is stored as JSON on the trace record
+- [ ] The agent determines the number of milestones based on trace complexity
+- [ ] Milestone view is the default display when a summary exists
+- [ ] User can toggle between milestone view and the existing trace viewer
+- [ ] Milestone view shows executive summary at the top
+- [ ] Milestones are numbered and show title, summary, and resolved span data (inputs → outputs)
+- [ ] When no summary exists, the existing trace viewer is shown (no toggle)
+- [ ] Re-ingesting with summarization enabled regenerates summaries
+- [ ] Re-ingesting with summarization disabled preserves existing summaries
+- [ ] Facilitator can trigger re-summarization without full re-ingestion
+- [ ] Ingestion API returns immediately; summarization runs in the background
+- [ ] The ingestion response includes `summarization_job_id` when summarization is triggered
+- [ ] Failed individual traces are retried up to 2 times with exponential backoff
+- [ ] Rate limit responses (429) trigger backoff, not failure
+- [ ] A batch of 100 traces completes summarization within a reasonable wall-clock time given the concurrency limit and model latency
+- [ ] Concurrent LLM calls do not exceed the serving endpoint's rate limit
+- [ ] Summarization does not block the ingestion API response
+- [ ] Individual trace summarization errors are logged with trace ID, error type, and retry count
+- [ ] SummarizationSettings shows a progress indicator while a summarization job is running
+- [ ] Progress indicator shows completed/total/failed counts (e.g., "Summarizing... 45/80 complete, 2 failed")
+- [ ] Progress updates automatically via polling while the job is active
+- [ ] On completion, succeeded/failed counts are displayed in SummarizationSettings
+- [ ] Failed traces are listed with their error descriptions
+- [ ] Facilitator can retry failed traces from the completion view (creates a new job for just those traces)
+- [ ] Re-summarize button exists in SummarizationSettings (disabled while a job is running)
+- [ ] Facilitator can choose to re-summarize all traces or only unsummarized traces
+- [ ] Confirmation dialog is shown before starting re-summarization
+- [ ] `POST /resummarize` accepts a `mode` parameter: "all", "unsummarized", or "failed"
+- [ ] Re-summarization creates a tracked `SummarizationJob` with the same progress UI
+- [ ] Trace list in FacilitatorDashboard shows a visual indicator for traces that have summaries
+- [ ] Aggregate count of summarized vs. unsummarized traces is visible (e.g., "45/80 traces summarized")
+- [ ] Last summarization timestamp is visible in SummarizationSettings
+- [ ] DiscoveryTraceCard defaults to summary view when a summary exists
+- [ ] Facilitator can toggle between summary view and raw user/assistant content
+- [ ] Summary view shows the executive summary text
+- [ ] Summary view has expandable milestones with titles and descriptions
+
+### Backend-Only Requirements (no frontend tests)
+
+These requirements are covered by backend tests only. UI regressions won't be caught:
+
+- :warning: Facilitator can select a model for summarization from available Databricks endpoints (unit)
+- :warning: Facilitator can provide optional free-text guidance for the summarization prompt (unit)
+- :warning: Agent produces an executive summary as the first pass (unit)
+- :warning: Agent extracts milestones with relevant span data as the second pass (unit)
+- :warning: Each milestone includes span data references resolved to actual trace values (unit)
+- :warning: Agent uses trace inspection tools to selectively examine spans (not a full-text dump) (unit)
+- :warning: Agent tools include: get_trace_overview, list_spans, get_span_detail, get_root_span, search_spans (unit)
+- :warning: Summarization failure does not block trace ingestion (unit)
+- :warning: Each milestone has a number, title, and summary (unit)
+- :warning: Each milestone has zero or more input span data references (span_name, field, optional jsonpath) (unit)
+- :warning: Each milestone has zero or more output span data references (span_name, field, optional jsonpath) (unit)
+- :warning: Span data references are resolved to actual values from the trace after agent output (unit)
+- :warning: When jsonpath is null, the entire span inputs or outputs field is included (unit)
+- :warning: Invalid span references (nonexistent span or path) resolve to null without failing the milestone (unit)
+- :warning: Multiple traces are summarized concurrently up to a configurable concurrency limit (unit)
+- :warning: A `SummarizationJob` database row is created when summarization starts (unit)
+- :warning: The job row is updated as each trace completes (trace ID appended to `completed_traces` or `failed_traces`) (unit)
+- :warning: Partial failures do not block the batch — failed traces are ingested with `summary = null` (unit)
+- :warning: `GET /workshops/{id}/summarization-job/{job_id}` returns job status with completed/total/failed counts (unit)
+- :warning: `GET /workshops/{id}/summarization-status` returns summary coverage stats and last job info (unit)
+- :warning: `summarization-status` endpoint provides the data for these indicators without requiring a job (unit)
+
+### Covered Requirements
+
+- [x] Facilitator can select a model for summarization from available Databricks endpoints (unit) **[BE-only]**
+- [x] Facilitator can provide optional free-text guidance for the summarization prompt (unit) **[BE-only]**
+- [x] Agent produces an executive summary as the first pass (unit) **[BE-only]**
+- [x] Agent extracts milestones with relevant span data as the second pass (unit) **[BE-only]**
+- [x] Each milestone includes span data references resolved to actual trace values (unit) **[BE-only]**
+- [x] Agent uses trace inspection tools to selectively examine spans (not a full-text dump) (unit) **[BE-only]**
+- [x] Agent tools include: get_trace_overview, list_spans, get_span_detail, get_root_span, search_spans (unit) **[BE-only]**
+- [x] Summarization failure does not block trace ingestion (unit) **[BE-only]**
+- [x] Each milestone has a number, title, and summary (unit) **[BE-only]**
+- [x] Each milestone has zero or more input span data references (span_name, field, optional jsonpath) (unit) **[BE-only]**
+- [x] Each milestone has zero or more output span data references (span_name, field, optional jsonpath) (unit) **[BE-only]**
+- [x] Span data references are resolved to actual values from the trace after agent output (unit) **[BE-only]**
+- [x] When jsonpath is null, the entire span inputs or outputs field is included (unit) **[BE-only]**
+- [x] Invalid span references (nonexistent span or path) resolve to null without failing the milestone (unit) **[BE-only]**
+- [x] Multiple traces are summarized concurrently up to a configurable concurrency limit (unit) **[BE-only]**
+- [x] A `SummarizationJob` database row is created when summarization starts (unit) **[BE-only]**
+- [x] The job row is updated as each trace completes (trace ID appended to `completed_traces` or `failed_traces`) (unit) **[BE-only]**
+- [x] Partial failures do not block the batch — failed traces are ingested with `summary = null` (unit) **[BE-only]**
+- [x] `GET /workshops/{id}/summarization-job/{job_id}` returns job status with completed/total/failed counts (unit) **[BE-only]**
+- [x] `GET /workshops/{id}/summarization-status` returns summary coverage stats and last job info (unit) **[BE-only]**
+- [x] `summarization-status` endpoint provides the data for these indicators without requiring a job (unit) **[BE-only]**
+
+### Tests Without Requirement Links
+
+These tests are tagged with the spec but don't link to specific requirements:
+
+- `tests/unit/services/test_trace_summarization_service.py` (test_from_dict) [unit]
+- `tests/unit/services/test_trace_summarization_service.py` (test_from_dict_missing_fields_uses_defaults) [unit]
+- `tests/unit/services/test_trace_summarization_service.py` (test_resolve_multiple_refs) [unit]
+- `tests/unit/services/test_trace_summarization_service.py` (test_batch_progress_callback) [unit]
+- `tests/unit/test_summarization_job.py` (test_get_summarization_job_not_found) [unit]
+- `tests/unit/test_summarization_job.py` (test_update_job_status) [unit]
+- `tests/unit/test_summarization_job.py` (test_get_latest_job) [unit]
+- `tests/unit/test_summarization_job.py` (test_get_latest_job_none) [unit]
+
+## UI_COMPONENTS_SPEC
+
+**Coverage**: 2/16 requirements (12%)
+
+### Uncovered Requirements
+
 - [ ] Items per page selector updates page size
 - [ ] Quick jump navigates to valid pages
 - [ ] Keyboard shortcuts work when enabled
 - [ ] Disabled states shown for unavailable actions
 - [ ] Page info accurately reflects data
-- [ ] JSON arrays render as tables
 - [ ] SQL queries formatted with line breaks
 - [ ] CSV export includes all table data
 - [ ] Copy to clipboard works for all content
@@ -992,97 +1100,25 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [ ] Focus visible and managed correctly
 - [ ] Color contrast meets WCAG AA
 
+### Covered Requirements
+
+- [x] Page navigation works correctly (first, prev, next, last) (unit)
+- [x] JSON arrays render as tables (unit)
+
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
 - `client/tests/e2e/ui-components.spec.ts` (pagination in annotation view navigates between pages) [e2e-real]
 - `client/tests/e2e/ui-components.spec.ts` (trace viewer renders trace content) [e2e-real]
-- `client/src/components/Pagination.test.tsx` (renders null when totalPages <= 1) [unit]
-- `client/src/components/Pagination.test.tsx` (1) [unit]
-- `client/src/components/Pagination.test.tsx` (shows correct item range and total) [unit]
-- `client/src/components/Pagination.test.tsx` (shows correct range on first page) [unit]
-- `client/src/components/Pagination.test.tsx` (shows correct range on last page with partial items) [unit]
-- `client/src/components/Pagination.test.tsx` (calls onPageChange on next click) [unit]
-- `client/src/components/Pagination.test.tsx` (calls onPageChange on previous click) [unit]
-- `client/src/components/Pagination.test.tsx` (calls onPageChange on first page click) [unit]
-- `client/src/components/Pagination.test.tsx` (calls onPageChange on last page click) [unit]
-- `client/src/components/Pagination.test.tsx` (disables previous/first buttons on first page) [unit]
-- `client/src/components/Pagination.test.tsx` (disables next/last buttons on last page) [unit]
-- `client/src/components/Pagination.test.tsx` (highlights current page) [unit]
-- `client/src/components/Pagination.test.tsx` (navigates to clicked page number) [unit]
-- `client/src/components/Pagination.test.tsx` (shows ellipsis for large page counts) [unit]
-- `client/src/components/Pagination.test.tsx` (does not show selector by default) [unit]
-- `client/src/components/Pagination.test.tsx` (shows selector when showItemsPerPageSelector is true) [unit]
-- `client/src/components/Pagination.test.tsx` (calls onItemsPerPageChange when selection changes) [unit]
-- `client/src/components/Pagination.test.tsx` (shows correct options (10, 25, 50, 100)) [unit]
-- `client/src/components/Pagination.test.tsx` (does not show quick jump by default) [unit]
-- `client/src/components/Pagination.test.tsx` (shows quick jump when showQuickJump is true) [unit]
-- `client/src/components/Pagination.test.tsx` (navigates to valid page when Go is clicked) [unit]
-- `client/src/components/Pagination.test.tsx` (navigates when Enter is pressed in quick jump input) [unit]
-- `client/src/components/Pagination.test.tsx` (disables Go button for invalid page numbers) [unit]
-- `client/src/components/Pagination.test.tsx` (does not show keyboard hints by default) [unit]
-- `client/src/components/Pagination.test.tsx` (shows keyboard hints when showKeyboardShortcuts is true) [unit]
-- `client/src/components/Pagination.test.tsx` (navigates to next page with ArrowRight) [unit]
-- `client/src/components/Pagination.test.tsx` (navigates to previous page with ArrowLeft) [unit]
-- `client/src/components/Pagination.test.tsx` (navigates to first page with Home key) [unit]
-- `client/src/components/Pagination.test.tsx` (navigates to last page with End key) [unit]
-- `client/src/components/Pagination.test.tsx` (does not navigate on ArrowRight when on last page) [unit]
-- `client/src/components/Pagination.test.tsx` (does not navigate on ArrowLeft when on first page) [unit]
-- `client/src/components/Pagination.test.tsx` (does not handle keyboard when showKeyboardShortcuts is false) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (renders with valid JSON output) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (renders error state for invalid JSON output) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (displays MLflow trace ID badge when provided) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (shows context section when showContext is true and context exists) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (hides context section when showContext is false) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (extracts content from OpenAI chat completion format) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (extracts content from text completion format) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (extracts content from Anthropic Claude format) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (concatenates multiple text blocks) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (extracts rationale from judge evaluation output) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (extracts JSON-encoded judge result from message content) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (renders result array as table when clicking Data Table tab) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (shows Download CSV button when Data Table tab is active) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (displays SQL query with formatting) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (shows Download SQL button when query_text exists) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (has Copy buttons for input and output sections) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (switches between Response and Raw JSON tabs for LLM content) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (switches between Data Table and Raw JSON tabs for SQL results) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (shows raw JSON when no LLM content or table data detected) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (handles double-stringified JSON) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (shows collapsible metadata section for LLM responses) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (handles empty result array) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (handles messages array format) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (handles Databricks agent response format) [unit]
-- `client/src/components/TraceDataViewer.test.tsx` (handles flattened chat completion format) [unit]
 
 ## EVAL_MODE_SPEC
 
-**Coverage**: 14/35 requirements (40%)
+**Coverage**: 18/19 requirements (94%)
 
 ### Uncovered Requirements
 
-- [ ] Criteria can be authored directly (without discovery)
 - [ ] Discovery analysis can run agent loops over trace spans as alternative to summaries
-- [ ] Richer findings surface example-specific observations
-- [ ] Negative-weight criteria penalize when met
-- [ ] Normalized score = raw / max_possible, clipped to [0, 1]
-- [ ] One independent judge call per criterion
-- [ ] Judge sees trace content + single criterion, not other criteria
-- [ ] Judge returns met (boolean) + rationale
-- [ ] Evaluation runs as background job with progress tracking
-- [ ] Judge scores optionally hidden from human reviewer
-- [ ] One task-level judge aligned using all criteria across all traces as examples
-- [ ] Each criterion's human met/not-met decision stored as a separate MLflow assessment on the trace
-- [ ] All assessments share the judge name; extraction yields all (not just most recent)
-- [ ] Semantic memory distills guidelines from overlapping criteria patterns
-- [ ] Episodic memory indexes specific criterion examples for retrieval
-- [ ] Aligned judge registered to MLflow
-- [ ] Re-hydration rebuilds episodic memory from trace assessments without external state
-- [ ] Re-evaluation compares pre/post alignment accuracy on same trace set
-- [ ] Export produces trace → criteria mapping
-- [ ] Export includes scoring configuration (types, weights, aggregation rules)
-- [ ] Exported eval can be re-run via `mlflow.genai.evaluate()`
 
 ### Backend-Only Requirements (no frontend tests)
 
@@ -1100,8 +1136,11 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: Discovery analysis uses trace summaries when available (unit)
 - :warning: Hurdle criteria gate the entire trace — any hurdle failure → score 0 (unit)
 - :warning: Standard criteria scored as met (1) or not met (0) × weight (unit)
+- :warning: Negative-weight criteria penalize when met (unit)
+- :warning: Normalized score = raw / max_possible, clipped to [0, 1] (unit)
 - :warning: Scoring handles edge cases: no criteria, all hurdles, all negative weights (unit)
 - :warning: Results stored per-criterion with rationale (unit)
+- :warning: Aggregated eval scores are available per trace or for all workshop traces (unit)
 
 ### Covered Requirements
 
@@ -1112,21 +1151,24 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Facilitator can create criteria on a specific trace (unit) **[BE-only]**
 - [x] Each criterion has a type (standard or hurdle) and weight (-10 to +10) (unit) **[BE-only]**
 - [x] Criteria can be promoted from discovery findings (unit) **[BE-only]**
+- [x] Criteria can be authored directly (without discovery) (unit)
 - [x] Criteria are editable and deletable (unit) **[BE-only]**
 - [x] Per-trace rubric is rendered as markdown (unit) **[BE-only]**
 - [x] Discovery analysis uses trace summaries when available (unit) **[BE-only]**
 - [x] Hurdle criteria gate the entire trace — any hurdle failure → score 0 (unit) **[BE-only]**
 - [x] Standard criteria scored as met (1) or not met (0) × weight (unit) **[BE-only]**
+- [x] Negative-weight criteria penalize when met (unit) **[BE-only]**
+- [x] Normalized score = raw / max_possible, clipped to [0, 1] (unit) **[BE-only]**
 - [x] Scoring handles edge cases: no criteria, all hurdles, all negative weights (unit) **[BE-only]**
 - [x] Results stored per-criterion with rationale (unit) **[BE-only]**
+- [x] Aggregated eval scores are available per trace or for all workshop traces (unit) **[BE-only]**
 
 ### Tests Without Requirement Links
 
 These tests are tagged with the spec but don't link to specific requirements:
 
+- `tests/unit/services/test_database_service_eval_mode.py` (test_eval_mode_tables_are_present_in_metadata) [unit]
 - `client/tests/e2e/eval-mode-workflow.spec.ts` (eval mode supports per-trace criteria and scoring) [e2e-mocked]
-- `client/src/components/eval/CriterionEditor.eval.test.tsx` (shows empty state when no criteria) [unit]
-- `client/src/components/eval/CriterionEditor.eval.test.tsx` (submits a new criterion) [unit]
 
 ---
 

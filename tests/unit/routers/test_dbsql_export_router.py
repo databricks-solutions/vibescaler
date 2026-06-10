@@ -1,8 +1,10 @@
 import pytest
 
 
-@pytest.mark.spec("DATASETS_SPEC")
-@pytest.mark.req("Datasets can be created with arbitrary trace lists")
+# NOTE: These tests verify the DBSQL export router, which is unrelated to
+# DATASETS_SPEC. They previously carried DATASETS_SPEC @spec/@req tags for
+# dataset-creation and dataset-lineage criteria they do not test; those tags
+# were removed so coverage reporting stays honest.
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_dbsql_export_success(async_client, override_get_db, monkeypatch):
@@ -35,8 +37,6 @@ async def test_dbsql_export_success(async_client, override_get_db, monkeypatch):
     assert body["total_rows"] == 1
 
 
-@pytest.mark.spec("DATASETS_SPEC")
-@pytest.mark.req("Dataset lineage tracked (source datasets, operations)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_dbsql_export_status_happy_path(async_client, override_get_db, monkeypatch):

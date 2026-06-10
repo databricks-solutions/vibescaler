@@ -84,16 +84,16 @@ async def test_permission_api_returns_role_based_defaults_for_valid_user(async_c
 
 
 @pytest.mark.spec("AUTHENTICATION_SPEC")
-@pytest.mark.req("Permission API failure: User can log in with defaults")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_permission_api_failure_when_db_service_raises(async_client, app):
     """When the database service raises an unexpected error during permission lookup,
     the exception propagates - the frontend should then apply default permissions.
 
-    Per AUTHENTICATION_SPEC Permission Loading Flow:
-    - On other error: Apply default permissions (fallback)
-    This tests the server-side behavior that triggers the frontend fallback.
+    NOTE: this only asserts the server-side error propagation. The actual
+    "user can log in with defaults" fallback is frontend behavior
+    (UserContext.loadPermissions) and is NOT asserted here, so this test
+    intentionally carries no @req link for that criterion.
     """
     import server.routers.users as users_router
 

@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum, StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class WorkshopStatus(StrEnum):
@@ -370,7 +370,23 @@ class RubricSuggestion(BaseModel):
     positive: str | None = Field(None, max_length=500, description="What excellent responses demonstrate")
     negative: str | None = Field(None, max_length=500, description="What poor responses demonstrate")
     examples: str | None = Field(None, max_length=500, description="Concrete examples of good and bad")
-    judgeType: str = Field(default="likert", pattern="^(likert|binary|freeform)$", description="Judge type")
+    judgeType: str = Field(
+        default="likert",
+        pattern="^(likert|binary)$",
+        description="Judge type (legacy 'freeform' is accepted but coerced to 'likert')",
+    )
+
+    @field_validator("judgeType", mode="before")
+    @classmethod
+    def _coerce_legacy_freeform(cls, value: object) -> object:
+        """Accept legacy 'freeform' values but coerce them to 'likert'.
+
+        Free-form criteria are no longer creatable; coercing (instead of rejecting)
+        keeps legacy data readable. Runs before the pattern constraint.
+        """
+        if isinstance(value, str) and value.strip().lower() == "freeform":
+            return "likert"
+        return value
 
 
 class AnnotationCreate(BaseModel):

@@ -69,7 +69,7 @@ test.describe('Authentication Flow', { tag: ['@spec:AUTHENTICATION_SPEC'] }, () 
     await scenario.cleanup();
   });
 
-  test('error clears on new login attempt', async ({ page }) => {
+  test('error clears on new login attempt', { tag: "@req:Error recovery: Errors cleared on new login attempt" }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Error Recovery Workshop' })
       .withFacilitator()

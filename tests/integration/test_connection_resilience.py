@@ -17,6 +17,11 @@ pytestmark = [
 ]
 
 
+@pytest.mark.req(
+    "Connection resilience tested: connection errors classified as transient vs not, "
+    "`_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff "
+    "and gives up after 3 attempts"
+)
 class TestIsConnectionError:
     """Verify _is_connection_error classifies errors correctly."""
 
@@ -60,7 +65,6 @@ class TestIsConnectionError:
         exc = Exception(message)
         assert _is_connection_error(exc) is True
 
-    @pytest.mark.spec("AUTHENTICATION_SPEC")
     def test_pool_exhaustion_timeout_is_not_connection_error(self):
         """SQLAlchemy QueuePool TimeoutError must NOT be classified as a
         transient connection error.  Treating saturation as such triggers
@@ -79,8 +83,17 @@ class TestIsConnectionError:
         assert _is_connection_error(exc) is False
 
 
+@pytest.mark.req(
+    "Connection resilience tested: connection errors classified as transient vs not, "
+    "`_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff "
+    "and gives up after 3 attempts"
+)
 class TestResetConnectionPool:
-    """Verify _reset_connection_pool disposes engine and refreshes OAuth."""
+    """Verify _reset_connection_pool disposes the engine.
+
+    Note: no explicit OAuth refresh happens here — Postgres credentials are
+    re-injected per new connection via the do_connect listener.
+    """
 
     def test_reset_disposes_engine(self):
         from server.database import _reset_connection_pool, engine
@@ -102,6 +115,11 @@ class TestResetConnectionPool:
             mock_dispose.assert_called_once()
 
 
+@pytest.mark.req(
+    "Connection resilience tested: connection errors classified as transient vs not, "
+    "`_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff "
+    "and gives up after 3 attempts"
+)
 class TestGetDbRetry:
     """Verify get_db retries on transient connection errors."""
 
@@ -173,12 +191,16 @@ class TestGetDbRetry:
             assert call_count == 1  # No retry
 
 
-@pytest.mark.spec("AUTHENTICATION_SPEC")
 class TestStreamingEndpointsDoNotHoldSessions:
     """Streaming/SSE endpoints must not bind a DB Session via FastAPI
     dependency injection — doing so holds one pool connection per
     subscriber for the entire stream lifetime and saturates the pool.
     See gh#163 (production cascade traced to /discovery-comments/stream).
+
+    Intentionally not @req-linked: pool-saturation regression guards with no
+    matching success criterion. (A class-level AUTHENTICATION_SPEC marker was
+    removed here — module-level pytestmark overrode it in the marker collector,
+    and AUTHENTICATION_SPEC has no matching criterion.)
     """
 
     def _signature_params(self, fn):

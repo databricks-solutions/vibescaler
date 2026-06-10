@@ -80,7 +80,7 @@ test.describe('Annotation - Last Trace Bug', {
   });
 
   test('10th trace annotation should be saved correctly', {
-    tag: ['@spec:ANNOTATION_SPEC', '@req:Changes automatically save on navigation (Next/Previous)'],
+    tag: ['@spec:ANNOTATION_SPEC', '@req:Annotation upsert persists every trace submission, including the final trace in a session'],
   }, async ({ page }) => {
     // Create scenario with real API
     const scenario = await TestScenario.create(page)
@@ -194,13 +194,16 @@ test.describe('Annotation - Last Trace Bug', {
   });
 
   /**
-   * UI BUG REPRODUCTION TEST
+   * UI LAST-TRACE PERSISTENCE TEST
    *
-   * This test reproduces the bug where the 10th annotation fails to save
-   * when clicking the Complete button in the UI.
+   * Drives all 10 annotations through the UI and clicks Complete on the last
+   * trace. The final save is awaited before the terminal completion screen
+   * (#155, data-testid="annotation-complete-screen") appears, so the 10th
+   * annotation must be persisted server-side — not lost (the original bug
+   * left the facilitator seeing 9/10).
    */
-  test.skip('UI: 10th annotation should be saved when clicking Complete button', {
-    tag: ['@spec:ANNOTATION_SPEC', '@req:Changes automatically save on navigation (Next/Previous)'],
+  test('UI: 10th annotation persists server-side after clicking Complete', {
+    tag: ['@spec:ANNOTATION_SPEC', '@req:Completing the final trace shows a terminal completion state', '@req:Changes automatically save on navigation (Next/Previous)'],
   }, async ({
     page,
   }) => {
@@ -232,12 +235,19 @@ test.describe('Annotation - Last Trace Bug', {
       // Wait for the progress indicator to show correct trace number
       await waitForAnnotationProgress(page, i + 1, 10);
 
-      // Wait for the Next button to be disabled (proves form is reset with no ratings)
-      // This ensures the form is ready for input before clicking a rating
+      // Wait for the nav button to be disabled (proves form is reset with no
+      // ratings) before clicking a rating. On the last trace the button is
+      // rendered as the Complete button instead of Next.
       if (i > 0) {
-        const navButton = page.getByTestId('next-trace-button');
+        const navButton = i < 9
+          ? page.getByTestId('next-trace-button')
+          : page.getByTestId('complete-annotation-button');
         await expect(navButton).toBeDisabled({ timeout: 5000 });
       }
+
+      // Navigation is debounced at 300ms to prevent duplicate saves; pace the
+      // loop like a human so the next click is not swallowed by the debounce.
+      await page.waitForTimeout(350);
 
       // Select a rating - click the Likert button for "Agree" (rating 4)
       // The Likert scale uses role="button" divs with the number displayed inside
@@ -251,33 +261,43 @@ test.describe('Annotation - Last Trace Bug', {
         await expect(nextButton).toBeEnabled({ timeout: 5000 });
         await nextButton.click();
       } else {
-        // Last trace - click Complete button
+        // Last trace - click Complete button (final save is awaited)
         const completeButton = page.getByTestId('complete-annotation-button');
         await expect(completeButton).toBeEnabled({ timeout: 5000 });
         await completeButton.click();
       }
     }
 
-    // Wait for completion toast
-    await expect(
-      page.getByText('All traces annotated successfully!')
-    ).toBeVisible({ timeout: 15000 });
+    // The terminal completion screen replaces the trace UI (#155)
+    await expect(page.getByTestId('annotation-complete-screen')).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByText('All Annotations Complete!')).toBeVisible();
 
-    // CRITICAL: Verify all 10 annotations were saved via API
+    // CRITICAL: Verify all 10 annotations were saved server-side.
+    // Traces 1-9 save in the background, so poll until they settle.
+    await expect
+      .poll(
+        async () => {
+          const annotations = await getAnnotations(page, workshopId, sme.id, API_URL);
+          return new Set(annotations.map((a) => a.trace_id)).size;
+        },
+        {
+          message: 'Expected annotations for all 10 unique traces to persist server-side',
+          timeout: 15000,
+        }
+      )
+      .toBe(10);
+
+    // The 10th trace specifically must be persisted (the original bug lost it)
     const annotations = await getAnnotations(page, workshopId, sme.id, API_URL);
-
-    // This is the key assertion - should be 10, not 9
+    const tenthTraceAnnotation = annotations.find(
+      (a) => a.trace_id === scenario.traces[9].id
+    );
     expect(
-      annotations.length,
-      `Expected 10 annotations but got ${annotations.length}. The 10th trace annotation was not saved.`
-    ).toBe(10);
-
-    // Verify we have annotations for all 10 unique traces
-    const annotatedTraceIds = new Set(annotations.map((a) => a.trace_id));
-    expect(
-      annotatedTraceIds.size,
-      `Expected 10 unique trace annotations but got ${annotatedTraceIds.size}`
-    ).toBe(10);
+      tenthTraceAnnotation,
+      'The 10th trace annotation was not saved when clicking Complete'
+    ).toBeDefined();
 
     await scenario.cleanup();
   });

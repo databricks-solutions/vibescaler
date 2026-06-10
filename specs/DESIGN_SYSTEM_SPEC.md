@@ -9,75 +9,84 @@ import SpecCoverage from '@site/src/components/SpecCoverage';
 
 ## Overview
 
-This specification defines the visual design system for the Human Evaluation Workshop, including the color palette, typography, component styling, and accessibility requirements. The system uses Tailwind CSS with a consistent purple/indigo theme.
+This specification defines the visual design system for the Human Evaluation Workshop, including the color palette, typography, component styling, and accessibility requirements. The system uses Tailwind CSS with a Material Design 3-style purple theme.
+
+**Source of truth**: the shipped CSS variables in `client/src/index.css` (consumed via `client/tailwind.config.js`). Token values below quote that file's HSL triplets; hex values are the rendered equivalents. If this document and `index.css` ever disagree, `index.css` wins — update this document, not the CSS.
 
 ## Color System
 
-### Primary Palette (Indigo-based Purple)
+### Primary Palette (Deep Purple)
 
-The primary color is Indigo-500 (`#6366F1`), providing a professional purple theme.
+The primary color is a rich deep purple — `--primary: 262 52% 47%` (`#673AB6`).
+
+> Historical note: earlier revisions of this spec pinned Indigo-500 (`#6366F1`).
+> That color never shipped; the product has always rendered the `262`-hue purple
+> defined in `client/src/index.css`. (Some stale comments inside `index.css`
+> still mention `#6366F1` — the HSL values are authoritative.)
 
 #### Light Mode
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `primary` | `#6366F1` | Primary buttons, links, accents |
-| `primary-foreground` | `#FFFFFF` | Text on primary background |
-| `primary-container` | `#F5F3FF` | Subtle backgrounds |
-| `primary-container-foreground` | `#3730A3` | Text on container background |
+| Token | HSL (CSS variable) | Hex | Usage |
+|-------|--------------------|-----|-------|
+| `primary` | `262 52% 47%` | `#673AB6` | Primary buttons, links, accents |
+| `primary-foreground` | `0 0% 100%` | `#FFFFFF` | Text on primary background |
+| `primary-container` | `262 90% 95%` | `#EFE7FE` | Subtle backgrounds |
+| `primary-container-foreground` | `262 52% 35%` | `#4D2B88` | Text on container background |
 
-#### Dark Mode
+#### Dark Mode (roadmap — CSS variables ship, but no toggle applies them; see Dark Mode section)
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `primary` | `#C7D2FE` | Primary buttons, links (lighter for dark bg) |
-| `primary-foreground` | `#1E1B4B` | Text on primary background |
-| `primary-container` | `#312E81` | Subtle backgrounds |
-| `primary-container-foreground` | `#E0E7FF` | Text on container background |
+| Token | HSL (CSS variable) | Hex | Usage |
+|-------|--------------------|-----|-------|
+| `primary` | `262 70% 75%` | `#B393EC` | Primary buttons, links (lighter for dark bg) |
+| `primary-foreground` | `262 52% 15%` | `#21123A` | Text on primary background |
+| `primary-container` | `262 47% 30%` | `#432970` | Subtle backgrounds |
+| `primary-container-foreground` | `262 90% 88%` | `#D9C5FC` | Text on container background |
 
 ### Secondary Palette (Badges & Subtle UI)
 
 #### Light Mode
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `secondary` | `#F5F3FF` | Badge backgrounds |
-| `secondary-foreground` | `#6366F1` | Badge text |
+| Token | HSL (CSS variable) | Hex | Usage |
+|-------|--------------------|-----|-------|
+| `secondary` | `270 60% 96%` | `#F5EFFB` | Badge backgrounds |
+| `secondary-foreground` | `262 52% 47%` | `#673AB6` | Badge text |
 
-#### Dark Mode
+#### Dark Mode (roadmap)
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `secondary` | `#312E81` | Badge backgrounds |
-| `secondary-foreground` | `#C7D2FE` | Badge text |
+| Token | HSL (CSS variable) | Hex | Usage |
+|-------|--------------------|-----|-------|
+| `secondary` | `270 20% 25%` | `#40334C` | Badge backgrounds |
+| `secondary-foreground` | `262 70% 75%` | `#B393EC` | Badge text |
 
 ### Extended Purple Scale
 
-Available via Tailwind classes (`bg-purple-500`, `text-purple-700`, etc.):
+The `purple-*` Tailwind classes do NOT use Tailwind's default palette — `client/tailwind.config.js` remaps them to the `--purple-*` CSS variables in `index.css`, keeping the whole scale on the primary 262 hue:
 
 ```
-purple-50   #FAF5FF   Lightest (backgrounds, hover states)
-purple-100  #F3E8FF   Very light (badges, containers)
-purple-200  #E9D5FF   Light (borders)
-purple-300  #D8B4FE   Soft
-purple-400  #C084FC   Medium-light
-purple-500  #A855F7   Main (matches primary)
-purple-600  #9333EA   Medium-dark (hover states)
-purple-700  #7E22CE   Dark (text)
-purple-800  #6B21A8   Darker (emphasis)
-purple-900  #581C87   Darkest (high contrast)
+purple-50   262 90% 98%   #F9F5FE   Lightest (backgrounds, hover states)
+purple-100  262 90% 95%   #EFE7FE   Very light (badges, containers)
+purple-200  262 83% 88%   #DAC7FA   Light (borders)
+purple-300  262 74% 78%   #BC9DF0   Soft
+purple-400  262 63% 65%   #976EDE   Medium-light
+purple-500  262 52% 47%   #673AB6   Main (matches primary)
+purple-600  262 52% 40%   #58319B   Medium-dark (hover states)
+purple-700  262 52% 35%   #4D2B88   Dark (text)
+purple-800  262 45% 28%   #3F2768   Darker (emphasis)
+purple-900  262 40% 22%   #32224F   Darkest (high contrast)
 ```
 
 ### Semantic Colors
 
-| Token | Light | Dark | Usage |
-|-------|-------|------|-------|
-| `background` | `#FFFFFF` | `#0A0A0A` | Page background |
-| `foreground` | `#0A0A0A` | `#FAFAFA` | Default text |
-| `muted` | `#F4F4F5` | `#27272A` | Muted backgrounds |
-| `muted-foreground` | `#71717A` | `#A1A1AA` | Muted text |
-| `destructive` | `#EF4444` | `#DC2626` | Error states |
-| `border` | `#E4E4E7` | `#27272A` | Borders |
+| Token | Light (HSL / hex) | Dark (HSL / hex, roadmap) | Usage |
+|-------|-------------------|---------------------------|-------|
+| `background` | `0 0% 99%` / `#FCFCFC` | `0 0% 6%` / `#0F0F0F` | Page background |
+| `foreground` | `0 0% 10%` / `#1A1A1A` | `0 0% 90%` / `#E6E6E6` | Default text |
+| `muted` | `270 12% 93%` / `#EDEBEF` | `270 11% 20%` / `#332D39` | Muted backgrounds |
+| `muted-foreground` | `264 7% 29%` / `#49454F` | `270 11% 69%` / `#B0A7B9` | Muted text |
+| `destructive` | `0 72% 51%` / `#DC2828` | `0 100% 84%` / `#FFADAD` | Error states |
+| `border` | `270 6% 47%` / `#78717F` | `270 11% 40%` / `#665B71` | Borders |
+
+`index.css` also ships `tertiary`, `success`, `warning`, and `info` palettes (with `*-container` variants) following the same Material 3 tonal pattern.
 
 ## Component Styling
 
@@ -237,44 +246,55 @@ Never rely solely on color to convey information:
 - Escape closes modals/dropdowns
 - Enter/Space activate buttons
 
-## Dark Mode
+## Dark Mode (roadmap)
 
-### Implementation
+**Status: not shipped.** Tailwind is configured with `darkMode: ['class']` and `index.css` ships a full `.dark` variable block, but **no UI toggle or theme detection applies the `dark` class** — the app always renders in light mode. Dark mode criteria are roadmap until a toggle (or `prefers-color-scheme` wiring) exists.
+
+### Planned Implementation
 
 Theme controlled via `class` strategy on `<html>`:
 
 ```tsx
-// Toggle dark mode
+// Toggle dark mode (no shipped UI invokes this yet)
 document.documentElement.classList.toggle('dark');
 ```
 
-### CSS Variables
+### CSS Variables (shipped in `client/src/index.css`)
 
 ```css
 /* Light mode (default) */
 :root {
-  --primary: 239 84% 67%;      /* Indigo-500 */
-  --background: 0 0% 100%;
-  --foreground: 0 0% 4%;
+  --primary: 262 52% 47%;      /* Deep purple #673AB6 */
+  --background: 0 0% 99%;
+  --foreground: 0 0% 10%;
 }
 
-/* Dark mode */
+/* Dark mode (defined but currently unreachable) */
 .dark {
-  --primary: 224 93% 88%;      /* Lighter indigo */
-  --background: 0 0% 4%;
-  --foreground: 0 0% 98%;
+  --primary: 262 70% 75%;      /* Lighter purple #B393EC */
+  --background: 0 0% 6%;
+  --foreground: 0 0% 90%;
 }
 ```
 
 ### Component Adaptation
 
-Components automatically adapt to dark mode:
+Components use semantic tokens, so they will adapt automatically once the `dark` class can be applied:
 
 ```tsx
-// Automatically uses dark mode colors when .dark class present
+// Uses dark mode colors when .dark class present
 <Card className="bg-background text-foreground">
   {/* Content */}
 </Card>
+```
+
+## Class Utilities
+
+All components compose Tailwind classes through the `cn()` utility (`client/src/lib/utils.ts`, clsx + tailwind-merge). It merges conditional class inputs (strings, arrays, objects) and resolves conflicting Tailwind utilities with later-value-wins semantics:
+
+```typescript
+cn('p-2', 'p-4')                          // → 'p-4'
+cn('bg-red-500', condition && 'bg-blue-500')  // conflict resolved, falsy filtered
 ```
 
 ## File Locations
@@ -283,6 +303,7 @@ Components automatically adapt to dark mode:
 |------|---------|
 | `client/src/index.css` | CSS variables, base styles |
 | `client/tailwind.config.js` | Tailwind theme configuration |
+| `client/src/lib/utils.ts` | `cn()` class-merging utility |
 | `client/src/components/ui/` | UI component library |
 
 ## Migration Guide
@@ -318,9 +339,10 @@ className="bg-purple-500 text-purple-50"
 <SpecCoverage spec="DESIGN_SYSTEM_SPEC" />
 
 - [ ] Primary purple consistent across all components
-- [ ] Dark mode fully functional
+- [ ] `cn()` utility merges class names and resolves Tailwind conflicts (later value wins)
 - [ ] All text meets WCAG AA contrast
 - [ ] Focus indicators visible
 - [ ] No hardcoded colors in components
 - [ ] Badges use secondary color scheme
 - [ ] Buttons use appropriate variants
+- [ ] Dark mode fully functional (roadmap)

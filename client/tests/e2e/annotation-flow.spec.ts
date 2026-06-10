@@ -1,8 +1,8 @@
 /**
  * E2E tests for the annotation workflow.
  *
- * Verifies toast notifications, multi-line comments, navigation controls,
- * and annotation count accuracy using mocked API responses.
+ * Verifies background save-on-navigation, the persistent "Saved" indicator,
+ * multi-line comments, navigation controls, and annotation count accuracy.
  *
  * @spec ANNOTATION_SPEC
  */
@@ -22,7 +22,7 @@ import {
 test.describe('Annotation Flow', {
   tag: ['@spec:ANNOTATION_SPEC'],
 }, () => {
-  test('new annotation is saved when navigating to next trace', { tag: ['@req:Toast shows "Annotation saved!" for new submissions'] }, async ({ page }) => {
+  test('new annotation is saved when navigating to next trace', { tag: ['@req:Changes automatically save on navigation (Next/Previous)', '@req:Annotated traces show a persistent Saved indicator instead of a success toast'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Toast - New Annotation' })
       .withFacilitator()
@@ -53,7 +53,7 @@ test.describe('Annotation Flow', {
     await scenario.cleanup();
   });
 
-  test('edit annotation persists changed rating', { tag: ['@req:Toast shows "Annotation updated!" only when changes detected'] }, async ({ page }) => {
+  test('edit annotation persists changed rating', { tag: ['@req:Users can edit previously submitted annotations', '@req:Changes automatically save on navigation (Next/Previous)', '@req:Annotated traces show a persistent Saved indicator instead of a success toast'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Toast - Edit Annotation' })
       .withFacilitator()
@@ -118,7 +118,7 @@ test.describe('Annotation Flow', {
     await scenario.cleanup();
   });
 
-  test('comment-only edit persists updated comment', { tag: ['@req:Toast shows "Annotation updated!" only when changes detected'] }, async ({ page }) => {
+  test('comment-only edit persists updated comment', { tag: ['@req:Users can edit previously submitted annotations', '@req:Changes automatically save on navigation (Next/Previous)'] }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Comment-Only Edit' })
       .withFacilitator()

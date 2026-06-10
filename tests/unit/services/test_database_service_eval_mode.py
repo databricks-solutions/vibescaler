@@ -87,7 +87,6 @@ def test_trace_criterion_create_requires_valid_weight_and_type():
 
 
 @pytest.mark.spec("EVAL_MODE_SPEC")
-@pytest.mark.req("Facilitator can create criteria on a specific trace")
 def test_eval_mode_tables_are_present_in_metadata():
     table_names = set(Base.metadata.tables.keys())
     assert "trace_criteria" in table_names

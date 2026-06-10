@@ -33,6 +33,13 @@ type BuiltScenario = Awaited<ReturnType<InstanceType<typeof TestScenario>['build
  */
 async function openFacilitatorPage(scenario: BuiltScenario): Promise<Page> {
   const page = await scenario.newPageAs(scenario.facilitator);
+  // The facilitator lands on the workflow-steps view; enter the discovery
+  // monitor, where the Draft Rubric sidebar lives. (Navigation guard only —
+  // the test's assertions below remain unconditional.)
+  const discoveryStep = page.getByRole('button', { name: /Discovery Phase/i });
+  if (await discoveryStep.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await discoveryStep.click();
+  }
   return page;
 }
 

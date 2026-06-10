@@ -1,26 +1,40 @@
 /**
- * E2E Tests for Auto-Evaluation functionality
+ * E2E Tests for Auto-Evaluation setup (annotation start page)
  *
- * Spec: JUDGE_EVALUATION_SPEC (Auto-Evaluation section, lines 150-248)
+ * Spec: JUDGE_EVALUATION_SPEC (Auto-Evaluation section)
  *
- * Note: These tests focus on the UI components and flow.
- * Full MLflow integration requires external services and is tested
- * via integration tests.
+ * These tests drive the facilitator UI: sidebar navigation to the annotation
+ * start page, the auto-evaluation toggle + model selector, and starting the
+ * annotation phase with auto-evaluation disabled.
+ *
+ * Running auto-evaluation itself (background MLflow job) requires Databricks
+ * model serving and is covered by unit tests
+ * (tests/unit/routers/test_workshops_begin_annotation.py); rendering of
+ * evaluation results in the Judge Tuning page is covered by
+ * judge-evaluation.spec.ts via the demo-model pipeline.
  */
 
 import { test, expect } from '@playwright/test';
 import { TestScenario } from '../lib';
-import { beginAnnotation, beginAnnotationViaSidebar } from '../lib/actions';
 
-const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000';
+const MOCK_MODELS = [
+  { name: 'databricks-claude-opus-4-5', state: 'READY', task: 'llm/v1/chat' },
+  { name: 'databricks-gpt-5-2', state: 'READY', task: 'llm/v1/chat' },
+];
 
-test.describe('Auto-Evaluation UI', () => {
-  test('begin annotation dialog shows model selection when auto-eval is available', {
-    tag: ['@spec:JUDGE_EVALUATION_SPEC', '@req:Auto-evaluation runs in background when annotation phase starts'],
+test.describe('Auto-Evaluation Setup', () => {
+  test('annotation setup page offers auto-evaluation toggle and model selection', {
+    tag: [
+      '@spec:JUDGE_EVALUATION_SPEC',
+      '@req:Facilitator can toggle auto-evaluation and select a model at annotation start',
+    ],
   }, async ({ page }) => {
-    // Setup: Workshop with rubric, traces, ready for annotation
+    // Model list comes from Databricks serving endpoints; mock it so the
+    // dropdown is deterministic in the e2e environment.
+    await page.route('**/available-models', (route) => route.fulfill({ json: MOCK_MODELS }));
+
     const scenario = await TestScenario.create(page)
-      .withWorkshop({ name: 'Auto-Eval Test Workshop' })
+      .withWorkshop({ name: 'Auto-Eval Setup Workshop' })
       .withFacilitator()
       .withParticipants(1)
       .withTraces(3)
@@ -34,46 +48,46 @@ test.describe('Auto-Evaluation UI', () => {
     await page.goto('/');
     await scenario.loginAs(scenario.facilitator);
 
-    // Navigate to the workshop
-    await expect(page.getByRole('heading', { name: 'Auto-Eval Test Workshop' })).toBeVisible({
+    const workshopHeading = page.getByRole('heading', { name: 'Auto-Eval Setup Workshop' });
+    await expect(workshopHeading).toBeVisible({ timeout: 10000 });
+    await workshopHeading.click();
+
+    // Navigate to the annotation phase via the workflow sidebar; annotation
+    // has not started, so the facilitator lands on the setup page.
+    await page.getByTestId('workflow-step-annotation').click();
+    await expect(page.getByRole('heading', { name: 'Start Annotation Phase' })).toBeVisible({
       timeout: 10000,
     });
 
-    // Navigate to annotation phase setup
-    // The "Begin Annotation" button should be visible in rubric phase
-    await beginAnnotation(page, scenario.workshop.id, API_URL);
+    // Auto-evaluation section with toggle, enabled by default
+    await expect(page.getByText('LLM Auto-Evaluation')).toBeVisible();
+    const autoEvalToggle = page.locator('#auto-evaluate-toggle');
+    await expect(autoEvalToggle).toBeVisible();
+    await expect(autoEvalToggle).toHaveAttribute('aria-checked', 'true');
 
-    // Wait for the annotation dialog/modal to appear
-    // The dialog should have options for auto-evaluation
-    await page.waitForTimeout(1000);
+    // Model selector lists the available evaluation models (friendly names)
+    await expect(page.getByText('Evaluation Model')).toBeVisible();
+    await page.getByRole('combobox').click();
+    await expect(page.getByRole('option', { name: 'Claude Opus 4.5' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'GPT-5.2' })).toBeVisible();
+    await page.keyboard.press('Escape');
 
-    // Look for auto-evaluation related elements
-    // Could be a toggle, checkbox, or model selector
-    const autoEvalToggle = page.locator('text=Auto-evaluation').or(
-      page.locator('text=Automatic evaluation')
-    ).or(
-      page.locator('text=LLM Judge')
-    );
-
-    // The dialog should have some form of auto-eval control
-    // Even if disabled by default
-    const dialogContent = page.locator('[role="dialog"]').or(
-      page.locator('.modal')
-    );
-
-    if (await dialogContent.isVisible({ timeout: 2000 })) {
-      // Verify dialog has annotation configuration options
-      await expect(page.getByText(/traces/i).first()).toBeVisible();
-    }
+    // Toggling off hides model selection and explains the manual path
+    await autoEvalToggle.click();
+    await expect(autoEvalToggle).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByText(/Auto-evaluation disabled/)).toBeVisible();
+    await expect(page.getByText('Evaluation Model')).toBeHidden();
 
     await scenario.cleanup();
   });
 
-  test('annotation phase can start without auto-evaluation', {
-    tag: ['@spec:JUDGE_EVALUATION_SPEC', '@req:Auto-evaluation runs in background when annotation phase starts'],
+  test('annotation phase starts without auto-evaluation when toggle is off', {
+    tag: [
+      '@spec:JUDGE_EVALUATION_SPEC',
+      '@req:Annotation phase can start with auto-evaluation disabled',
+    ],
   }, async ({ page }) => {
-    // Spec: JUDGE_EVALUATION_SPEC lines 219-226
-    // evaluation_model_name=null should skip auto-evaluation
+    // Spec: evaluation_model_name=null skips auto-evaluation
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'No Auto-Eval Workshop' })
       .withFacilitator()
@@ -89,122 +103,34 @@ test.describe('Auto-Evaluation UI', () => {
     await page.goto('/');
     await scenario.loginAs(scenario.facilitator);
 
-    await expect(page.getByRole('heading', { name: 'No Auto-Eval Workshop' })).toBeVisible({
+    const workshopHeading = page.getByRole('heading', { name: 'No Auto-Eval Workshop' });
+    await expect(workshopHeading).toBeVisible({ timeout: 10000 });
+    await workshopHeading.click();
+
+    await page.getByTestId('workflow-step-annotation').click();
+    await expect(page.getByRole('heading', { name: 'Start Annotation Phase' })).toBeVisible({
       timeout: 10000,
     });
 
-    // Verify workshop is in rubric phase and can proceed to annotation
-    // This tests that annotation can begin without auto-evaluation
-    const workshopData = await scenario.api.getWorkshop();
-    expect(workshopData.current_phase).toBe('rubric');
+    // Disable auto-evaluation, then start the phase through the UI
+    const autoEvalToggle = page.locator('#auto-evaluate-toggle');
+    await autoEvalToggle.click();
+    await expect(autoEvalToggle).toHaveAttribute('aria-checked', 'false');
 
-    await scenario.cleanup();
-  });
-});
+    await page.getByRole('button', { name: 'Start Annotation Phase' }).click();
 
-test.describe('Judge Tuning Page', () => {
-  test('judge tuning page displays evaluation results section', {
-    tag: ['@spec:JUDGE_EVALUATION_SPEC', '@req:Results appear in Judge Tuning page'],
-  }, async ({ page }) => {
-    // Spec: JUDGE_EVALUATION_SPEC lines 556-575
-    // Judge Tuning page should show evaluation results
-    const scenario = await TestScenario.create(page)
-      .withWorkshop({ name: 'Judge Tuning Test' })
-      .withFacilitator()
-      .withParticipants(2)
-      .withTraces(3)
-      .withDiscoveryFinding({ insight: 'Finding 1' })
-      .withDiscoveryComplete()
-      .withRubric({ question: 'Accuracy: Is the response accurate?' })
-      .withAnnotation({ rating: 4, comment: 'Good' })
-      .withAnnotation({ rating: 5, comment: 'Excellent' })
-      .withRealApi()
-      .inPhase('results')
-      .build();
+    // Success toast for the no-auto-eval path (not the MLflow warning path)
+    await expect(page.getByText('Annotation started')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('SMEs can now begin rating traces.')).toBeVisible();
 
-    await page.goto('/');
-    await scenario.loginAs(scenario.facilitator);
-
-    await expect(page.getByRole('heading', { name: 'Judge Tuning Test' })).toBeVisible({
-      timeout: 10000,
+    // Facilitator is moved to the annotation monitor
+    await expect(page.getByRole('heading', { name: 'Annotation Monitoring' })).toBeVisible({
+      timeout: 15000,
     });
 
-    // Navigate to Judge Tuning tab if available
-    const judgeTuningTab = page.getByRole('tab', { name: /Judge Tuning|Results|Evaluation/i });
-    if (await judgeTuningTab.isVisible({ timeout: 3000 })) {
-      await judgeTuningTab.click();
-
-      // Should see some form of results or evaluation UI
-      await page.waitForTimeout(1000);
-
-      // Look for common result elements
-      const resultsIndicators = [
-        page.getByText(/accuracy/i),
-        page.getByText(/evaluation/i),
-        page.getByText(/score/i),
-        page.getByText(/metrics/i),
-      ];
-
-      // At least one results indicator should be present
-      let foundResults = false;
-      for (const indicator of resultsIndicators) {
-        if (await indicator.isVisible({ timeout: 1000 })) {
-          foundResults = true;
-          break;
-        }
-      }
-
-      // Results page should have loaded (even if empty initially)
-      expect(page.url()).toContain('workshop=');
-    }
-
-    await scenario.cleanup();
-  });
-});
-
-test.describe('Model Selection', () => {
-  test('model dropdown shows available evaluation models', {
-    tag: ['@spec:JUDGE_EVALUATION_SPEC', '@req:Auto-evaluation model stored for re-evaluation consistency'],
-  }, async ({ page }) => {
-    // Spec: JUDGE_EVALUATION_SPEC lines 237-249
-    // Model selection options should be available
-    const scenario = await TestScenario.create(page)
-      .withWorkshop({ name: 'Model Selection Test' })
-      .withFacilitator()
-      .withParticipants(1)
-      .withTraces(2)
-      .withRubric({ question: 'Test: Test?' })
-      .withRealApi()
-      .inPhase('annotation')
-      .build();
-
-    await page.goto('/');
-    await scenario.loginAs(scenario.facilitator);
-
-    await expect(page.getByRole('heading', { name: 'Model Selection Test' })).toBeVisible({
-      timeout: 10000,
-    });
-
-    // Look for model selection UI
-    // This could be on Judge Tuning page or in evaluation controls
-    const judgeTuningTab = page.getByRole('tab', { name: /Judge Tuning|Evaluation/i });
-    if (await judgeTuningTab.isVisible({ timeout: 3000 })) {
-      await judgeTuningTab.click();
-      await page.waitForTimeout(500);
-
-      // Look for model dropdown or selector
-      const modelSelector = page.locator('select').filter({ hasText: /model|gpt|claude|llama/i }).or(
-        page.getByRole('combobox').filter({ hasText: /model/i })
-      ).or(
-        page.locator('[data-testid="model-selector"]')
-      );
-
-      // Model selection UI might exist
-      if (await modelSelector.first().isVisible({ timeout: 2000 })) {
-        // Verify it has options
-        expect(await modelSelector.count()).toBeGreaterThanOrEqual(0);
-      }
-    }
+    // Backend actually advanced the phase
+    const workshop = await scenario.api.getWorkshop();
+    expect(workshop.current_phase).toBe('annotation');
 
     await scenario.cleanup();
   });

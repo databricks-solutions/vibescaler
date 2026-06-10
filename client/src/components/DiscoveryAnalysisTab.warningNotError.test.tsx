@@ -1,5 +1,8 @@
 // @spec DISCOVERY_SPEC
-// @req Analysis shows warning (not error) if < 2 participants
+// AUDIT (2026-06): @req tag removed — DiscoveryAnalysisTab is not mounted anywhere in
+// the live app (FacilitatorDiscoveryWorkspace replaced it). Tests of an unmounted
+// component must not carry spec criteria; equivalent live-workspace tests carry them
+// where the live UI implements the behavior.
 import { describe, expect, it, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { DiscoveryAnalysisTab } from './DiscoveryAnalysisTab';

@@ -34,7 +34,7 @@ This specification defines the LLM judge evaluation system for the Human Evaluat
 │  ┌──────────────┐    ┌──────────────┐                      │
 │  │   Human      │    │   Judge      │                      │
 │  │  Annotations │───▶│  Alignment   │                      │
-│  │  (Feedback)  │    │  (SIMBA)     │                      │
+│  │  (Feedback)  │    │  (MemAlign)  │                      │
 │  └──────────────┘    └──────────────┘                      │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -283,7 +283,7 @@ judge = get_scorer(name=judge_name, experiment_id=experiment_id)
 
 # Judge includes:
 # - Original instructions + distilled guidelines (semantic memory)
-# - Note: Episodic memory (example retrieval) not persisted in registered judge
+# - Episodic trace IDs (episodic memory is rebuilt from these traces at evaluation time)
 ```
 
 ### API Endpoint
@@ -356,7 +356,25 @@ MemAlign uses two types of memory to improve judge alignment:
 | Memory Type | Purpose | Persistence |
 |-------------|---------|-------------|
 | **Semantic** | Distilled guidelines from feedback patterns | Included in registered judge instructions |
-| **Episodic** | Similar examples retrieved during evaluation | Not persisted (runtime only) |
+| **Episodic** | Similar examples retrieved during evaluation | Trace IDs persisted on the registered judge (`_episodic_trace_ids`); examples rebuilt from those traces at evaluation time |
+
+### Episodic Memory Persistence and Re-Alignment (#161)
+
+The aligned judge is persisted by calling `aligned_judge.update()` (or `register()` on
+first registration) directly on the `MemoryAugmentedJudge` returned by `judge.align()`.
+MLflow serializes the clean base instructions plus `semantic_memory` and
+`episodic_trace_ids` — reconstructing the judge via `make_judge(instructions=...)` is
+forbidden because it flattens the decorated prompt and duplicates guideline blocks.
+
+Because `MemAlignOptimizer.align()` appends every trace it is given to episodic memory
+without trace-ID dedup, re-alignment must dedup against the persisted trace IDs:
+
+1. Load the registered judge via `get_scorer(name=judge_name, experiment_id=...)` before
+   falling back to `make_judge()`
+2. Dedup any duplicate IDs already persisted on the judge (legacy corruption repair)
+3. Pass only traces whose IDs are **not** already in episodic memory to `align()`
+4. If every labeled trace is already in episodic memory, skip `align()` entirely and
+   report the existing memory counts
 
 ### Flow
 
@@ -386,7 +404,7 @@ aligned_judge = judge.align(traces, optimizer)
 # Aligned judge has:
 # - aligned_judge.instructions (original + distilled guidelines)
 # - aligned_judge._semantic_memory (list of guidelines)
-# - aligned_judge._episodic_memory (list of examples - not persisted)
+# - aligned_judge._episodic_memory (list of examples; persisted as _episodic_trace_ids)
 ```
 
 ### Scale-Specific Behavior
@@ -451,93 +469,122 @@ kappa = calculate_cohens_kappa(
 
 ## Data Model
 
-### Judge
+There is no standalone `Judge` entity. A judge is identified by the workshop's
+`judge_name` column plus a versioned `JudgePrompt`; the aligned judge artifact itself
+lives in MLflow (registered scorer).
+
+### JudgePrompt (`judge_prompts` table)
 
 ```
-Judge:
+JudgePrompt:
   - id: UUID
   - workshop_id: UUID
-  - name: string
-  - prompt: string
-  - judge_type: 'likert' | 'binary'
-  - model_endpoint: string
+  - prompt_text: string
+  - judge_type: 'likert' | 'binary' | 'freeform'
+  - version: int                       # Incremented per workshop; re-eval creates a new version
+  - few_shot_examples: JSON
+  - model_name: string
+  - model_parameters: Optional[JSON]   # e.g. {"aligned": true, "alignment_model": ...}
+  - binary_labels: Optional[JSON]      # {"pass": "Pass", "fail": "Fail"}
+  - rating_scale: int (default 5)
+  - created_by: string
   - created_at: timestamp
-  - updated_at: timestamp
+  - performance_metrics: Optional[JSON]
 ```
 
-### JudgeEvaluation
+### JudgeEvaluation (`judge_evaluations` table)
 
 ```
 JudgeEvaluation:
   - id: UUID
-  - judge_id: UUID
+  - workshop_id: UUID
+  - prompt_id: UUID                    # FK to judge_prompts (results versioned by prompt)
   - trace_id: string
-  - rating: float
-  - rationale: Optional[string]
-  - raw_response: JSON
+  - predicted_rating / human_rating: Optional[int]      # Likert judges
+  - predicted_binary / human_binary: Optional[bool]     # Binary judges
+  - predicted_feedback / human_feedback: Optional[str]  # Freeform judges
+  - confidence: Optional[float]
+  - reasoning: Optional[string]
   - created_at: timestamp
 ```
 
-### AlignmentJob
+### AlignmentJob (file-backed, not a DB table)
+
+Background alignment/evaluation jobs are dataclasses persisted as JSON under
+`/tmp/workshop_jobs/{job_id}.json` (+ `.logs`), shared between alignment, evaluation,
+and auto-evaluation flows:
 
 ```
 AlignmentJob:
-  - id: UUID
-  - judge_id: UUID
+  - job_id: UUID
+  - workshop_id: UUID
   - status: 'pending' | 'running' | 'completed' | 'failed'
-  - original_prompt: string
-  - optimized_prompt: Optional[string]
-  - metrics: JSON
-  - created_at: timestamp
-  - completed_at: Optional[timestamp]
+  - logs: list[string]
+  - result: Optional[JSON]             # e.g. {success, guideline_count, example_count, ...}
+  - error: Optional[string]
+  - created_at / updated_at: timestamp
 ```
 
 ## API Endpoints
 
-### Run Evaluation
+All judge/alignment routes are workshop-scoped (there are no `/judges/{judge_id}/*`
+routes). Long-running work returns a `job_id` immediately and is polled.
+
+| Route | Purpose |
+|-------|---------|
+| `POST /workshops/{workshop_id}/start-alignment` | Start background MemAlign job |
+| `GET /workshops/{workshop_id}/alignment-job/{job_id}` | Poll alignment job status/logs/result |
+| `GET /workshops/{workshop_id}/alignment-status` | Alignment readiness summary |
+| `GET /workshops/{workshop_id}/traces-for-alignment` | Traces with human feedback for alignment |
+| `POST /workshops/{workshop_id}/start-evaluation` | Start background MLflow evaluation job |
+| `POST /workshops/{workshop_id}/start-simple-evaluation` | Direct endpoint-call evaluation job |
+| `GET /workshops/{workshop_id}/evaluation-job/{job_id}` | Poll evaluation job |
+| `POST /workshops/{workshop_id}/re-evaluate` | Re-evaluate with registered (aligned) judge |
+| `POST /workshops/{workshop_id}/evaluate-judge` | Synchronous pipeline (demo model supported) |
+| `POST /workshops/{workshop_id}/evaluate-judge-direct` | Synchronous direct evaluation |
+| `GET/POST /workshops/{workshop_id}/judge-prompts` | List/create judge prompt versions |
+| `PUT /workshops/{workshop_id}/judge-prompts/{prompt_id}/metrics` | Store performance metrics |
+| `GET/POST /workshops/{workshop_id}/judge-evaluations/{prompt_id}` | Load/save results per prompt version |
+| `GET /workshops/{workshop_id}/auto-evaluation-status` | Auto-eval job status |
+| `GET /workshops/{workshop_id}/auto-evaluation-results` | Auto-eval results |
+| `POST /workshops/{workshop_id}/restart-auto-evaluation` | Re-run auto-evaluation |
+| `PUT /workshops/{workshop_id}/judge-name` | Set judge/feedback name |
+| `GET /workshops/{workshop_id}/irr` | Calculate IRR |
+
+### Start Alignment
 
 ```
-POST /workshops/{workshop_id}/judges/{judge_id}/evaluate
+POST /workshops/{workshop_id}/start-alignment
 {
-  "trace_ids": ["trace-1", "trace-2", ...]
+  "judge_name": "quality_judge",
+  "judge_prompt": "...",
+  "evaluation_model_name": "databricks-claude-sonnet-4",
+  "alignment_model_name": "databricks-claude-sonnet-4",   // optional
+  "embedding_model_name": "databricks-gte-large-en"       // optional
 }
+
+Response (returns immediately; work continues in a background thread):
+{
+  "job_id": "uuid",
+  "status": "running",
+  "message": "Alignment job started. Poll /alignment-job/{job_id} for status."
+}
+```
+
+### Poll Alignment Job
+
+```
+GET /workshops/{workshop_id}/alignment-job/{job_id}?since_log_index=0
 
 Response:
 {
   "job_id": "uuid",
-  "status": "running"
-}
-```
-
-### Get Evaluation Results
-
-```
-GET /workshops/{workshop_id}/judges/{judge_id}/evaluations
-
-Response:
-{
-  "evaluations": [
-    {
-      "trace_id": "trace-1",
-      "rating": 4.0,
-      "rationale": "..."
-    }
-  ]
-}
-```
-
-### Run Alignment
-
-```
-POST /workshops/{workshop_id}/judges/{judge_id}/align
-{
-  "trace_ids": ["trace-1", "trace-2", ...]  // Traces with human feedback
-}
-
-Response:
-{
-  "job_id": "uuid",
-  "status": "running"
+  "status": "running" | "completed" | "failed",
+  "logs": ["..."],
+  "log_count": 12,
+  "updated_at": 1760000000.0,
+  "result": { "success": true, "guideline_count": 3, "example_count": 10, ... },  // when completed
+  "error": "..."                                                                  // when failed
 }
 ```
 
@@ -546,17 +593,23 @@ Response:
 ```
 GET /workshops/{workshop_id}/irr
 
-Response:
+Response (IRRResult):
 {
-  "krippendorff_alpha": 0.72,
-  "cohens_kappa": {
-    "user_a_vs_user_b": 0.68,
-    "user_a_vs_user_c": 0.71
-  },
-  "annotation_count": 150,
-  "annotator_count": 3
+  "workshop_id": "uuid",
+  "score": 0.72,
+  "ready_to_proceed": true,
+  "calculated_at": "...",
+  "details": {
+    "metric_used": "Cohen's Kappa" | "Krippendorff's Alpha",
+    "per_metric_scores": { "q_1": { "score": 0.7, "interpretation": "...", ... } },
+    "problematic_patterns": ["Trace abc... has extreme disagreement (range: 4)"],
+    ...
+  }
 }
 ```
+
+Only ratings for questions in the current rubric are included; the metric is selected
+automatically (2 complete raters → Cohen's Kappa, otherwise Krippendorff's Alpha).
 
 ## UI Components
 
@@ -597,6 +650,8 @@ Features:
 - [ ] Binary rubrics evaluated with 0/1 scale (not 1-5)
 - [ ] Auto-evaluation model stored for re-evaluation consistency
 - [ ] Results appear in Judge Tuning page
+- [ ] Facilitator can toggle auto-evaluation and select a model at annotation start
+- [ ] Annotation phase can start with auto-evaluation disabled
 
 ### Re-Evaluation
 - [ ] Re-evaluate loads registered judge with aligned instructions
@@ -609,6 +664,8 @@ Features:
 - [ ] Alignment jobs run asynchronously
 - [ ] MemAlign distills semantic memory (guidelines)
 - [ ] Aligned judge registered to MLflow
+- [ ] Episodic trace IDs persist on the registered judge across alignment runs
+- [ ] Re-alignment skips traces already in the judge's episodic memory
 - [ ] Metrics reported (guideline count, example count)
 - [ ] Works for both Likert and Binary scales
 
@@ -617,6 +674,7 @@ Features:
 - [ ] Cohen's Kappa calculated for rater pairs
 - [ ] Handles edge cases (no variation, single rater)
 - [ ] Updates when new annotations added
+- [ ] Traces with extreme disagreement surfaced in IRR diagnostics
 
 ## Troubleshooting
 

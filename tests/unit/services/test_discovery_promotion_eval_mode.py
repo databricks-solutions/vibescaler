@@ -37,7 +37,6 @@ def _seed_workshop_with_finding(test_db, workshop_id: str, mode: str):
 
 @pytest.mark.spec("EVAL_MODE_SPEC")
 @pytest.mark.req("Criteria can be promoted from discovery findings")
-@pytest.mark.req("Eval-mode workshops do not use the global rubric system")
 def test_promote_finding_to_trace_criteria_in_eval_mode(test_db):
     finding_id, trace_id = _seed_workshop_with_finding(test_db, "ws-eval", "eval")
     service = DiscoveryService(test_db)

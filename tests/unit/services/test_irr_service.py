@@ -63,6 +63,39 @@ def test_calculate_irr_for_workshop_uses_krippendorff_when_missing_data():
 
 
 @pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+@pytest.mark.req("Updates when new annotations added")
+def test_calculate_irr_for_workshop_reflects_newly_added_annotations():
+    """Recomputing IRR after new annotations are added changes the result.
+
+    The /irr endpoint recalculates from the current annotation set on every
+    call, so adding a disagreeing annotation pair must move the score and the
+    reported annotation counts — no caching of stale results.
+    """
+    agreeing = [
+        _ann(trace_id="t1", user_id="u1", rating=3, ratings={"q1": 3}),
+        _ann(trace_id="t1", user_id="u2", rating=3, ratings={"q1": 3}),
+        _ann(trace_id="t2", user_id="u1", rating=4, ratings={"q1": 4}),
+        _ann(trace_id="t2", user_id="u2", rating=4, ratings={"q1": 4}),
+    ]
+    before = calculate_irr_for_workshop("w1", annotations=agreeing, db=None)
+    assert before.score == 1.0  # Perfect agreement
+    assert before.details["num_annotations"] == 4
+
+    # New annotations arrive: both raters rate a third trace with extreme disagreement
+    after = calculate_irr_for_workshop(
+        "w1",
+        annotations=agreeing
+        + [
+            _ann(trace_id="t3", user_id="u1", rating=1, ratings={"q1": 1}),
+            _ann(trace_id="t3", user_id="u2", rating=5, ratings={"q1": 5}),
+        ],
+        db=None,
+    )
+    assert after.details["num_annotations"] == 6
+    assert after.score < before.score  # Disagreement pulls the score down
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
 def test_calculate_irr_for_workshop_sends_no_canned_suggestions_for_low_agreement():
     # Perfect disagreement previously triggered hard-coded recommendation text
     annotations = [
