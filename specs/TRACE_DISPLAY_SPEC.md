@@ -360,6 +360,7 @@ jsonpath-plus  # Full-featured, ~15KB gzipped
 ### Functional — Consistency
 
 - [ ] All backend services that consume trace input/output apply the same span filter and JSONPath pipeline as the TraceViewer
+- [ ] Copy Output copies the representation currently displayed (formatted vs raw)
 
 ### Non-Functional
 

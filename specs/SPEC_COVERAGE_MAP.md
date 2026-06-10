@@ -1,6 +1,6 @@
 # Spec Test Coverage Map
 
-**Generated**: 2026-06-10 12:28:33
+**Generated**: 2026-06-10 13:02:19
 
 This report shows test coverage for each specification's success criteria.
 
@@ -32,12 +32,12 @@ This report shows test coverage for each specification's success criteria.
 | [ROLE_PERMISSIONS_SPEC](#role-permissions-spec) | 16 | 12 | 75% | 17 | 0 | 0 | 0 | **12** |
 | [RUBRIC_SPEC](#rubric-spec) | 25 | 21 | 84% | 67 | 0 | 0 | 0 | **18** |
 | [TESTING_SPEC](#testing-spec) | 30 | 0 | 0% | 35 | 50 | 0 | 0 | 0 |
-| [TRACE_DISPLAY_SPEC](#trace-display-spec) | 18 | 14 | 77% | 70 | 0 | 0 | 0 | **12** |
+| [TRACE_DISPLAY_SPEC](#trace-display-spec) | 19 | 15 | 78% | 70 | 0 | 0 | 0 | **12** |
 | [TRACE_INGESTION_SPEC](#trace-ingestion-spec) | 16 | 0 | 0% | 16 | 0 | 0 | 0 | 0 |
 | [TRACE_SUMMARIZATION_SPEC](#trace-summarization-spec) | 64 | 21 | 32% | 58 | 6 | 0 | 0 | **21** |
 | [UI_COMPONENTS_SPEC](#ui-components-spec) | 16 | 0 | 0% | 4 | 0 | 0 | 0 | 0 |
 
-**Total**: 224/459 requirements covered (48%)
+**Total**: 225/460 requirements covered (48%)
 
 ---
 
@@ -1044,7 +1044,7 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 ## TRACE_DISPLAY_SPEC
 
-**Coverage**: 14/18 requirements (77%)
+**Coverage**: 15/19 requirements (78%)
 
 ### Uncovered Requirements
 
@@ -1083,6 +1083,7 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Empty filter config results in no filtering and root trace data is used (unit) **[BE-only]**
 - [x] String span inputs and outputs are returned as-is without double-serialization (unit) **[BE-only]**
 - [x] All backend services that consume trace input/output apply the same span filter and JSONPath pipeline as the TraceViewer (unit) **[BE-only]**
+- [x] Copy Output copies the representation currently displayed (formatted vs raw) (unit)
 - [x] JSONPath evaluation does not noticeably slow down trace display (unit) **[BE-only]**
 - [x] Preview responds within 500ms (unit) **[BE-only]**
 - [x] Invalid JSONPath syntax shows helpful error message in preview (unit) **[BE-only]**
@@ -1093,7 +1094,6 @@ These tests are tagged with the spec but don't link to specific requirements:
 
 - `client/src/hooks/useJsonPathExtraction.test.ts` (file-level) [unit]
 - `client/src/components/JsonPathSettings.attrValueDisabled.test.tsx` (file-level) [unit]
-- `client/src/components/TraceViewer.copyOutput.test.tsx` (file-level) [unit]
 - `client/src/components/TraceViewer.copyOutput.test.tsx` (file-level) [unit]
 
 ## TRACE_INGESTION_SPEC
