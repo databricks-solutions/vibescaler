@@ -42,4 +42,16 @@ export class DefaultService {
             url: '/test',
         });
     }
+    /**
+     * Deployment Status
+     * Return DB-independent deployment setup status for the frontend shell.
+     * @returns any Successful Response
+     * @throws ApiError
+     */
+    public static deploymentStatusDeploymentStatusGet(): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/deployment/status',
+        });
+    }
 }

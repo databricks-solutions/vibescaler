@@ -1,6 +1,6 @@
 # Spec Test Coverage Map
 
-**Generated**: 2026-06-10 15:05:57
+**Generated**: 2026-06-10 15:11:46
 
 This report shows test coverage for each specification's success criteria.
 
@@ -573,14 +573,14 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_draft_rubric_items.py` (test_ungrouped_items_each_become_question) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_no_items_raises_400) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_mixed_grouped_and_ungrouped) [unit]
-- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (renders evidence trace IDs for findings (truncated to 8 chars)) [unit]
-- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (shows trace ID badge for each disagreement item) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (renders trace ID badges for items with source_trace_ids) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (does not render trace badges for manual items with no trace IDs) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (renders source type badges for each item) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (shows item count in header) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (creates a new manual group from item controls) [unit]
 - `client/src/components/DraftRubricPanel.test.tsx` (moves an item into an existing group from item controls) [unit]
+- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (renders evidence trace IDs for findings (truncated to 8 chars)) [unit]
+- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (shows trace ID badge for each disagreement item) [unit]
 
 ## DISCOVERY_TRACE_ASSIGNMENT_SPEC
 
