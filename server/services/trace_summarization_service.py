@@ -17,6 +17,7 @@ import httpx
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai import messages as pai_messages
+from pydantic_ai.models import Model
 from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.profiles.openai import OpenAIModelProfile
