@@ -30,7 +30,7 @@ Before starting the workshop, ensure you have:
 - [ ] **At least 10 traces** to enable alignment
 - [ ] Access to a Databricks workspace with **Databricks Apps** enabled
 - [ ] MLflow experiment with traces (if using MLflow ingestion)
-- [ ] MLflow experiment [added as an app resource](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/mlflow) with **Can read** permission (grants the app's service principal access — no personal access token needed)
+- [ ] MLflow experiment [added as an app resource](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/mlflow) with **Can edit** permission (grants the app's service principal access — no personal access token needed; Can edit is required because annotations sync back to the experiment as MLflow feedback)
 - [ ] Model serving endpoint(s) for AI features (evaluation and alignment LLMs)
 
 ---

@@ -71,3 +71,37 @@
 .spec-coverage-video {
   margin-top: 1rem;
 }
+
+.spec-link {
+  white-space: nowrap;
+}
+
+.spec-link-bar {
+  display: inline-block;
+  width: 2.75em;
+  height: 0.5em;
+  border-radius: 999px;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  background: var(--ifm-color-emphasis-200);
+  margin-left: 0.35em;
+  overflow: hidden;
+}
+
+.spec-link-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.spec-link-bar--success .spec-link-bar-fill {
+  background: var(--ifm-color-success);
+}
+
+.spec-link-bar--warning .spec-link-bar-fill {
+  background: var(--ifm-color-warning);
+}
+
+.spec-link-bar--muted .spec-link-bar-fill {
+  background: var(--ifm-color-emphasis-500);
+}
+
