@@ -99,11 +99,12 @@ test.describe('Discovery Analysis (Step 2)', {
   // (tests/unit/routers/test_discovery_analysis.py,
   // tests/unit/services/test_discovery_analysis_service.py).
 
-  // NOTE (2026-06 audit): deliberately untagged + skipped so it cannot count as spec
-  // coverage. The live FacilitatorDiscoveryWorkspace does not render a <2-participant
-  // warning (regression, owner decision pending). Re-enable and re-tag to
-  // "Warning if < 2 participants (not an error)" once the warning is restored.
-  test.skip('analysis results show participant warning when < 2 participants', async ({ page }) => {
+  test('analysis results show participant warning when < 2 participants', {
+    tag: [
+      '@spec:DISCOVERY_SPEC',
+      '@req:Warning if < 2 participants (not an error)',
+    ],
+  }, async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Warning Test' })
       .withFacilitator()
@@ -112,10 +113,19 @@ test.describe('Discovery Analysis (Step 2)', {
       .inPhase(WorkshopPhase.DISCOVERY)
       .build();
 
+    // The shared api-mocker has no route for available-models; the workspace
+    // disables Run Analysis when no models are available, so serve one here.
+    await page.route(/\/workshops\/[^/?]+\/available-models$/, (route) =>
+      route.fulfill({
+        json: [{ name: 'databricks-claude-sonnet-4-5', state: 'READY', task: 'llm/v1/chat' }],
+      }),
+    );
+
     await scenario.loginAs(scenario.facilitator);
 
     const runButton = page.getByRole('button', { name: /Run AI Analysis/i });
     await expect(runButton).toBeVisible({ timeout: 10000 });
+    await expect(runButton).toBeEnabled();
     await runButton.click();
 
     // Should show warning (not error) about limited participant data

@@ -1,14 +1,14 @@
 {
-  "generated": "2026-06-10T18:21:07.551007",
+  "generated": "2026-06-11T09:02:30.428516",
   "summary": {
-    "total_requirements": 407,
-    "covered_requirements": 280,
-    "coverage_percent": 68
+    "total_requirements": 408,
+    "covered_requirements": 292,
+    "coverage_percent": 71
   },
   "pyramid": {
-    "unit": 1103,
+    "unit": 1114,
     "integration": 61,
-    "e2e-mocked": 22,
+    "e2e-mocked": 23,
     "e2e-real": 67
   },
   "specs": {
@@ -480,12 +480,12 @@
     },
     "DISCOVERY_SPEC": {
       "total_requirements": 79,
-      "covered_requirements": 76,
-      "coverage_percent": 96,
+      "covered_requirements": 77,
+      "coverage_percent": 97,
       "by_type": {
-        "unit": 309,
+        "unit": 318,
         "integration": 4,
-        "e2e-mocked": 6,
+        "e2e-mocked": 7,
         "e2e-real": 22
       },
       "requirements": [
@@ -790,7 +790,7 @@
           "covered": false
         },
         {
-          "text": "Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll)",
+          "text": "Draft rubric items link to their origin (inline origin link; click routes to the originating trace/finding)",
           "covered": false
         },
         {
@@ -799,7 +799,7 @@
         },
         {
           "text": "Disagreements color-coded by priority (red/yellow/blue) on trace cards",
-          "covered": false
+          "covered": true
         },
         {
           "text": "\"Create Rubric \u2192\" in sidebar transitions to rubric creation with groups pre-populated as criteria",
@@ -1252,7 +1252,7 @@
       "covered_requirements": 19,
       "coverage_percent": 100,
       "by_type": {
-        "unit": 94,
+        "unit": 96,
         "integration": 0,
         "e2e-mocked": 0,
         "e2e-real": 7
@@ -1337,9 +1337,9 @@
       ]
     },
     "TRACE_INGESTION_SPEC": {
-      "total_requirements": 16,
-      "covered_requirements": 0,
-      "coverage_percent": 0,
+      "total_requirements": 17,
+      "covered_requirements": 9,
+      "coverage_percent": 52,
       "by_type": {
         "unit": 16,
         "integration": 0,
@@ -1349,11 +1349,11 @@
       "requirements": [
         {
           "text": "Traces are deduplicated by `(workshop_id, mlflow_trace_id)` \u2014 re-ingest updates, not duplicates",
-          "covered": false
+          "covered": true
         },
         {
           "text": "`mlflow_url`, `mlflow_host`, and `mlflow_experiment_id` are persisted on ingest",
-          "covered": false
+          "covered": true
         },
         {
           "text": "MLflow link in TraceViewer opens the correct trace in the correct experiment",
@@ -1361,27 +1361,31 @@
         },
         {
           "text": "Traces without `mlflow_trace_id` get a generated UUID and insert normally",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Input extraction prefers the last user-role message from the request payload",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Output extraction prefers the last assistant-role message from the response payload",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Each trace gets its own unique extracted input (no shared-prefix duplication)",
-          "covered": false
+          "covered": true
         },
         {
-          "text": "Extraction handles: `{\"messages\": [...]}`, `{\"request\": {\"input\": [...]}}`, list-of-items, and `{\"object\": \"response\"}` formats",
+          "text": "Extraction handles the `{\"messages\": [...]}` and `{\"request\": {\"input\": [...]}}` formats",
+          "covered": true
+        },
+        {
+          "text": "Extraction handles the list-of-items and `{\"object\": \"response\"}` output formats",
           "covered": false
         },
         {
           "text": "Extraction falls back to cleaned raw text when no structured format matches",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Re-ingesting traces preserves existing `DiscoveryFeedbackDB` FK references",
@@ -1393,7 +1397,7 @@
         },
         {
           "text": "Re-ingesting traces preserves existing `DiscoveryFindingDB` FK references",
-          "covered": false
+          "covered": true
         },
         {
           "text": "`active_discovery_trace_ids` remain valid after re-ingestion",
@@ -1415,8 +1419,8 @@
     },
     "TRACE_SUMMARIZATION_SPEC": {
       "total_requirements": 64,
-      "covered_requirements": 21,
-      "coverage_percent": 32,
+      "covered_requirements": 23,
+      "coverage_percent": 35,
       "by_type": {
         "unit": 58,
         "integration": 0,
@@ -1446,7 +1450,7 @@
         },
         {
           "text": "Agent accesses trace data through inspection tools (not a full-text dump)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Agent produces an executive summary as the first pass",
@@ -1462,7 +1466,7 @@
         },
         {
           "text": "Span data references are resolved in a post-processing step (not LLM-generated values)",
-          "covered": false
+          "covered": true
         },
         {
           "text": "Agent uses trace inspection tools to selectively examine spans (not a full-text dump)",

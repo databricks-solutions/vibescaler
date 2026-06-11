@@ -314,7 +314,6 @@ Backend consumers of `get_display_text`: `server/services/judge_service.py`, `se
 ### Functional — Consistency
 
 - [ ] All backend services that consume trace input/output apply the same span filter and JSONPath pipeline as the TraceViewer
-<!-- AUDIT: alignment_service bypasses this pipeline; owner decision pending -->
 - [ ] Copy Output copies the representation currently displayed (formatted vs raw)
 
 ### Non-Functional
@@ -372,3 +371,4 @@ The following are explicitly **not** included in this implementation:
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
 | 2026-04-15 | [Pipeline Consistency Fix](../.claude/plans/2026-04-15-trace-display-pipeline-consistency.md) | partial | Shared helper `get_display_text` extracted and wired into judge_service, discovery_service, and discovery_analysis_service; alignment_service not yet wired (owner decision pending) |
+| 2026-06-10 | — | complete | alignment_service evaluation inputs/outputs wired through get_display_text; consistency tests now cover alignment_service |

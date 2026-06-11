@@ -24,6 +24,8 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 import { DiscoveryOverviewBar } from './DiscoveryOverviewBar';
 import { CrossTraceAnalysisSummary } from './CrossTraceAnalysisSummary';
@@ -153,10 +155,12 @@ export const FacilitatorDiscoveryWorkspace: React.FC<FacilitatorDiscoveryWorkspa
   const disagreementsByTrace = useMemo(() => {
     if (!currentAnalysis) return new Map();
     const map = new Map();
+    // Tag each disagreement with its priority tier so trace cards can color-code
+    // them (red = high, yellow = medium, blue = lower).
     const allDisagreements = [
-      ...(currentAnalysis.disagreements?.high ?? []),
-      ...(currentAnalysis.disagreements?.medium ?? []),
-      ...(currentAnalysis.disagreements?.lower ?? []),
+      ...(currentAnalysis.disagreements?.high ?? []).map((d) => ({ ...d, priority: 'high' })),
+      ...(currentAnalysis.disagreements?.medium ?? []).map((d) => ({ ...d, priority: 'medium' })),
+      ...(currentAnalysis.disagreements?.lower ?? []).map((d) => ({ ...d, priority: 'lower' })),
     ];
     for (const d of allDisagreements) {
       if (d.trace_id) {
@@ -467,6 +471,19 @@ export const FacilitatorDiscoveryWorkspace: React.FC<FacilitatorDiscoveryWorkspa
             </button>
           </div>
         </div>
+
+        {discoveryMode === 'analysis' && currentAnalysis && currentAnalysis.participant_count < 2 && (
+          <div className="max-w-5xl mx-auto">
+            {/* Limited data is a warning, not an error — default Alert variant, never destructive. */}
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Limited Participant Data</AlertTitle>
+              <AlertDescription>
+                This analysis is based on feedback from only {currentAnalysis.participant_count} participant{currentAnalysis.participant_count !== 1 ? 's' : ''}. Results may not be representative. Consider waiting for more feedback.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
         {discoveryMode === 'analysis' && currentAnalysis && (
           <div className="animate-in fade-in slide-in-from-top-4">

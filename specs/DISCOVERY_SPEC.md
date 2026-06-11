@@ -867,9 +867,6 @@ When the `MLFLOW_DSPY_DEV_EXPERIMENT_ID` environment variable is set, the discov
 - [ ] Each analysis run creates a new record (history preserved)
 - [ ] Re-runnable — new analysis as more feedback comes in, prior analyses retained
 - [ ] Warning if < 2 participants (not an error)
-<!-- AUDIT: live regression, owner decision pending — the backend computes the warning data,
-     but FacilitatorDiscoveryWorkspace does not render a <2-participant warning. Backend tags
-     below this criterion are truthful for the data layer only. -->
 - [ ] Data freshness banner (participant count, last run timestamp)
 - [ ] Results organized by priority (HIGH → MEDIUM → LOWER)
 
@@ -927,9 +924,6 @@ When the `MLFLOW_DSPY_DEV_EXPERIMENT_ID` environment variable is set, the discov
 - [ ] Fallback question if LLM unavailable after retries
 - [ ] Fallback warning banner shown only to facilitators, never to participants/SMEs
 - [ ] Analysis shows warning (not error) if < 2 participants
-<!-- AUDIT: live regression, owner decision pending — no <2-participant warning is rendered
-     in the live FacilitatorDiscoveryWorkspace (the DiscoveryAnalysisTab that rendered it is
-     no longer mounted). Backend tag covers the service-level behavior only. -->
 - [ ] Form validation prevents empty submissions
 
 ### UX — Participant
@@ -947,15 +941,9 @@ When the `MLFLOW_DSPY_DEV_EXPERIMENT_ID` environment variable is set, the discov
 - [ ] Overview bar shows stats inline + compact controls (Run Analysis, Add Traces, Pause, Model selector)
 - [ ] Draft rubric sidebar is always visible while browsing traces
 - [ ] Promote action visibly moves items from trace feed/summary into the sidebar
-- [ ] Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll)
-<!-- AUDIT: spec drift, owner decision pending — no TraceReferenceBadge component exists; the
-     live DraftRubricSidebar renders inline markdown origin links (click routes to origin)
-     instead of hover-preview badges. Criterion left in place, currently uncovered. -->
+- [ ] Draft rubric items link to their origin (inline origin link; click routes to the originating trace/finding)
 - [ ] Draft rubric items do NOT show source-type badges (Finding, Disagreement, etc.)
 - [ ] Disagreements color-coded by priority (red/yellow/blue) on trace cards
-<!-- AUDIT: live regression, owner decision pending — DiscoveryTraceCard renders all
-     disagreement priorities in rose instead of red/yellow/blue by priority. False green
-     tags (unmounted DiscoveryAnalysisTab vitest, backend data-shape test) were removed. -->
 - [ ] "Create Rubric →" in sidebar transitions to rubric creation with groups pre-populated as criteria
 
 ### Roadmap

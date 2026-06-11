@@ -334,6 +334,9 @@ class TestSpanDataResolution:
         resolved = resolve_span_data_refs([ref], self.ctx)
         assert resolved[0].value is None
 
+    @pytest.mark.req(
+        "Span data references are resolved in a post-processing step (not LLM-generated values)"
+    )
     def test_resolve_multiple_refs(self):
         refs = [
             SpanDataRef(
@@ -379,7 +382,7 @@ class TestToolBasedAgent:
         assert expected.issubset(milestone_tool_names)
 
     @pytest.mark.req(
-        "Agent uses trace inspection tools to selectively examine spans (not a full-text dump)"
+        "Agent accesses trace data through inspection tools (not a full-text dump)"
     )
     def test_format_trace_for_prompt_removed(self):
         """The old text-dump method should no longer exist."""
@@ -710,7 +713,7 @@ class TestBatchSummarization:
         assert all(r["summary"] is not None for r in results)
 
     @pytest.mark.req(
-        "Partial failures do not block the batch — failed traces are ingested with summary = null"
+        "Partial failures do not block the batch — failed traces are ingested with `summary = null`"
     )
     @pytest.mark.asyncio
     async def test_batch_partial_failure(self):

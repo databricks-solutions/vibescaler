@@ -20,6 +20,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, cohen_kappa_score, confusion_matrix
 
 from server.services.database_service import DatabaseService
+from server.utils.trace_display_utils import get_display_text
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -747,6 +748,27 @@ class AlignmentService:
             if "inputs" not in eval_df.columns or "outputs" not in eval_df.columns:
                 yield "Preparing inputs/outputs columns from MLflow trace data..."
 
+                # Load workshop display config (span filter + JSONPath) so the judge
+                # evaluates the same transformed text SMEs annotated in the TraceViewer
+                # (TRACE_DISPLAY_SPEC — Consistency; same wiring as judge_service).
+                workshop = self.db_service.get_workshop(workshop_id)
+                has_display_config = bool(
+                    workshop
+                    and (
+                        getattr(workshop, "span_attribute_filter", None)
+                        or getattr(workshop, "input_jsonpath", None)
+                        or getattr(workshop, "output_jsonpath", None)
+                    )
+                )
+                workshop_traces_by_mlflow_id: dict[str, Any] = {}
+                if has_display_config:
+                    for ws_trace in self.db_service.get_traces(workshop_id):
+                        mlflow_id = getattr(ws_trace, "mlflow_trace_id", None)
+                        if mlflow_id:
+                            workshop_traces_by_mlflow_id[str(mlflow_id).strip()] = ws_trace
+                    if workshop_traces_by_mlflow_id:
+                        yield "Applying workshop display pipeline (span filter + JSONPath) to evaluation inputs/outputs"
+
                 # Fetch full trace data for each trace_id to extract inputs/outputs
                 eval_df = eval_df.copy()
                 inputs_list = []
@@ -754,6 +776,20 @@ class AlignmentService:
 
                 for trace_id in eval_df["trace_id"]:
                     try:
+                        # Display-configured text when config exists (same pattern as
+                        # judge_service): the judge must see what the SMEs rated.
+                        ws_trace = workshop_traces_by_mlflow_id.get(trace_id)
+                        if ws_trace is not None:
+                            display_input, display_output = get_display_text(
+                                ws_trace,
+                                workshop,
+                                include_milestone_context=bool(getattr(ws_trace, "summary", None)),
+                            )
+                            inputs_list.append(display_input)
+                            outputs_list.append(display_output)
+                            continue
+
+                        # Raw fallback: fetch full MLflow trace data
                         full_trace = mlflow.get_trace(trace_id)
                         # Extract inputs/outputs from trace data structure
                         # MLflow traces have data.request and data.response

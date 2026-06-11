@@ -32,7 +32,58 @@ interface Disagreement {
   underlying_theme: string;
   followup_questions: string[];
   facilitator_suggestions: string[];
+  /** Disagreement priority tier: 'high' | 'medium' | 'lower'. Drives red/yellow/blue color-coding. */
+  priority?: string;
 }
+
+interface DisagreementTierStyle {
+  label: string;
+  container: string;
+  iconWrap: string;
+  icon: string;
+  labelText: string;
+  button: string;
+  theme: string;
+  questionCard: string;
+  bullet: string;
+}
+
+// Disagreements are color-coded by priority: red = high, yellow = medium, blue = lower.
+const DISAGREEMENT_TIER_STYLES: Record<string, DisagreementTierStyle> = {
+  high: {
+    label: 'High Disagreement',
+    container: 'border-red-200 bg-red-50/50 hover:bg-red-50',
+    iconWrap: 'bg-red-200',
+    icon: 'text-red-700',
+    labelText: 'text-red-800',
+    button: 'border-red-200 text-red-700 hover:bg-red-100 hover:text-red-800',
+    theme: 'text-red-800 bg-red-100/50',
+    questionCard: 'border-red-100',
+    bullet: 'text-red-400',
+  },
+  medium: {
+    label: 'Medium Disagreement',
+    container: 'border-yellow-200 bg-yellow-50/50 hover:bg-yellow-50',
+    iconWrap: 'bg-yellow-200',
+    icon: 'text-yellow-700',
+    labelText: 'text-yellow-800',
+    button: 'border-yellow-200 text-yellow-700 hover:bg-yellow-100 hover:text-yellow-800',
+    theme: 'text-yellow-800 bg-yellow-100/50',
+    questionCard: 'border-yellow-100',
+    bullet: 'text-yellow-400',
+  },
+  lower: {
+    label: 'Lower Disagreement',
+    container: 'border-blue-200 bg-blue-50/50 hover:bg-blue-50',
+    iconWrap: 'bg-blue-200',
+    icon: 'text-blue-700',
+    labelText: 'text-blue-800',
+    button: 'border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800',
+    theme: 'text-blue-800 bg-blue-100/50',
+    questionCard: 'border-blue-100',
+    bullet: 'text-blue-400',
+  },
+};
 
 export interface PromotePayload {
   key: string;
@@ -473,7 +524,7 @@ function DiscoverySocialThread({
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Comment on this trace. Use @assistant to summarize or @agent to investigate..."
+            placeholder="Add a comment for the panel..."
             className="min-h-[100px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -725,19 +776,20 @@ export const DiscoveryTraceCard: React.FC<DiscoveryTraceCardProps> = ({
               <div className="space-y-3 pl-2 border-l-2 border-slate-100 ml-3">
                 {disagreements?.map((d, i) => {
                   const key = `disagreement-${trace.id}-${i}`;
+                  const tier = DISAGREEMENT_TIER_STYLES[d.priority ?? 'high'] ?? DISAGREEMENT_TIER_STYLES.high;
                   return (
-                    <div key={key} className={`group relative rounded-xl border border-rose-200 bg-rose-50/50 p-4 shadow-sm transition-all hover:shadow-md hover:bg-rose-50 ${promotedKeys.has(key) ? ' promoted-collapsing opacity-50' : ''}`}>
+                    <div key={key} className={`group relative rounded-xl border ${tier.container} p-4 shadow-sm transition-all hover:shadow-md ${promotedKeys.has(key) ? ' promoted-collapsing opacity-50' : ''}`}>
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-rose-200 flex items-center justify-center">
-                            <AlertTriangle className="w-3.5 h-3.5 text-rose-700" />
+                          <div className={`h-6 w-6 rounded-full ${tier.iconWrap} flex items-center justify-center`}>
+                            <AlertTriangle className={`w-3.5 h-3.5 ${tier.icon}`} />
                           </div>
-                          <span className="text-xs font-bold uppercase tracking-wider text-rose-800">High Disagreement</span>
+                          <span className={`text-xs font-bold uppercase tracking-wider ${tier.labelText}`}>{tier.label}</span>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 text-[10px] font-semibold uppercase tracking-wider bg-white border-rose-200 text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition-colors shadow-sm"
+                          className={`h-7 text-[10px] font-semibold uppercase tracking-wider bg-white ${tier.button} transition-colors shadow-sm`}
                           disabled={promotedKeys.has(key)}
                           onClick={() => onPromote({ key, text: d.summary, source_type: 'disagreement', source_trace_ids: [d.trace_id] })}
                         >
@@ -770,14 +822,14 @@ export const DiscoveryTraceCard: React.FC<DiscoveryTraceCardProps> = ({
                         </ReactMarkdown>
                       </div>
                       <div className="pl-8 mt-3 space-y-3">
-                        <p className="text-xs font-medium text-rose-800 bg-rose-100/50 inline-block px-2 py-1 rounded">Theme: {d.underlying_theme}</p>
+                        <p className={`text-xs font-medium ${tier.theme} inline-block px-2 py-1 rounded`}>Theme: {d.underlying_theme}</p>
                         {d.followup_questions?.length > 0 && (
-                          <div className="bg-white rounded-lg border border-rose-100 p-3 shadow-sm">
+                          <div className={`bg-white rounded-lg border ${tier.questionCard} p-3 shadow-sm`}>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Follow-up Questions</span>
                             <ul className="space-y-1.5">
                               {d.followup_questions.map((q, qi) => (
                                 <li key={qi} className="text-xs text-slate-700 flex items-start gap-2">
-                                  <span className="text-rose-400 mt-0.5">•</span>
+                                  <span className={`${tier.bullet} mt-0.5`}>•</span>
                                   <span className="leading-relaxed">{q}</span>
                                 </li>
                               ))}
