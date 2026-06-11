@@ -81,10 +81,10 @@ spec-tagging-validator = "tools.spec_tagging_validator:main"
 test-summary = "tools.test_summary:main"
 
 [project.urls]
-Homepage = "https://github.com/databricks/human-eval-workshop"
-Documentation = "https://github.com/databricks/human-eval-workshop#readme"
-Repository = "https://github.com/databricks/human-eval-workshop"
-Issues = "https://github.com/databricks/human-eval-workshop/issues"
+Homepage = "https://github.com/databricks-solutions/project-0xfffff"
+Documentation = "https://github.com/databricks-solutions/project-0xfffff#readme"
+Repository = "https://github.com/databricks-solutions/project-0xfffff"
+Issues = "https://github.com/databricks-solutions/project-0xfffff/issues"
 
 [build-system]
 requires = ["hatchling"]
