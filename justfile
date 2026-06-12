@@ -534,8 +534,10 @@ spec-coverage *args:
     echo "📊 Analyzing spec test coverage..."
     uv run spec-coverage-analyzer {{args}}
     if [[ "{{args}}" != *"--affected"* ]]; then
+      mkdir -p docs/static
+      uv run spec-coverage-analyzer --json > docs/static/spec-coverage.json
       echo ""
-      echo "📋 Coverage report: SPEC_COVERAGE_MAP.md"
+      echo "📋 Coverage report: SPEC_COVERAGE_MAP.md (+ docs/static/spec-coverage.json snapshot)"
     fi
   fi
 

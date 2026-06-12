@@ -3,6 +3,6 @@
   "private": true,
   "description": "Root package.json to enable Databricks Apps Node.js build flow",
   "scripts": {
-    "build": "NPM_CONFIG_REGISTRY=https://registry.npmjs.org/ npm -C client install && npm -C client run build && NPM_CONFIG_REGISTRY=https://registry.npmjs.org/ npm -C docs install && mkdir -p docs/static && python3 tools/spec_coverage_analyzer.py --json > docs/static/spec-coverage.json && npm -C docs run build"
+    "build": "bash tools/build_app.sh"
   }
 }
