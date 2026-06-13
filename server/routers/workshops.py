@@ -4441,6 +4441,7 @@ async def start_simple_evaluation(
                 trace_map = {t.id: t for t in traces}
 
                 evaluations = []
+                failed_evaluations: list[dict[str, Any]] = []
                 job.add_log(f"Evaluating {len(trace_annotations)} traces using endpoint: {request.endpoint_name}")
 
                 # Log sample ratings for debugging
@@ -4568,17 +4569,27 @@ async def start_simple_evaluation(
                                 "reject",
                                 "bad",
                                 "does not satisfy",
+                                # Common negated-pass phrases (whole-word match, checked first)
+                                "not good",
+                                "not acceptable",
+                                "not correct",
+                                "not pass",
                             ]
 
-                            if any(word in response_lower for word in pass_keywords):
-                                predicted_rating = 1  # Pass
-                                job.add_log(
-                                    f"✅ Binary judge: Found PASS keyword in response for trace {trace_id[:8]}..."
-                                )
-                            elif any(word in response_lower for word in fail_keywords):
+                            # Match keywords by WHOLE WORD (regex word boundaries), not substring,
+                            # so "incorrect"/"unacceptable" are not read as "correct"/"acceptable".
+                            # Check FAIL first so negatives win.
+                            fail_pattern = r"\b(?:" + "|".join(re.escape(k) for k in fail_keywords) + r")\b"
+                            pass_pattern = r"\b(?:" + "|".join(re.escape(k) for k in pass_keywords) + r")\b"
+                            if re.search(fail_pattern, response_lower):
                                 predicted_rating = 0  # Fail
                                 job.add_log(
                                     f"✅ Binary judge: Found FAIL keyword in response for trace {trace_id[:8]}..."
+                                )
+                            elif re.search(pass_pattern, response_lower):
+                                predicted_rating = 1  # Pass
+                                job.add_log(
+                                    f"✅ Binary judge: Found PASS keyword in response for trace {trace_id[:8]}..."
                                 )
                             else:
                                 # Try to extract ONLY 0 or 1 (strict - reject anything else)
@@ -4599,34 +4610,42 @@ async def start_simple_evaluation(
                                                 f"⚠️ Binary judge: Response contains {found_number} (not 0 or 1) for trace {trace_id[:8]}... - ignoring. Response: {response_text[:150]}"
                                             )
 
-                            # Default for binary - only if we couldn't parse anything
-                            if predicted_rating is None:
+                            # Do NOT default unparseable output to Pass. Leave it None and
+                            # handle it below as a failed evaluation (excluded from agreement).
+                            if predicted_rating is not None and predicted_rating not in [0, 1]:
                                 job.add_log(
-                                    f"⚠️ Binary judge: Could not parse binary rating from response for trace {trace_id[:8]}... - defaulting to 1 (Pass). Response: {response_text[:150]}"
+                                    f"⚠️ Binary judge: invalid rating {predicted_rating} for trace {trace_id[:8]}... - treating as unparseable."
                                 )
-                                predicted_rating = 1  # Default to pass if unclear
-
-                            # Final validation: ensure predicted_rating is strictly 0 or 1
-                            if predicted_rating not in [0, 1]:
-                                job.add_log(
-                                    f"❌ Binary judge: Invalid rating {predicted_rating} detected - forcing to 1. Response: {response_text[:150]}"
-                                )
-                                predicted_rating = 1
+                                predicted_rating = None
                         else:
                             # Likert judge: look for numeric rating 1-5
                             match = re.search(r"\b([1-5])\b", response_text)
                             if match:
                                 predicted_rating = int(match.group(1))
 
-                            # Default for Likert
-                            if predicted_rating is None:
-                                predicted_rating = 3  # Default to neutral if unclear
+                            # Do NOT default unparseable output to neutral (3). Leave it None
+                            # and handle it below as a failed evaluation.
 
                         # Log the final predicted rating for debugging (first few traces)
                         if idx < 3:
                             job.add_log(
                                 f"📊 Final predicted_rating for trace {trace_id[:8]}...: {predicted_rating} (is_binary_judge={is_binary_judge})"
                             )
+
+                        # Unparseable judge output: do not fabricate a rating (previously
+                        # defaulted to Pass/3). Record as a failure and exclude from agreement.
+                        if predicted_rating is None:
+                            job.add_log(
+                                f"⚠️ Could not parse a rating from judge output for trace {trace_id[:8]}... - excluded from agreement."
+                            )
+                            failed_evaluations.append(
+                                {
+                                    "trace_id": trace_id,
+                                    "human_rating": human_rating,
+                                    "error": "unparseable judge output",
+                                }
+                            )
+                            continue
 
                         evaluations.append(
                             {
@@ -4647,14 +4666,15 @@ async def start_simple_evaluation(
                         error_details = traceback.format_exc()
                         job.add_log(f"Warning: Failed to evaluate trace {trace_id[:8]}...: {str(eval_err)[:100]}")
                         job.add_log(f"Error details: {error_details[-300:]}")  # Last 300 chars of traceback
-                        # Use default rating on error (use human rating as fallback)
-                        evaluations.append(
+                        # Record the failure but do NOT fabricate agreement. Previously this
+                        # appended predicted_rating == human_rating, which counted a failed LLM
+                        # call as perfect agreement and inflated Cohen's kappa. Failed traces are
+                        # excluded from the agreement set and surfaced as a failure count instead.
+                        failed_evaluations.append(
                             {
                                 "trace_id": trace_id,
-                                "predicted_rating": human_rating,
                                 "human_rating": human_rating,
-                                "confidence": 0.0,
-                                "reasoning": f"Evaluation error: {eval_err!s}",
+                                "error": str(eval_err),
                             }
                         )
 
@@ -4662,6 +4682,11 @@ async def start_simple_evaluation(
                 job.add_log(
                     f"📊 Evaluation loop complete: {len(evaluations)} evaluations from {len(trace_annotations)} annotated traces"
                 )
+                if failed_evaluations:
+                    job.add_log(
+                        f"⚠️ {len(failed_evaluations)} trace(s) failed to evaluate and were excluded from agreement "
+                        f"(not counted as matches)."
+                    )
                 if len(evaluations) < len(trace_annotations):
                     skipped = len(trace_annotations) - len(evaluations)
                     job.add_log(f"⚠️ WARNING: {skipped} trace(s) were skipped during evaluation!")
@@ -4711,6 +4736,7 @@ async def start_simple_evaluation(
                     "correlation": float(kappa),
                     "accuracy": float(accuracy),
                     "total_evaluations": len(evaluations),
+                    "failed_evaluations": len(failed_evaluations),
                     "confusion_matrix": conf_matrix_list,
                     "agreement_by_rating": {},
                     "is_binary": is_binary_judge,
