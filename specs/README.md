@@ -357,6 +357,5 @@ Issues where the spec documents intended behavior but the implementation diverge
 ## Related Documentation
 
 - [CHANGELOG](/CHANGELOG) — version history
-- [RELEASE_NOTES](/RELEASE_NOTES) — release documentation
 - [Facilitator Guide](/FACILITATOR_GUIDE) — deployment and workshop facilitation
 - [Lakebase Setup](/lakebase-setup) — Databricks Apps database setup

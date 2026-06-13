@@ -1,6 +1,11 @@
 # Documentation
 
-This folder contains release notes and version history.
+This folder contains product documentation, release notes, and version history.
+
+## Start Here
+
+- [VibeScaler Overview](/OVERVIEW) — what the product does and what's built today, linked to specs
+- [Running a Facilitated Session](/RUNNING_A_SESSION) — pacing, energy, and coaching for live sessions
 
 ## Specifications
 
@@ -8,10 +13,7 @@ Browse the [Specs Index](/specs/) for searchable specifications, success-criteri
 
 ## Release Documentation
 
-- **[RELEASE_NOTES.md](RELEASE_NOTES.md)** - Current release information and quick start guide
 - **[CHANGELOG.md](CHANGELOG.md)** - Full version history
-- **[VERSION_1.5_RELEASE.md](VERSION_1.5_RELEASE.md)** - v1.5 release details
-- **[VERSION_1.3_RELEASE.md](VERSION_1.3_RELEASE.md)** - v1.3 release details
 
 ## Other Documentation
 

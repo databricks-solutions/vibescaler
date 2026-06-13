@@ -37,6 +37,7 @@ Notes:
 
 - **Start simple, then go deeper**: each example begins with a baseline prompt (“what makes this effective or ineffective?”). As a participant responds, the application can propose a small number of follow-up questions that encourage deeper thinking (edge cases, missing info, boundary conditions, failure modes).
 - **Probe disagreements intentionally**: when different participants notice different things about the same example, follow-up questions can be tailored to surface the disagreement and clarify the underlying definition of “good” vs “bad”.
+- **Steer the follow-ups**: the generated questions are suggestions, not a script. If a follow-up isn’t germane to what you actually noticed, say so and describe what you observed instead — subsequent questions adapt to your observation.
 - **Stop when coverage is good**: follow-up questions aren’t infinite; once the key angles have been explored (or a sensible limit is reached), the application stops proposing more so the group can move on.
 
 ### For the facilitator (across participants and examples)

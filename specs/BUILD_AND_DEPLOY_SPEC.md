@@ -199,6 +199,16 @@ The Databricks Apps build then runs on the platform:
 `app.yaml` command. Requires `DATABRICKS_APP_NAME` (set by `just configure`)
 and optionally `DATABRICKS_CONFIG_PROFILE`.
 
+The root `npm run build` invokes `tools/build_app.sh`, which builds the
+client app and the docs site **in parallel** (total build time is bounded by
+the slower of the two). The spec-coverage JSON the docs import at compile
+time is committed as a snapshot (`docs/static/spec-coverage.json`, refreshed
+by `just spec-coverage` alongside `SPEC_COVERAGE_MAP.md`): the build
+regenerates it only when full-fidelity analysis is possible (`uv` present);
+otherwise the committed snapshot is used, so the Apps build container —
+which has Node and Python but not `uv` — ships accurate bars instead of the
+analyzer's degraded fallback scan, and the docs always build.
+
 There is no `deploy.sh`; database bootstrap happens at app startup via the
 gunicorn `on_starting` hook (see Bootstrap Behavior), not as a deploy step.
 

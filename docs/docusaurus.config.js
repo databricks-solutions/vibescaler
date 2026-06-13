@@ -52,6 +52,23 @@ const config = {
         sidebarPath: require.resolve('./specsSidebars.js'),
       }),
     ],
+    [
+      '@docusaurus/plugin-content-docs',
+      /** @type {import('@docusaurus/plugin-content-docs').Options} */
+      ({
+        id: 'v2',
+        path: '../docs/plans',
+        routeBasePath: 'v2',
+        // Curated: only the V2 vision docs are published; dated implementation
+        // working-plans in the same folder stay internal.
+        include: [
+          'v2_master_north_star.md',
+          'llm_judge_active_learning_prd.md',
+          'grading_rubrics_research.md',
+        ],
+        sidebarPath: require.resolve('./v2Sidebars.js'),
+      }),
+    ],
   ],
 
   themes: [
@@ -63,8 +80,8 @@ const config = {
         // dev/prod static server redirects to `search-index.json/?_=…` which 404s.
         hashed: 'filename',
         language: ['en'],
-        docsRouteBasePath: ['/', '/specs'],
-        docsDir: ['../doc', '../specs'],
+        docsRouteBasePath: ['/', '/specs', '/v2'],
+        docsDir: ['../doc', '../specs', '../docs/plans'],
         indexBlog: false,
         searchBarShortcut: true,
         searchBarShortcutHint: true,
@@ -93,6 +110,13 @@ const config = {
             sidebarId: 'specsSidebar',
             position: 'left',
             label: 'Specs',
+          },
+          {
+            type: 'docSidebar',
+            docsPluginId: 'v2',
+            sidebarId: 'v2Sidebar',
+            position: 'left',
+            label: 'V2 Vision',
           },
           {
             // pathname:// escapes baseUrl (/docs/) so this targets the app root on the same host.

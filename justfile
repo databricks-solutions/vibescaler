@@ -323,6 +323,61 @@ docs-coverage:
   mkdir -p {{docs-dir}}/static
   python3 tools/spec_coverage_analyzer.py --json > {{docs-dir}}/static/spec-coverage.json
 
+# Fail when docs reference specs whose tagged tests are failing in the latest
+# run — run after tests, before docs-build, so stale docs never publish.
+[group('dev')]
+docs-gate:
+  uv run python tools/docs_health_gate.py
+
+# Regenerate docs UI walkthroughs (screenshots + .webm) by driving the real app
+# with Playwright demo specs (client/tests/demos/*.demo.ts → docs/static/demos/).
+[group('dev')]
+docs-demos:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  export E2E_QUIET=1
+  mkdir -p .test-results {{docs-dir}}/static/demos
+
+  DB_PATH=".e2e-demos.db"
+  API_PORT=$(just _find-port 8000)
+  UI_PORT=$(just _find-port 3000)
+  echo "Using ports: API=$API_PORT, UI=$UI_PORT"
+  rm -f "$DB_PATH"
+
+  # Job control so the servers subshell leads its own process group — cleanup
+  # must kill the whole group (uvicorn + vite), or `wait` hangs forever on
+  # orphaned children when this runs non-interactively.
+  set -m
+  (
+    set +e
+    just e2e-servers "$DB_PATH" "$API_PORT" "$UI_PORT"
+    code=$?
+    if [ "$code" -eq 130 ] || [ "$code" -eq 143 ]; then
+      exit 0
+    fi
+    exit "$code"
+  ) &
+  servers_pid=$!
+  set +m
+
+  cleanup() {
+    if kill -0 "$servers_pid" 2>/dev/null; then
+      kill -TERM -- "-$servers_pid" 2>/dev/null || kill -TERM "$servers_pid" 2>/dev/null || true
+    fi
+    wait "$servers_pid" 2>/dev/null || true
+  }
+  trap cleanup INT TERM EXIT
+
+  just e2e-wait-ready "$API_PORT" "$UI_PORT"
+
+  PW_DEMOS=1 PW_NO_WEBSERVER=1 \
+    DEMO_OUT_DIR="{{justfile_directory()}}/{{docs-dir}}/static/demos" \
+    E2E_API_URL="http://127.0.0.1:$API_PORT" \
+    PLAYWRIGHT_BASE_URL="http://127.0.0.1:$UI_PORT" \
+    npm -C {{client-dir}} run test -- tests/demos --project=demos --workers=1
+
+  cleanup
+
 # `docusaurus start` — fast reload; @easyops-cn/docusaurus-search-local index is build-only.
 [group('dev')]
 docs-dev:
@@ -482,8 +537,10 @@ spec-coverage *args:
     echo "📊 Analyzing spec test coverage..."
     uv run spec-coverage-analyzer {{args}}
     if [[ "{{args}}" != *"--affected"* ]]; then
+      mkdir -p docs/static
+      uv run spec-coverage-analyzer --json > docs/static/spec-coverage.json
       echo ""
-      echo "📋 Coverage report: SPEC_COVERAGE_MAP.md"
+      echo "📋 Coverage report: SPEC_COVERAGE_MAP.md (+ docs/static/spec-coverage.json snapshot)"
     fi
   fi
 
