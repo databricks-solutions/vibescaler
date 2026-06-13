@@ -1090,6 +1090,19 @@ class AlignmentService:
             else:
                 yield "WARNING: Result DataFrame is None"
 
+            # Fail loudly when no evaluations were produced (judge value column missing,
+            # result DataFrame empty/None, or every row failed to parse) instead of
+            # returning success with kappa=0, which is indistinguishable from a real result.
+            if not evaluations:
+                error_msg = (
+                    f"Evaluation produced zero results from {len(trace_ids_for_eval)} traces. "
+                    "The judge value column may be missing or every row failed to parse — "
+                    "see the log above for available columns and skipped/errored rows."
+                )
+                yield f"ERROR: {error_msg}"
+                yield {"error": error_msg, "success": False}
+                return
+
             # Use effective_judge_type for appropriate metrics calculation
             yield f"Computing metrics for judge type: {effective_judge_type}"
 
