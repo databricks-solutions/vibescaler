@@ -640,3 +640,36 @@ def test_store_evaluation_results_skips_none_ratings(db_service, workshop, trace
     stored = db_service.get_judge_evaluations(workshop.id, prompts[0].id)
     assert len(stored) == 1
     assert stored[0].trace_id == "t-2"
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+@pytest.mark.req("Evaluation with zero extracted results fails loudly instead of reporting kappa=0")
+def test_evaluation_with_zero_results_fails_instead_of_reporting_success():
+    """run_evaluation_with_answer_sheet must not return success with empty evaluations.
+
+    When the judge value column is missing, the result DataFrame is None, or every row
+    fails to parse, ``evaluations`` is empty and ``_calculate_eval_metrics([])`` returns
+    kappa=0 (see test_calculate_eval_metrics_empty_returns_defaults). Returning
+    success=True with kappa=0 is indistinguishable from a real zero-agreement result, so
+    the generator must yield an error result and stop *before* computing metrics.
+    """
+    import inspect
+
+    import server.services.alignment_service as svc
+
+    source = inspect.getsource(svc.AlignmentService.run_evaluation_with_answer_sheet)
+
+    assert "if not evaluations:" in source, (
+        "run_evaluation_with_answer_sheet must guard against zero extracted evaluations"
+    )
+    guard_idx = source.index("if not evaluations:")
+    metrics_idx = source.index("_calculate_eval_metrics(evaluations")
+    assert guard_idx < metrics_idx, (
+        "the zero-results guard must run BEFORE _calculate_eval_metrics so an empty "
+        "evaluation set fails loudly instead of reporting kappa=0"
+    )
+    guard_block = source[guard_idx:metrics_idx]
+    assert '"success": False' in guard_block, (
+        "the zero-results guard must yield {'success': False, 'error': ...}, not proceed "
+        "to build a success result with kappa=0"
+    )

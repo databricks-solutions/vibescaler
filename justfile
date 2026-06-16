@@ -23,8 +23,11 @@ client-dir := "client"
 docs-dir := "docs"
 docs-port := "3100"
 server-dir := "server"
-db-pypi-index := "https://pypi-proxy.dev.databricks.com/simple"
-db-npm-registry := "https://npm-proxy.dev.databricks.com/"
+# Package registries default to the public ones (works for external users).
+# Databricks-internal devs: export DB_PYPI_INDEX / DB_NPM_REGISTRY to the
+# internal proxies (public PyPI/npm are blocked on the corp network).
+db-pypi-index := env_var_or_default("DB_PYPI_INDEX", "https://pypi.org/simple")
+db-npm-registry := env_var_or_default("DB_NPM_REGISTRY", "https://registry.npmjs.org/")
 
 # Default target: show available recipes
 _default:

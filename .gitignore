@@ -34,6 +34,12 @@ workshop.db
 
 # Test results (JSON reports for LLM agents)
 .test-results/
+test-results/
+e2e-test-output.txt
 htmlcov/
 coverage/
 .coverage
+
+# Local backup / build-timestamp artifacts (should never be committed)
+*.bak
+client/vite.config.ts.timestamp-*.mjs
