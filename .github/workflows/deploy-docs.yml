@@ -1,0 +1,83 @@
+name: Deploy Docs to GitHub Pages
+
+# Builds the Docusaurus site (docs/) and publishes it to GitHub Pages.
+# Content comes from /doc, /specs, and curated /docs/plans (see docs/docusaurus.config.js).
+#
+# Prerequisites (one-time, in repo Settings):
+#   1. Actions enabled for this repository.
+#   2. Pages → Build and deployment → Source = "GitHub Actions".
+#
+# Published at: https://databrickslabs.github.io/project-0xfffff/
+
+on:
+  push:
+    branches: ["rc/v1.10.0"]
+    paths:
+      - "docs/**"
+      - "doc/**"
+      - "specs/**"
+      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
+
+# Least-privilege token scoped for Pages deployment via OIDC.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deploy; let an in-progress run finish rather than cancel it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install docs dependencies
+        run: npm -C docs install --package-lock=false
+
+      # The SpecCoverage component embeds docs/static/spec-coverage.json, which is
+      # committed to the repo. We intentionally do NOT regenerate it here: the
+      # analyzer's Vitest scan needs the full client toolchain, and a partial CI run
+      # would publish understated coverage. Refresh it locally with `just docs-coverage`.
+      - name: Build Docusaurus site
+        env:
+          DOCS_URL: https://databrickslabs.github.io
+          DOCS_BASE_URL: /project-0xfffff/
+          DOCS_ORG: databrickslabs
+          DOCS_PROJECT: project-0xfffff
+          DOCS_STANDALONE: "1"
+        run: npm -C docs run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

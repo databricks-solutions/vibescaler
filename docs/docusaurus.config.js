@@ -4,12 +4,14 @@ const config = {
   title: 'Judge Builder Workshop',
   tagline: 'Setup and facilitation docs for the Databricks workshop app',
 
-  url: 'https://example.com',
-  baseUrl: '/docs/',
+  // Deployment target. Defaults serve the docs under the Databricks App at /docs/.
+  // The GitHub Pages workflow overrides these via env (.github/workflows/deploy-docs.yml).
+  url: process.env.DOCS_URL || 'https://example.com',
+  baseUrl: process.env.DOCS_BASE_URL || '/docs/',
   trailingSlash: true,
 
-  organizationName: 'databricks-solutions',
-  projectName: 'project-0xfffff',
+  organizationName: process.env.DOCS_ORG || 'databricks-solutions',
+  projectName: process.env.DOCS_PROJECT || 'project-0xfffff',
 
   onBrokenLinks: 'warn',
   markdown: {
@@ -118,12 +120,18 @@ const config = {
             position: 'left',
             label: 'V2 Vision',
           },
-          {
-            // pathname:// escapes baseUrl (/docs/) so this targets the app root on the same host.
-            to: 'pathname:///',
-            label: 'Open App',
-            position: 'right',
-          },
+          // App and docs are co-hosted under the Databricks App; on a standalone
+          // deploy (GitHub Pages) there is no app to open, so DOCS_STANDALONE drops it.
+          ...(process.env.DOCS_STANDALONE
+            ? []
+            : [
+                {
+                  // pathname:// escapes baseUrl (/docs/) so this targets the app root on the same host.
+                  to: 'pathname:///',
+                  label: 'Open App',
+                  position: 'right',
+                },
+              ]),
         ],
       },
       footer: {
