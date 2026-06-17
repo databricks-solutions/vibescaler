@@ -1,6 +1,7 @@
 # How These Docs Work
 
 import SpecLink from '@site/src/components/SpecLink';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 These docs are organized along the two axes of [Diátaxis](https://diataxis.fr/):
 
@@ -39,6 +40,6 @@ just docs-demos   # regenerates docs/static/demos/<SPEC_NAME>/*.{png,webm}
 
 Because the media is generated from the live app, it can't silently drift from reality the way hand-captured screenshots do: when the UI changes, rerunning one command re-captures every walkthrough. Artifacts are organized per spec, so each walkthrough sits next to the coverage data for the behavior it shows.
 
-<img src="/docs/demos/ANNOTATION_SPEC/annotation-interface.png" alt="Generated screenshot of the SME annotation interface" width="100%" />
+<img src={useBaseUrl('/demos/ANNOTATION_SPEC/annotation-interface.png')} alt="Generated screenshot of the SME annotation interface" width="100%" />
 
 *Example: the SME annotation interface, captured by `just docs-demos`.*

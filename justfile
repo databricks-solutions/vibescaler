@@ -405,6 +405,51 @@ docs-build:
   python3 tools/spec_coverage_analyzer.py --json > {{docs-dir}}/static/spec-coverage.json
   npm -C {{docs-dir}} run build
 
+# Build for GitHub Pages and publish to the gh-pages branch of a remote
+# (default: labs → https://databrickslabs.github.io/vibescaler/). Use this while
+# repo Actions are disabled; it mirrors .github/workflows/deploy-docs.yml.
+# Media uses useBaseUrl(), so /demos/* resolves under the Pages baseUrl with no
+# hardcoded paths to rewrite — building the docs IS pointing the links correctly.
+[group('dev')]
+docs-deploy-pages remote="labs":
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  if [ ! -d "{{docs-dir}}/node_modules" ] || [ "{{docs-dir}}/package.json" -nt "{{docs-dir}}/node_modules" ]; then
+    just npm-install {{docs-dir}}
+  fi
+
+  # Regenerate spec coverage; keep the committed copy if generation fails.
+  mkdir -p {{docs-dir}}/static
+  if python3 tools/spec_coverage_analyzer.py --json > /tmp/spec-coverage.json; then
+    mv /tmp/spec-coverage.json {{docs-dir}}/static/spec-coverage.json
+  else
+    echo "⚠️  spec coverage generation failed; using committed {{docs-dir}}/static/spec-coverage.json"
+  fi
+
+  # Build with GitHub Pages url/baseUrl so assets and media resolve under /vibescaler/.
+  DOCS_URL="https://databrickslabs.github.io" \
+  DOCS_BASE_URL="/vibescaler/" \
+  DOCS_ORG="databrickslabs" \
+  DOCS_PROJECT="vibescaler" \
+  DOCS_STANDALONE="1" \
+    npm -C {{docs-dir}} run build
+
+  # .nojekyll so GitHub Pages serves Docusaurus assets verbatim (skips Jekyll).
+  touch {{docs-dir}}/build/.nojekyll
+
+  # Publish build output to gh-pages (force-push: it is a generated artifact).
+  REMOTE_URL="$(git remote get-url {{remote}})"
+  PUBLISH_DIR="$(mktemp -d)"
+  cp -R {{docs-dir}}/build/. "$PUBLISH_DIR/"
+  git -C "$PUBLISH_DIR" init -q
+  git -C "$PUBLISH_DIR" add -A
+  git -C "$PUBLISH_DIR" -c user.name="docs-deploy" -c user.email="docs-deploy@vibescaler" commit -qm "deploy docs $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  git -C "$PUBLISH_DIR" push -f "$REMOTE_URL" HEAD:gh-pages
+  rm -rf "$PUBLISH_DIR"
+
+  echo "✅ Published to https://databrickslabs.github.io/vibescaler/"
+
 # `docusaurus build` + `docusaurus serve` — use this to verify Cmd+K search locally.
 [group('dev')]
 docs-serve:
