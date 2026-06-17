@@ -7,7 +7,7 @@ name: Deploy Docs to GitHub Pages
 #   1. Actions enabled for this repository.
 #   2. Pages → Build and deployment → Source = "GitHub Actions".
 #
-# Published at: https://databrickslabs.github.io/project-0xfffff/
+# Published at: https://databrickslabs.github.io/vibescaler/
 
 on:
   push:
@@ -57,9 +57,9 @@ jobs:
       - name: Build Docusaurus site
         env:
           DOCS_URL: https://databrickslabs.github.io
-          DOCS_BASE_URL: /project-0xfffff/
+          DOCS_BASE_URL: /vibescaler/
           DOCS_ORG: databrickslabs
-          DOCS_PROJECT: project-0xfffff
+          DOCS_PROJECT: vibescaler
           DOCS_STANDALONE: "1"
         run: npm -C docs run build
 
