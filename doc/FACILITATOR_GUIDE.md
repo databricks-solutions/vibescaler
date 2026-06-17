@@ -1,4 +1,4 @@
-# Judge Builder Workshop - Facilitator Guide
+# VibeScaler - Facilitator Guide
 
 A comprehensive guide for facilitators to deploy, configure, and run the LLM Judge Calibration Workshop application on Databricks.
 
