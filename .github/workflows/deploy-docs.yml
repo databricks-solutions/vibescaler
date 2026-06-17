@@ -3,9 +3,14 @@ name: Deploy Docs to GitHub Pages
 # Builds the Docusaurus site (docs/) and publishes it to GitHub Pages.
 # Content comes from /doc, /specs, and curated /docs/plans (see docs/docusaurus.config.js).
 #
-# Prerequisites (one-time, in repo Settings):
-#   1. Actions enabled for this repository.
+# NOTE: This is the GitHub Actions deploy path, kept for when Actions get enabled
+# on this repo. Until then the live site is served from the `gh-pages` branch
+# (Pages → "Deploy from a branch"), rebuilt via `just docs-build` + a manual push.
+# To switch over to this workflow:
+#   1. Enable Actions for this repository (Settings → Actions → General).
 #   2. Pages → Build and deployment → Source = "GitHub Actions".
+#   3. Run it (Actions tab → "Deploy Docs to GitHub Pages" → Run workflow); it then
+#      supersedes the gh-pages branch.
 #
 # Published at: https://databrickslabs.github.io/vibescaler/
 
