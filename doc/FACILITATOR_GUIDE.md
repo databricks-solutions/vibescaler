@@ -127,7 +127,7 @@ You can deploy directly from the GitHub repository — no need to download or im
 #### Option A: Deploy from Git (Recommended)
 
 1. On the app details page, configure the Git repository:
-   - Enter the repository URL: `https://github.com/databricks-solutions/project-0xfffff`
+   - Enter the repository URL: `https://github.com/databrickslabs/vibescaler`
    - Select **GitHub** as the Git provider
    - Click **Save**
 2. Click **Deploy**, then select **From Git**
@@ -141,7 +141,7 @@ You can deploy directly from the GitHub repository — no need to download or im
 
 If you prefer to deploy from a workspace copy (e.g., for an air-gapped environment):
 
-1. Download the source code zip from the [releases page](https://github.com/databricks-solutions/project-0xfffff/releases)
+1. Download the source code zip from the [releases page](https://github.com/databrickslabs/vibescaler/releases)
 2. In Databricks, go to **Workspace** → click the **three dots** → **Import**
 3. Drag and drop the zip file and click **Import**
 4. On the app details page, click **Deploy**

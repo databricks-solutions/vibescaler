@@ -7,7 +7,7 @@ const sidebars = {
       type: 'category',
       label: 'Start here',
       collapsed: false,
-      items: ['OVERVIEW', 'ABOUT_THESE_DOCS'],
+      items: ['OVERVIEW', 'quickstart', 'ABOUT_THESE_DOCS'],
     },
     {
       type: 'category',
