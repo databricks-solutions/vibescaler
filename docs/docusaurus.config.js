@@ -1,8 +1,8 @@
 // @ts-check
 
 const config = {
-  title: 'Judge Builder Workshop',
-  tagline: 'Setup and facilitation docs for the Databricks workshop app',
+  title: 'VibeScaler',
+  tagline: 'Setup and facilitation docs for VibeScaler',
 
   // Deployment target. Defaults serve the docs under the Databricks App at /docs/.
   // The GitHub Pages workflow overrides these via env (.github/workflows/deploy-docs.yml).
@@ -98,7 +98,7 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'Judge Builder Workshop',
+        title: 'VibeScaler',
         items: [
           {
             type: 'docSidebar',
