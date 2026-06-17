@@ -15,7 +15,7 @@ Every session opens with some version of this. Read it aloud if it helps:
 >
 > The rubric is the concrete mechanism: your observations become criteria, your scores calibrate a judge, and by the end of the session that judge evaluates the way you do. What makes VibeScaler different is that the rubric doesn't end as a document — it's a **living rubric**: judges aligned to it keep measuring production traffic, and it evolves as your agent and your experts do.
 
-For the research behind rubric-based calibration (HealthBench, Mercor's ACE benchmark, the Rubric Gap), see [Grading Rubrics for AI Model Calibration](/v2/grading_rubrics_research) in the V2 section.
+For the research behind rubric-based calibration (HealthBench, Mercor's ACE benchmark, the Rubric Gap), see [Grading Rubrics for AI Model Calibration](/roadmap/grading_rubrics_research) in the Roadmap section.
 
 ## Before the session: selecting discovery traces
 

@@ -1,3 +1,7 @@
+---
+draft: true
+---
+
 # Using VibeScaler with Coding Agents
 
 This repository is built to be worked on — and operated — with coding agents like Claude Code and Cursor. This page covers both directions: how the repo is structured so agents can contribute safely, and how to use these docs as agent context when facilitating.

@@ -1,3 +1,7 @@
+---
+slug: /
+---
+
 # VibeScaler Overview
 
 import SpecLink from '@site/src/components/SpecLink';

@@ -1,10 +1,14 @@
+---
+slug: /documentation-index
+---
+
 # Documentation
 
 This folder contains product documentation, release notes, and version history.
 
 ## Start Here
 
-- [VibeScaler Overview](/OVERVIEW) — what the product does and what's built today, linked to specs
+- [VibeScaler Overview](/) — what the product does and what's built today, linked to specs
 - [Running a Facilitated Session](/RUNNING_A_SESSION) — pacing, energy, and coaching for live sessions
 
 ## Specifications

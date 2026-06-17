@@ -419,12 +419,23 @@ docs-deploy-pages remote="labs":
     just npm-install {{docs-dir}}
   fi
 
-  # Regenerate spec coverage; keep the committed copy if generation fails.
+  # Refresh spec coverage, but never publish a partial scan: regenerating without the
+  # full client+server toolchain silently undercounts (the Vitest/e2e scan no-ops).
+  # Adopt the fresh report only if it covers at least as much as the committed one;
+  # otherwise keep committed and tell the user to run `just docs-coverage` first.
   mkdir -p {{docs-dir}}/static
-  if python3 tools/spec_coverage_analyzer.py --json > /tmp/spec-coverage.json; then
-    mv /tmp/spec-coverage.json {{docs-dir}}/static/spec-coverage.json
+  COMMITTED="{{docs-dir}}/static/spec-coverage.json"
+  if python3 tools/spec_coverage_analyzer.py --json > /tmp/spec-coverage.json 2>/dev/null; then
+    NEW="$(python3 -c "import json;print(json.load(open('/tmp/spec-coverage.json'))['summary']['covered_requirements'])" 2>/dev/null || echo 0)"
+    OLD="$(python3 -c "import json;print(json.load(open('$COMMITTED'))['summary']['covered_requirements'])" 2>/dev/null || echo 0)"
+    if [ "$NEW" -ge "$OLD" ]; then
+      mv /tmp/spec-coverage.json "$COMMITTED"
+      echo "↻ spec coverage refreshed ($NEW criteria covered)"
+    else
+      echo "⚠️  regenerated coverage ($NEW) < committed ($OLD) — likely a partial scan; keeping committed. Run 'just docs-coverage' with the full toolchain to refresh."
+    fi
   else
-    echo "⚠️  spec coverage generation failed; using committed {{docs-dir}}/static/spec-coverage.json"
+    echo "⚠️  spec coverage generation failed; using committed coverage"
   fi
 
   # Build with GitHub Pages url/baseUrl so assets and media resolve under /vibescaler/.

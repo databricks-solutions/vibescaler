@@ -1,7 +1,6 @@
 ---
 id: README
 title: Specifications Index
-slug: /
 sidebar_position: 1
 sidebar_label: Specs Index
 ---

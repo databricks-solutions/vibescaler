@@ -54,23 +54,8 @@ const config = {
         sidebarPath: require.resolve('./specsSidebars.js'),
       }),
     ],
-    [
-      '@docusaurus/plugin-content-docs',
-      /** @type {import('@docusaurus/plugin-content-docs').Options} */
-      ({
-        id: 'v2',
-        path: '../docs/plans',
-        routeBasePath: 'v2',
-        // Curated: only the V2 vision docs are published; dated implementation
-        // working-plans in the same folder stay internal.
-        include: [
-          'v2_master_north_star.md',
-          'llm_judge_active_learning_prd.md',
-          'grading_rubrics_research.md',
-        ],
-        sidebarPath: require.resolve('./v2Sidebars.js'),
-      }),
-    ],
+    // 'v2' docs plugin removed — the V2 vision docs now live in the main docs under
+    // the 'Changelog & roadmap' section (doc/roadmap/), so they share one sidebar.
   ],
 
   themes: [
@@ -82,8 +67,8 @@ const config = {
         // dev/prod static server redirects to `search-index.json/?_=…` which 404s.
         hashed: 'filename',
         language: ['en'],
-        docsRouteBasePath: ['/', '/specs', '/v2'],
-        docsDir: ['../doc', '../specs', '../docs/plans'],
+        docsRouteBasePath: ['/', '/specs'],
+        docsDir: ['../doc', '../specs'],
         indexBlog: false,
         searchBarShortcut: true,
         searchBarShortcutHint: true,
@@ -111,15 +96,11 @@ const config = {
             docsPluginId: 'specs',
             sidebarId: 'specsSidebar',
             position: 'left',
-            label: 'Specs',
+            label: 'Specifications',
           },
-          {
-            type: 'docSidebar',
-            docsPluginId: 'v2',
-            sidebarId: 'v2Sidebar',
-            position: 'left',
-            label: 'V2 Vision',
-          },
+          // 'V2 Vision' tab intentionally omitted from the public nav: forward-looking
+          // planning docs whose vocabulary (Developer/Sprint) conflicts with the shipped
+          // docs (facilitator/workshop). Re-surface in a roadmap space once reconciled.
           // App and docs are co-hosted under the Databricks App; on a standalone
           // deploy (GitHub Pages) there is no app to open, so DOCS_STANDALONE drops it.
           ...(process.env.DOCS_STANDALONE
