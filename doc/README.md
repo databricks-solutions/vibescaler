@@ -13,7 +13,7 @@ This folder contains product documentation, release notes, and version history.
 
 ## Specifications
 
-Browse the [Specs Index](/specs/) for searchable specifications, success-criteria coverage, and per-domain behavior specs. Use the **Specs** item in the navbar for the full sidebar.
+Browse the [Specs Index](/specs/) for searchable specifications, success-criteria coverage, and per-domain behavior specs. Use the **Specifications** item in the navbar for the full sidebar.
 
 ## Release Documentation
 
@@ -23,4 +23,4 @@ Browse the [Specs Index](/specs/) for searchable specifications, success-criteri
 
 - [Facilitator Guide](/FACILITATOR_GUIDE) — deployment and workshop facilitation
 - [Lakebase Setup](/lakebase-setup) — Databricks Apps database setup
-- [License](https://github.com/databricks-solutions/project-0xfffff/blob/main/LICENSE.md) — license (repository)
+- [License](https://github.com/databrickslabs/vibescaler/blob/main/LICENSE.md) — license (repository)
