@@ -1,12 +1,12 @@
 {
-  "generated": "2026-06-11T09:02:30.428516",
+  "generated": "2026-06-19T16:24:33.687854",
   "summary": {
-    "total_requirements": 408,
-    "covered_requirements": 292,
+    "total_requirements": 409,
+    "covered_requirements": 293,
     "coverage_percent": 71
   },
   "pyramid": {
-    "unit": 1114,
+    "unit": 1118,
     "integration": 61,
     "e2e-mocked": 23,
     "e2e-real": 67
@@ -808,11 +808,11 @@
       ]
     },
     "JUDGE_EVALUATION_SPEC": {
-      "total_requirements": 30,
-      "covered_requirements": 28,
+      "total_requirements": 31,
+      "covered_requirements": 29,
       "coverage_percent": 93,
       "by_type": {
-        "unit": 108,
+        "unit": 112,
         "integration": 7,
         "e2e-mocked": 0,
         "e2e-real": 11
@@ -888,6 +888,10 @@
         },
         {
           "text": "Pre-align and post-align scores directly comparable",
+          "covered": true
+        },
+        {
+          "text": "Re-evaluation computes agreement against human ratings (Cohen's Kappa over human/judge pairs), not over an empty set (`require_human_ratings=True`)",
           "covered": true
         },
         {

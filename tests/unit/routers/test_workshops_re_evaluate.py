@@ -204,7 +204,7 @@ async def test_re_evaluate_tags_traces_fallback_when_no_active_annotation_ids(
 
 
 @pytest.mark.spec("JUDGE_EVALUATION_SPEC")
-@pytest.mark.req("Re-evaluation measures the aligned judge's agreement against human ratings")
+@pytest.mark.req("Re-evaluation computes agreement against human ratings")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_re_evaluate_requires_human_ratings(async_client, override_get_db, monkeypatch):
