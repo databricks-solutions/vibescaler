@@ -1,6 +1,6 @@
 # Spec Test Coverage Map
 
-**Generated**: 2026-06-19 16:23:47
+**Generated**: 2026-06-19 16:43:44
 
 This report shows test coverage for each specification's success criteria.
 
@@ -17,7 +17,7 @@ These tests earn ZERO coverage credit until the spec is registered or the tag is
 
 | Type | Count | Description |
 |------|-------|-------------|
-| Unit | 1118 | pytest unit tests, Vitest tests |
+| Unit | 1117 | pytest unit tests, Vitest tests |
 | Integration | 61 | pytest with real DB/API |
 | E2E (Mocked) | 23 | Playwright with mocked API |
 | E2E (Real) | 67 | Playwright with real API |
@@ -33,7 +33,7 @@ These tests earn ZERO coverage credit until the spec is registered or the tag is
 | [DATASETS_SPEC](#datasets-spec) | 5 | 5 | 100% | 31 | 0 | 0 | 2 | **4** |
 | [DESIGN_SYSTEM_SPEC](#design-system-spec) | 7 | 2 | 28% | 40 | 0 | 2 | 0 | 0 |
 | [DISCOVERY_SPEC](#discovery-spec) | 79 | 77 | 97% | 318 | 4 | 7 | 22 | **39** |
-| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 31 | 29 | 93% | 112 | 7 | 0 | 11 | **20** |
+| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 31 | 29 | 93% | 111 | 7 | 0 | 11 | **20** |
 | [ROLE_PERMISSIONS_SPEC](#role-permissions-spec) | 16 | 16 | 100% | 30 | 0 | 0 | 0 | **15** |
 | [RUBRIC_SPEC](#rubric-spec) | 26 | 26 | 100% | 98 | 0 | 2 | 6 | **18** |
 | [TESTING_SPEC](#testing-spec) | 25 | 16 | 64% | 65 | 48 | 0 | 0 | **16** |
@@ -536,6 +536,22 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_draft_rubric_items.py` (test_ungrouped_items_each_become_question) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_no_items_raises_400) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_mixed_grouped_and_ungrouped) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 1) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 0) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (does NOT show warning when participant_count >= 2) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (warning uses default Alert variant (not destructive/error)) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (shows a warning (not destructive error) when < 2 participants) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (does not show any alert when >= 2 participants) [unit]
+- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (renders evidence trace IDs for findings (truncated to 8 chars)) [unit]
+- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (shows trace ID badge for each disagreement item) [unit]
+- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders disagreement sections in order: HIGH, MEDIUM, LOWER) [unit]
+- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders findings with priority badges) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (renders trace ID badges for items with source_trace_ids) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (does not render trace badges for manual items with no trace IDs) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (renders source type badges for each item) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (shows item count in header) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (creates a new manual group from item controls) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (moves an item into an existing group from item controls) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders template selector with Evaluation Criteria as the default selected value) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders a model selector alongside the template selector) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders the Run Analysis button) [unit]
@@ -565,33 +581,17 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders facilitator suggestions for disagreements) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (shows no-results message when no analyses exist) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (hides disagreement section when that priority level has no items) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 1) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 0) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (does NOT show warning when participant_count >= 2) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (warning uses default Alert variant (not destructive/error)) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays participant count) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays singular participant text when count is 1) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the analysis timestamp) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the template name) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the model used) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (HIGH disagreement section uses red border) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (MEDIUM disagreement section uses yellow border) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (LOWER disagreement section uses blue border) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (HIGH items use red background) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (MEDIUM items use yellow background) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (LOWER items use blue background) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (shows a warning (not destructive error) when < 2 participants) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (does not show any alert when >= 2 participants) [unit]
-- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (renders evidence trace IDs for findings (truncated to 8 chars)) [unit]
-- `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (shows trace ID badge for each disagreement item) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (renders trace ID badges for items with source_trace_ids) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (does not render trace badges for manual items with no trace IDs) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (renders source type badges for each item) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (shows item count in header) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (creates a new manual group from item controls) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (moves an item into an existing group from item controls) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays participant count) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays singular participant text when count is 1) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the analysis timestamp) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the template name) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the model used) [unit]
-- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders disagreement sections in order: HIGH, MEDIUM, LOWER) [unit]
-- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders findings with priority badges) [unit]
 
 ## JUDGE_EVALUATION_SPEC
 

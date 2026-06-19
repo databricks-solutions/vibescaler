@@ -1,12 +1,12 @@
 {
-  "generated": "2026-06-19T16:24:33.687854",
+  "generated": "2026-06-19T16:43:56.118388",
   "summary": {
     "total_requirements": 409,
     "covered_requirements": 293,
     "coverage_percent": 71
   },
   "pyramid": {
-    "unit": 1118,
+    "unit": 1117,
     "integration": 61,
     "e2e-mocked": 23,
     "e2e-real": 67
@@ -812,7 +812,7 @@
       "covered_requirements": 29,
       "coverage_percent": 93,
       "by_type": {
-        "unit": 112,
+        "unit": 111,
         "integration": 7,
         "e2e-mocked": 0,
         "e2e-real": 11
