@@ -1,6 +1,6 @@
 # Spec Test Coverage Map
 
-**Generated**: 2026-06-11 03:38:04
+**Generated**: 2026-06-19 16:43:44
 
 This report shows test coverage for each specification's success criteria.
 
@@ -17,7 +17,7 @@ These tests earn ZERO coverage credit until the spec is registered or the tag is
 
 | Type | Count | Description |
 |------|-------|-------------|
-| Unit | 1114 | pytest unit tests, Vitest tests |
+| Unit | 1117 | pytest unit tests, Vitest tests |
 | Integration | 61 | pytest with real DB/API |
 | E2E (Mocked) | 23 | Playwright with mocked API |
 | E2E (Real) | 67 | Playwright with real API |
@@ -33,7 +33,7 @@ These tests earn ZERO coverage credit until the spec is registered or the tag is
 | [DATASETS_SPEC](#datasets-spec) | 5 | 5 | 100% | 31 | 0 | 0 | 2 | **4** |
 | [DESIGN_SYSTEM_SPEC](#design-system-spec) | 7 | 2 | 28% | 40 | 0 | 2 | 0 | 0 |
 | [DISCOVERY_SPEC](#discovery-spec) | 79 | 77 | 97% | 318 | 4 | 7 | 22 | **39** |
-| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 30 | 28 | 93% | 108 | 7 | 0 | 11 | **19** |
+| [JUDGE_EVALUATION_SPEC](#judge-evaluation-spec) | 31 | 29 | 93% | 111 | 7 | 0 | 11 | **20** |
 | [ROLE_PERMISSIONS_SPEC](#role-permissions-spec) | 16 | 16 | 100% | 30 | 0 | 0 | 0 | **15** |
 | [RUBRIC_SPEC](#rubric-spec) | 26 | 26 | 100% | 98 | 0 | 2 | 6 | **18** |
 | [TESTING_SPEC](#testing-spec) | 25 | 16 | 64% | 65 | 48 | 0 | 0 | **16** |
@@ -43,7 +43,7 @@ These tests earn ZERO coverage credit until the spec is registered or the tag is
 | [UI_COMPONENTS_SPEC](#ui-components-spec) | 16 | 2 | 12% | 57 | 0 | 0 | 2 | 0 |
 | [EVAL_MODE_SPEC](#eval-mode-spec) | 19 | 18 | 94% | 27 | 0 | 1 | 0 | **17** |
 
-**Total**: 292/408 requirements covered (71%)
+**Total**: 293/409 requirements covered (71%)
 
 ---
 
@@ -536,8 +536,22 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/services/test_draft_rubric_items.py` (test_ungrouped_items_each_become_question) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_no_items_raises_400) [unit]
 - `tests/unit/services/test_draft_rubric_items.py` (test_mixed_grouped_and_ungrouped) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 1) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 0) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (does NOT show warning when participant_count >= 2) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (warning uses default Alert variant (not destructive/error)) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (shows a warning (not destructive error) when < 2 participants) [unit]
+- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (does not show any alert when >= 2 participants) [unit]
 - `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (renders evidence trace IDs for findings (truncated to 8 chars)) [unit]
 - `client/src/components/DiscoveryAnalysisTab.evidence.test.tsx` (shows trace ID badge for each disagreement item) [unit]
+- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders disagreement sections in order: HIGH, MEDIUM, LOWER) [unit]
+- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders findings with priority badges) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (renders trace ID badges for items with source_trace_ids) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (does not render trace badges for manual items with no trace IDs) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (renders source type badges for each item) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (shows item count in header) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (creates a new manual group from item controls) [unit]
+- `client/src/components/DraftRubricPanel.test.tsx` (moves an item into an existing group from item controls) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders template selector with Evaluation Criteria as the default selected value) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders a model selector alongside the template selector) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders the Run Analysis button) [unit]
@@ -567,35 +581,21 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (renders facilitator suggestions for disagreements) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (shows no-results message when no analyses exist) [unit]
 - `client/src/components/DiscoveryAnalysisTab.test.tsx` (hides disagreement section when that priority level has no items) [unit]
-- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders disagreement sections in order: HIGH, MEDIUM, LOWER) [unit]
-- `client/src/components/DiscoveryAnalysisTab.priorityOrder.test.tsx` (renders findings with priority badges) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (renders trace ID badges for items with source_trace_ids) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (does not render trace badges for manual items with no trace IDs) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (renders source type badges for each item) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (shows item count in header) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (creates a new manual group from item controls) [unit]
-- `client/src/components/DraftRubricPanel.test.tsx` (moves an item into an existing group from item controls) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 1) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (shows warning alert when participant_count is 0) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (does NOT show warning when participant_count >= 2) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warning.test.tsx` (warning uses default Alert variant (not destructive/error)) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays participant count) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays singular participant text when count is 1) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the analysis timestamp) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the template name) [unit]
+- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the model used) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (HIGH disagreement section uses red border) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (MEDIUM disagreement section uses yellow border) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (LOWER disagreement section uses blue border) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (HIGH items use red background) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (MEDIUM items use yellow background) [unit]
 - `client/src/components/DiscoveryAnalysisTab.colorCoding.test.tsx` (LOWER items use blue background) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (shows a warning (not destructive error) when < 2 participants) [unit]
-- `client/src/components/DiscoveryAnalysisTab.warningNotError.test.tsx` (does not show any alert when >= 2 participants) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays participant count) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays singular participant text when count is 1) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the analysis timestamp) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the template name) [unit]
-- `client/src/components/DiscoveryAnalysisTab.freshness.test.tsx` (displays the model used) [unit]
 
 ## JUDGE_EVALUATION_SPEC
 
-**Coverage**: 28/30 requirements (93%)
+**Coverage**: 29/31 requirements (93%)
 
 ### Uncovered Requirements
 
@@ -614,6 +614,7 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - :warning: Auto-evaluation model stored for re-evaluation consistency (unit)
 - :warning: Re-evaluate loads registered judge with aligned instructions (integration, unit)
 - :warning: Uses same model as initial auto-evaluation (unit)
+- :warning: Re-evaluation computes agreement against human ratings (Cohen's Kappa over human/judge pairs), not over an empty set (`require_human_ratings=True`) (unit)
 - :warning: Alignment jobs run asynchronously (unit)
 - :warning: Aligned judge registered to MLflow (unit)
 - :warning: Episodic trace IDs persist on the registered judge across alignment runs (unit)
@@ -645,6 +646,7 @@ These requirements are covered by backend tests only. UI regressions won't be ca
 - [x] Uses same model as initial auto-evaluation (unit) **[BE-only]**
 - [x] Results stored against correct prompt version (e2e-real, integration, unit)
 - [x] Pre-align and post-align scores directly comparable (e2e-real, integration, unit)
+- [x] Re-evaluation computes agreement against human ratings (Cohen's Kappa over human/judge pairs), not over an empty set (`require_human_ratings=True`) (unit) **[BE-only]**
 - [x] Alignment jobs run asynchronously (unit) **[BE-only]**
 - [x] Aligned judge registered to MLflow (unit) **[BE-only]**
 - [x] Episodic trace IDs persist on the registered judge across alignment runs (unit) **[BE-only]**
@@ -670,6 +672,7 @@ These tests are tagged with the spec but don't link to specific requirements:
 - `tests/unit/routers/test_workshops_re_evaluate.py` (test_re_evaluate_tags_traces_fallback_when_no_active_annotation_ids) [unit]
 - `tests/unit/services/test_alignment_service.py` (test_likert_agreement_metric_from_store_is_one_when_equal) [unit] **[skipped — not counted]**
 - `tests/unit/services/test_alignment_service.py` (test_episodic_log_shows_two_full_examples_without_truncation) [unit]
+- `tests/unit/services/test_alignment_service.py` (test_evaluation_with_zero_results_fails_instead_of_reporting_success) [unit]
 - `tests/unit/services/test_cohens_kappa.py` (test_interpret_cohens_kappa_bucket_edges) [unit]
 - `tests/unit/services/test_cohens_kappa.py` (test_is_cohens_kappa_acceptable_default_threshold) [unit]
 - `tests/unit/services/test_discovery_dspy_litellm_interop.py` (test_get_sdk_token_normalizes_env_host_for_m2m_token_url) [unit]

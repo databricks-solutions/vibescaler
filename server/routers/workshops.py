@@ -5534,7 +5534,9 @@ async def re_evaluate(
                     evaluation_model_name=evaluation_model_name,
                     mlflow_config=mlflow_config,
                     judge_type=judge_type,
-                    require_human_ratings=False,  # Don't require human ratings - just run evaluation
+                    require_human_ratings=True,  # Re-eval measures the aligned judge's agreement
+                    # against the human ratings; without joining them, Cohen's kappa is computed over
+                    # zero pairs and always reports 0 (the post-alignment screen looked like 0% agreement).
                     tag_type="eval",  # Use 'eval' tag for evaluation traces
                     use_registered_judge=True,  # Use the aligned judge with semantic memory from memalign
                 ):
