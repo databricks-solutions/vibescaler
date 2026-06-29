@@ -4,33 +4,48 @@ on:
   pull_request:
     branches: [main, 'release/**']
 
+permissions:
+  contents: read
+
 jobs:
   e2e-test:
     runs-on:
       group: databricks-solutions-protected-runner-group
       labels: linux-ubuntu-latest
 
+    permissions:
+      # OIDC token exchange to authenticate against JFrog from an IT-managed runner.
+      id-token: write
+      contents: read
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
+      # Python is provisioned by uv (see .python-version); no setup-python step.
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
+        with:
+          version: "0.11.2"
+          checksum: "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"  # uv-x86_64-unknown-linux-gnu.tar.gz
+
+      - name: Setup for JFrog
+        uses: ./.github/actions/jfrog-auth
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: client/package-lock.json
 
       - name: Install just
-        uses: extractions/setup-just@v2
+        uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b  # v3
+
+      # public npm registry is blocked on the IT-managed runner; route npm through
+      # the JFrog Artifactory proxy via OIDC (writes ~/.npmrc).
+      - name: Setup JFrog npm registry
+        uses: ./.github/actions/setup-jfrog-npm
 
       - name: Install Python dependencies
         run: uv sync
@@ -82,7 +97,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
           name: playwright-report
           path: client/playwright-report/
@@ -90,7 +105,7 @@ jobs:
 
       - name: Upload test screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
           name: test-screenshots
           path: client/test-results/
