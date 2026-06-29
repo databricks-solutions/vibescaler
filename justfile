@@ -287,16 +287,20 @@ ui:
 # Install npm deps for a package directory.
 # USE_DATABRICKS_PACKAGE_PROXIES=1 → Databricks corp npm proxy (local dev on VPN).
 # Otherwise inherits your user/global npm registry (omit .npmrc registry pins).
+# The committed package-lock.json is maintained (no --package-lock=false): it
+# carries the integrity hashes CI installs from via `npm ci`, so local installs
+# must keep it in sync. A lockfile change in `git status` means deps moved —
+# commit it with the package.json change.
 [group('dev')]
 npm-install dir *args:
   #!/usr/bin/env bash
   set -euo pipefail
   if [ "${USE_DATABRICKS_PACKAGE_PROXIES:-0}" = "1" ]; then
     echo "📦 npm install in {{dir}} (Databricks proxy: {{db-npm-registry}})"
-    npm -C "{{dir}}" install --package-lock=false --registry="{{db-npm-registry}}" {{args}}
+    npm -C "{{dir}}" install --registry="{{db-npm-registry}}" {{args}}
   else
     echo "📦 npm install in {{dir}} (registry: $(npm config get registry))"
-    npm -C "{{dir}}" install --package-lock=false {{args}}
+    npm -C "{{dir}}" install {{args}}
   fi
 
 [group('dev')]

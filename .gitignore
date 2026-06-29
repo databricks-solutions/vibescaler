@@ -7,10 +7,8 @@ __pycache__
 .env
 node_modules/
 client/node_modules/
-package-lock.json
 docs/.docusaurus/
 docs/build/
-docs/package-lock.json
 # Allow client/build for deployment (built files needed for Databricks Apps)
 client/build/*
 # Match nested copies too (e.g. client/.claude/mlflow/claude_tracing.log)

@@ -49,14 +49,15 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
         with:
           node-version: "20"
+          cache: "npm"
+          cache-dependency-path: docs/package-lock.json
 
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
-        with:
-          python-version: "3.11"
-
+      # Install from the committed, hash-locked lockfile (npm ci is frozen: it
+      # fails rather than silently resolving if docs/package-lock.json drifts
+      # from docs/package.json). No Python step: the docs build is npm-only and
+      # consumes the committed docs/static/spec-coverage.json snapshot.
       - name: Install docs dependencies
-        run: npm -C docs install --package-lock=false
+        run: npm -C docs ci
 
       # The SpecCoverage component embeds docs/static/spec-coverage.json, which is
       # committed to the repo. We intentionally do NOT regenerate it here: the

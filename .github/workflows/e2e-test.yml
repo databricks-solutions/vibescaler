@@ -39,8 +39,27 @@ jobs:
           cache: 'npm'
           cache-dependency-path: client/package-lock.json
 
+      # Install `just` from its official release, pinned to a version and verified
+      # against the upstream SHA-256 before use (lockdown policy: any binary fetched
+      # over the network must have its checksum checked, and the hash must live in
+      # the repo). Replaces the third-party extractions/setup-just action, which
+      # installed an unverified binary. To bump: update JUST_VERSION + JUST_SHA256
+      # from the release's SHA256SUMS (https://github.com/casey/just/releases).
       - name: Install just
-        uses: extractions/setup-just@f8a3cce218d9f83db3a2ecd90e41ac3de6cdfd9b  # v3
+        env:
+          JUST_VERSION: "1.45.0"
+          # sha256 of just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz
+          JUST_SHA256: "dc3f958aaf8c6506dd90426e9b03f86dd15e74a6467ee0e54929f750af3d9e49"
+        run: |
+          set -euo pipefail
+          tarball="$(mktemp)"
+          url="https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -fsSL "$url" -o "$tarball"
+          printf '%s  %s\n' "$JUST_SHA256" "$tarball" | sha256sum -c -
+          install_dir="$RUNNER_TEMP/just"
+          mkdir -p "$install_dir"
+          tar -xzf "$tarball" -C "$install_dir" just
+          printf '%s\n' "$install_dir" >> "$GITHUB_PATH"
 
       # public npm registry is blocked on the IT-managed runner; route npm through
       # the JFrog Artifactory proxy via OIDC (writes ~/.npmrc).
