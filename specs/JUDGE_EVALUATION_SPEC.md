@@ -307,6 +307,10 @@ Response:
 
 Re-evaluation uses the same model stored during initial auto-evaluation (`auto_evaluation_model` field) to ensure fair comparison between pre-align and post-align results.
 
+### Human-Rating Agreement
+
+Re-evaluation joins the **human ratings** for the evaluated traces and computes the aligned judge's agreement against them (Cohen's Kappa / accuracy), the same way the initial evaluation does. This is what makes the pre-align and post-align scores directly comparable, and it is why re-evaluation runs with human ratings required (`require_human_ratings=True`). Because re-evaluation is a post-annotation, post-alignment step, human ratings are expected to exist; if the trace set has no human-rated traces, re-evaluation fails with a clear error rather than reporting 0% agreement computed over an empty comparison set.
+
 ### Tag Types
 
 | Tag | Purpose |
@@ -659,6 +663,7 @@ Features:
 - [ ] Spinner stops when re-evaluation completes
 - [ ] Results stored against correct prompt version
 - [ ] Pre-align and post-align scores directly comparable
+- [ ] Re-evaluation computes agreement against human ratings (Cohen's Kappa over human/judge pairs), not over an empty set (`require_human_ratings=True`)
 
 ### Alignment
 - [ ] Alignment jobs run asynchronously
