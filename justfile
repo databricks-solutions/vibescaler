@@ -19,6 +19,12 @@ export PATH := "./{{client-dir}}/node_modules/.bin:" + env_var('PATH')
 client-dir := "client"
 server-dir := "server"
 
+# Supply-chain lockdown: force every uv command to use the committed lockfile and
+# never silently update it. Mirrors the Makefile `export UV_LOCKED := 1` guard from
+# the repository lockdown policy. Skipped when UV_FROZEN=1 is already set (e.g. by the
+# JFrog auth action in CI), and overridden to 0 by the `lock-dependencies` recipe.
+export UV_LOCKED := if env_var_or_default("UV_FROZEN", "") == "1" { "" } else { "1" }
+
 # Default target: show available recipes
 _default:
   @just --list
@@ -71,6 +77,22 @@ setup-python:
 setup-client:
   @echo "📦 Installing frontend dependencies..."
   @npm -C client install
+
+# Build the wheel with a hash-verified, pinned build backend (supply-chain lockdown).
+# Equivalent to the policy Makefile `build` target.
+[group('build')]
+build:
+  uv build --require-hashes --build-constraints=.build-constraints.txt
+
+# Regenerate the dependency and build-backend lockfiles. This is the ONLY place
+# allowed to update them (UV_LOCKED is forced to 0 here). Commit uv.lock and
+# .build-constraints.txt together. Equivalent to the policy Makefile
+# `lock-dependencies` target.
+[group('build')]
+lock-dependencies:
+  UV_LOCKED=0 uv lock
+  uv run python -c "import tomllib; print(chr(10).join(tomllib.load(open('pyproject.toml','rb'))['build-system']['requires']))" \
+    | uv pip compile --generate-hashes --universal --no-header - > .build-constraints.txt
 
 # Interactive Databricks configuration + .env.local management
 configure:

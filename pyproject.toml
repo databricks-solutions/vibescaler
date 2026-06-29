@@ -94,6 +94,8 @@ build-backend = "hatchling.build"
 packages = ["server"]
 
 [tool.uv]
+# Pin uv to the lockdown-approved 0.11.x line; must match the version installed in CI.
+required-version = "~= 0.11.0"
 dev-dependencies = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
