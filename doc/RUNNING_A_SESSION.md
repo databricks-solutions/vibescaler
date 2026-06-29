@@ -11,12 +11,9 @@ Every session opens with some version of this. Read it aloud if it helps:
 
 > Generic metrics — correctness, groundedness, helpfulness — don't transfer. They only become useful once they're defined in *your* domain's terms, and the only people who can define them are in this room. That's why you're here.
 >
-> And to be clear about what this is **not**: it's not data labeling. The frontier of AI runs on exactly what you have — expertise. Mercor became one of the fastest-growing startups ever by paying domain experts to codify their taste so models can learn from it; their CEO's framing is that ["rubrics are the new oil"](https://conversationswithtyler.com/episodes/brendan-foody/) — the most valuable input isn't more text, it's a way of *measuring success*, because a model that can score its attempts can improve. The way your domain judges its work isn't written down anywhere. It exists in your heads. Today we write it down.
+> And to be clear about what this is **not**: it's not data labeling. The frontier of AI runs on exactly what you have — expertise. A growing slice of the industry now pays domain experts to codify their taste so models can learn from it: the most valuable input isn't more text, it's a way of *measuring success*, because a model that can score its attempts can improve. The way your domain judges its work isn't written down anywhere. It exists in your heads. Today we write it down.
 >
 > The rubric is the concrete mechanism: your observations become criteria, your scores calibrate a judge, and by the end of the session that judge evaluates the way you do. What makes VibeScaler different is that the rubric doesn't end as a document — it's a **living rubric**: judges aligned to it keep measuring production traffic, and it evolves as your agent and your experts do.
-
-For the research behind rubric-based calibration (HealthBench, Mercor's ACE benchmark, the Rubric Gap), see [Grading Rubrics for AI Model Calibration](/roadmap/grading_rubrics_research) in the Roadmap section.
-
 ## Before the session: selecting discovery traces
 
 Select for **behavioral diversity with representative samples**. The discovery set should cover the System Under Review's main trajectory types — not just its worst incidents — and include at least one clean success and one suspected failure so reviewers calibrate both ends of quality.

@@ -35,7 +35,8 @@ const sidebars = {
           items: [
             'roadmap/v2_master_north_star',
             'roadmap/llm_judge_active_learning_prd',
-            'roadmap/grading_rubrics_research',
+            // grading_rubrics_research kept internal (draft): it's an external-research
+            // survey naming other vendors/benchmarks, which the public-docs policy excludes.
           ],
         },
       ],
