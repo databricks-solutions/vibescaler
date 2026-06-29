@@ -19,26 +19,17 @@ branch_labels = None
 depends_on = None
 
 
-def _is_postgres() -> bool:
-    """Check if the current database is PostgreSQL."""
-    bind = op.get_bind()
-    return bind.dialect.name == "postgresql"
-
-
 def upgrade() -> None:
-    # Use dialect-specific default for boolean: 0 for SQLite, FALSE for PostgreSQL
-    bool_false_default = sa.text("FALSE") if _is_postgres() else sa.text("0")
-
     # Add discovery_randomize_traces column with default False
     op.add_column(
         "workshops",
-        sa.Column("discovery_randomize_traces", sa.Boolean(), nullable=True, server_default=bool_false_default)
+        sa.Column("discovery_randomize_traces", sa.Boolean(), nullable=True, server_default=sa.false())
     )
 
     # Add annotation_randomize_traces column with default False
     op.add_column(
         "workshops",
-        sa.Column("annotation_randomize_traces", sa.Boolean(), nullable=True, server_default=bool_false_default)
+        sa.Column("annotation_randomize_traces", sa.Boolean(), nullable=True, server_default=sa.false())
     )
 
 

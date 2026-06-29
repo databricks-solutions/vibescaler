@@ -1,3 +1,10 @@
+---
+id: ROLE_PERMISSIONS_SPEC
+title: Role & Permissions Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Role & Permissions Specification
 
 ## Overview
@@ -122,7 +129,6 @@ Only facilitators can advance the workshop through phases. Each transition has p
 | RUBRIC -> ANNOTATION | `POST /advance-to-annotation` | Rubric exists for workshop |
 | ANNOTATION -> RESULTS | `POST /advance-to-results` | At least one annotation exists |
 | ANNOTATION/RESULTS -> JUDGE_TUNING | `POST /advance-to-judge-tuning` | Idempotent if already in phase |
-| JUDGE_TUNING -> UNITY_VOLUME | `POST /advance-to-unity-volume` | Idempotent if already in phase |
 
 ### Facilitator-Only Operations
 
@@ -178,6 +184,8 @@ GET /users/{user_id}/permissions -> UserPermissions
 Returns the permission set derived from the user's role. Called by the frontend after login to determine UI visibility.
 
 ## Success Criteria
+
+<SpecCoverage spec="ROLE_PERMISSIONS_SPEC" />
 
 ### Role-to-Permission Mapping
 

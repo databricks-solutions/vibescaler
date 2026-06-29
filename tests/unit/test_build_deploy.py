@@ -276,6 +276,50 @@ class TestBatchModeForSqlite:
 
 
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req("Lakebase schema privilege grants are best-effort")
+class TestLakebaseMigrationSchemaSetup:
+    """SC: Alembic startup tolerates existing Lakebase schemas not owned by the app."""
+
+    def test_migration_schema_grant_is_best_effort(self):
+        """migrations/env.py catches failed schema GRANTs and rolls back before continuing."""
+        env_py = PROJECT_ROOT / "migrations" / "env.py"
+        content = env_py.read_text()
+
+        assert "GRANT ALL PRIVILEGES ON SCHEMA" in content
+        assert "except ProgrammingError" in content
+        assert "connection.rollback()" in content
+        assert "SET search_path" in content
+
+    def test_migration_version_table_is_created_wide_enough(self):
+        """migrations/env.py creates alembic_version with room for long revision IDs."""
+        env_py = PROJECT_ROOT / "migrations" / "env.py"
+        content = env_py.read_text()
+
+        assert "CREATE TABLE IF NOT EXISTS" in content
+        assert "alembic_version" in content
+        assert "VARCHAR(128)" in content
+        assert "version_num_width" in content
+
+    def test_boolean_migration_defaults_are_postgres_safe(self):
+        """Boolean columns in migrations must use sa.true()/sa.false() for server defaults."""
+        versions_dir = PROJECT_ROOT / "migrations" / "versions"
+        offenders: list[str] = []
+        for migration_file in versions_dir.glob("*.py"):
+            content = migration_file.read_text()
+            if "sa.Boolean()" not in content:
+                continue
+            # Reject any sa.text() used for boolean defaults — use sa.true()/sa.false() instead
+            if 'server_default=sa.text("0")' in content or "server_default=sa.text('0')" in content:
+                offenders.append(migration_file.name)
+            if 'server_default=sa.text("1")' in content or "server_default=sa.text('1')" in content:
+                offenders.append(migration_file.name)
+
+        assert offenders == [], (
+            f"Migrations using sa.text() for boolean defaults (use sa.true()/sa.false() instead): {offenders}"
+        )
+
+
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
 @pytest.mark.req("Release workflow creates zip artifact")
 class TestReleaseWorkflowCreatesArtifact:
     """SC: Release workflow creates zip artifact for deployment."""
@@ -372,6 +416,14 @@ class TestApiEndpointConfiguration:
             "app.yaml must specify uvicorn worker class"
         )
 
+    def test_app_yaml_references_gunicorn_conf(self):
+        """app.yaml uses gunicorn_conf.py for server hooks."""
+        app_yaml = PROJECT_ROOT / "app.yaml"
+        content = app_yaml.read_text()
+        assert "gunicorn_conf.py" in content, (
+            "app.yaml must reference gunicorn_conf.py for pre-fork migration hook"
+        )
+
 
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
 @pytest.mark.req("Database connection established")
@@ -395,3 +447,55 @@ class TestDatabaseConnectionConfig:
             with patch.dict(os.environ, env, clear=True):
                 backend = _detect_backend()
                 assert backend.value == "sqlite"
+
+    def test_lakebase_schema_name_defaults_to_stable_app_schema(self):
+        """Lakebase schema names stay stable so migrations apply across deployments."""
+        from server.db_config import get_lakebase_schema_name
+
+        with patch.dict(
+            os.environ,
+            {
+                "PGAPPNAME": "human-eval-workshop",
+                "PGUSER": "3903554c-7db9-4dc9-a423-31a8a65bff57",
+            },
+            clear=True,
+        ):
+            assert get_lakebase_schema_name() == "human_eval_workshop"
+
+    def test_lakebase_schema_name_can_be_overridden(self):
+        """Operators can choose a schema explicitly when reusing an existing Lakebase schema."""
+        from server.db_config import get_lakebase_schema_name
+
+        with patch.dict(os.environ, {"LAKEBASE_SCHEMA_NAME": "Release Branch Schema!"}, clear=True):
+            assert get_lakebase_schema_name() == "release_branch_schema"
+
+
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req("App serves setup docs and gates the UI until Lakebase is configured")
+class TestDeploymentStatusGate:
+    """The setup gate only applies to postgres targets; sqlite is fully operable."""
+
+    def _get_status(self):
+        import asyncio
+
+        from server.app import deployment_status
+
+        return asyncio.run(deployment_status())
+
+    def test_sqlite_backend_does_not_require_setup(self, monkeypatch):
+        monkeypatch.delenv("DATABASE_ENV", raising=False)
+        for var in ("PGHOST", "PGDATABASE", "PGUSER", "PGAPPNAME", "ENDPOINT_NAME"):
+            monkeypatch.delenv(var, raising=False)
+
+        status = self._get_status()
+        assert status["lakebase_configured"] is False
+        assert status["setup_required"] is False
+
+    def test_postgres_target_without_lakebase_requires_setup(self, monkeypatch):
+        monkeypatch.setenv("DATABASE_ENV", "postgres")
+        for var in ("PGHOST", "PGDATABASE", "PGUSER", "PGAPPNAME", "ENDPOINT_NAME"):
+            monkeypatch.delenv(var, raising=False)
+
+        status = self._get_status()
+        assert status["lakebase_configured"] is False
+        assert status["setup_required"] is True

@@ -4,8 +4,7 @@ This folder contains release notes and version history.
 
 ## Specifications
 
-For technical specifications, see the [specs/](../specs/) directory:
-- [Specs Index](../specs/README.md) - Searchable index of all specifications
+Browse the [Specs Index](/specs/) for searchable specifications, success-criteria coverage, and per-domain behavior specs. Use the **Specs** item in the navbar for the full sidebar.
 
 ## Release Documentation
 
@@ -16,6 +15,8 @@ For technical specifications, see the [specs/](../specs/) directory:
 
 ## Other Documentation
 
-- [Main README](../README.md) - Project overview and configuration
-- [License](../LICENSE.md) - License information
-- [Security](../SECURITY.md) - Security policies and reporting
+- [Main README](https://github.com/databricks-solutions/project-0xfffff/blob/main/README.md) — project overview and configuration (repository)
+- [Facilitator Guide](/FACILITATOR_GUIDE) — deployment and workshop facilitation, including Lakebase resources and branch-based local development
+- [Lakebase Setup](/lakebase-setup) — Databricks Apps database setup
+- [License](https://github.com/databricks-solutions/project-0xfffff/blob/main/LICENSE.md) — license (repository)
+- [Security](https://github.com/databricks-solutions/project-0xfffff/blob/main/SECURITY.md) — security policies and reporting (repository)

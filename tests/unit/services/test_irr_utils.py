@@ -9,14 +9,14 @@ from server.services.irr_utils import (
 )
 
 
-def _ann(*, trace_id: str, user_id: str, rating: int) -> Annotation:
+def _ann(*, trace_id: str, user_id: str, rating: int, ratings=None) -> Annotation:
     return Annotation(
         id=f"{trace_id}:{user_id}",
         workshop_id="w1",
         trace_id=trace_id,
         user_id=user_id,
         rating=rating,
-        ratings=None,
+        ratings=ratings,
         comment=None,
     )
 
@@ -168,3 +168,32 @@ def test_detect_problematic_patterns_basic_signals():
     issues = detect_problematic_patterns(annotations, db=None)
     assert any("always gives rating 1" in msg for msg in issues)
     assert any("extreme disagreement" in msg for msg in issues)
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+def test_detect_problematic_patterns_question_id_scopes_to_that_metric():
+    # q1 has extreme disagreement (1 vs 5); q2 has perfect agreement
+    annotations = [
+        _ann(trace_id="t1", user_id="u1", rating=1, ratings={"q1": 1, "q2": 3}),
+        _ann(trace_id="t1", user_id="u2", rating=5, ratings={"q1": 5, "q2": 3}),
+        _ann(trace_id="t2", user_id="u1", rating=1, ratings={"q1": 1, "q2": 3}),
+        _ann(trace_id="t2", user_id="u2", rating=5, ratings={"q1": 5, "q2": 3}),
+    ]
+    q1_issues = detect_problematic_patterns(annotations, db=None, question_id="q1")
+    assert any("extreme disagreement" in msg for msg in q1_issues)
+    q2_issues = detect_problematic_patterns(annotations, db=None, question_id="q2")
+    assert not any("disagreement" in msg for msg in q2_issues)
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+def test_detect_problematic_patterns_question_id_excludes_other_metric_ratings():
+    # u2 never rated q2; their q1/legacy ratings must not leak into the q2
+    # analysis and produce a spurious disagreement finding
+    annotations = [
+        _ann(trace_id="t1", user_id="u1", rating=1, ratings={"q1": 1, "q2": 1}),
+        _ann(trace_id="t1", user_id="u2", rating=5, ratings={"q1": 5}),
+        _ann(trace_id="t2", user_id="u1", rating=1, ratings={"q1": 1, "q2": 1}),
+        _ann(trace_id="t2", user_id="u2", rating=5, ratings={"q1": 5}),
+    ]
+    issues = detect_problematic_patterns(annotations, db=None, question_id="q2")
+    assert not any("disagreement" in msg for msg in issues)

@@ -7,6 +7,7 @@
 
 import type { Page, Browser, BrowserContext } from '@playwright/test';
 import type {
+  ProjectSetupState,
   User,
   Workshop,
   WorkshopCreate,
@@ -42,6 +43,7 @@ import {
   RubricBuilder,
   FindingBuilder,
   AnnotationBuilder,
+  buildPermissions,
   resetIdCounter,
 } from './mocks';
 
@@ -78,6 +80,7 @@ import * as actions from './actions';
  * ```
  */
 export class TestScenario {
+  private projectSetupConfig?: ProjectSetupState;
   private state: BuilderState;
   private runId: string;
 
@@ -117,6 +120,15 @@ export class TestScenario {
    */
   withWorkshop(config?: WorkshopConfig): this {
     this.state.workshopConfig = config || {};
+    return this;
+  }
+
+  /**
+   * Configure the V2 project setup state backing the app-shell gates.
+   * A completed default is always present; this overrides it.
+   */
+  withProjectSetup(config: ProjectSetupState = {}): this {
+    this.projectSetupConfig = config;
     return this;
   }
 
@@ -359,6 +371,9 @@ export class TestScenario {
     // Step 1: Login facilitator
     await this.loginFacilitatorViaApi(page, store, apiUrl);
 
+    // Step 1b: Ensure a completed project setup exists (V2 ProjectSetupGate)
+    await this.ensureProjectSetupViaApi(page, store, apiUrl);
+
     // Step 2: Create workshop
     await this.createWorkshopViaApi(page, store, apiUrl);
 
@@ -426,26 +441,90 @@ export class TestScenario {
       throw new Error('No facilitator found in store');
     }
 
-    const loginResponse = await page.request.post(`${apiUrl}/users/auth/login`, {
-      data: {
-        email: facilitator.email,
-        password: DEFAULT_FACILITATOR.password,
-      },
-    });
+    // V2 provider-resolved auth: there is no login endpoint. The real server's
+    // local_dev provider resolves (and persists) a facilitator identity via the
+    // session endpoint; adopt that user as the scenario facilitator.
+    const sessionResponse = await page.request.get(`${apiUrl}/api/auth/session`);
 
-    if (!loginResponse.ok()) {
+    if (!sessionResponse.ok()) {
       throw new Error(
-        `Failed to login facilitator: ${loginResponse.status()} ${await loginResponse.text()}`
+        `Failed to resolve auth session: ${sessionResponse.status()} ${await sessionResponse.text()}`
       );
     }
 
-    // Update facilitator with real data from login response
-    const loginData = await loginResponse.json();
-    if (loginData.user?.id) {
+    const sessionData = await sessionResponse.json();
+    if (sessionData.user?.id) {
       const index = store.users.findIndex((u) => u.role === UserRole.FACILITATOR);
       if (index !== -1) {
-        store.users[index] = { ...store.users[index], id: loginData.user.id };
+        store.users[index] = {
+          ...store.users[index],
+          id: sessionData.user.id,
+          email: sessionData.user.email ?? store.users[index].email,
+        };
       }
+    }
+  }
+
+  /**
+   * Real-API scenarios: impersonate a user by intercepting only the
+   * provider session endpoint; all other traffic reaches the real server.
+   * The provider-resolved UserContext has no other per-user testing seam.
+   */
+  private async overrideSessionAs(targetPage: Page, user: User): Promise<void> {
+    if (this.state.mockAll) {
+      return; // mocked scenarios resolve the session from store.currentUser
+    }
+    await targetPage.unroute('**/api/auth/session').catch(() => {});
+    await targetPage.route('**/api/auth/session', async (route) => {
+      await route.fulfill({
+        json: {
+          user,
+          permissions: buildPermissions(user.role),
+          provider: 'local_dev',
+          provider_role: user.role === UserRole.FACILITATOR ? 'CAN_MANAGE' : 'CAN_USE',
+          project: null,
+        },
+      });
+    });
+  }
+
+  /**
+   * Step 1b: Ensure a completed project setup exists so the V2
+   * ProjectSetupGate routes into the app instead of the setup flow.
+   * In dev/E2E the setup pipeline completes synchronously (dev-unqueued).
+   */
+  private async ensureProjectSetupViaApi(
+    page: Page,
+    store: MockDataStore,
+    apiUrl: string
+  ): Promise<void> {
+    const existing = await page.request.get(`${apiUrl}/api/project/setup`);
+    if (existing.ok()) {
+      store.projectSetup = await existing.json();
+      return;
+    }
+
+    const facilitator = store.users.find((u) => u.role === UserRole.FACILITATOR);
+    const setupResponse = await page.request.post(`${apiUrl}/api/project/setup`, {
+      data: {
+        name: store.projectSetup?.name || store.workshop?.name || 'e2e-project',
+        agent_description:
+          store.projectSetup?.agent_description || 'Agent under evaluation (e2e)',
+        facilitator_id: facilitator?.id || 'facilitator-1',
+        trace_uc_table_path:
+          store.projectSetup?.trace_uc_table_path || 'main.default.traces',
+      },
+    });
+
+    if (!setupResponse.ok()) {
+      throw new Error(
+        `Failed to create project setup: ${setupResponse.status()} ${await setupResponse.text()}`
+      );
+    }
+
+    const state = await page.request.get(`${apiUrl}/api/project/setup`);
+    if (state.ok()) {
+      store.projectSetup = await state.json();
     }
   }
 
@@ -516,7 +595,7 @@ export class TestScenario {
         workshop_id: store.workshop!.id,
       };
 
-      const userResponse = await page.request.post(`${apiUrl}/users/`, {
+      const userResponse = await page.request.post(`${apiUrl}/api/users/`, {
         data: userData,
       });
 
@@ -896,6 +975,22 @@ export class TestScenario {
       store.workshop.facilitator_id = facilitator.id;
     }
 
+    // V2 app-shell gates require a project setup; default to completed.
+    const facilitatorId =
+      store.users.find((u) => u.role === UserRole.FACILITATOR)?.id || 'facilitator-1';
+    store.projectSetup = {
+      project_id: this.projectSetupConfig?.project_id || 'project-1',
+      name: this.projectSetupConfig?.name || store.workshop?.name || 'project-1',
+      description: this.projectSetupConfig?.description ?? null,
+      agent_description:
+        this.projectSetupConfig?.agent_description || 'Agent under evaluation',
+      facilitator_id: this.projectSetupConfig?.facilitator_id || facilitatorId,
+      trace_uc_table_path:
+        this.projectSetupConfig?.trace_uc_table_path || 'main.default.traces',
+      setup_job_id: this.projectSetupConfig?.setup_job_id || 'setup-job-1',
+      setup_status: this.projectSetupConfig?.setup_status || 'completed',
+    };
+
     // Build participants
     this.state.participantConfigs.forEach((config, index) => {
       const user = new UserBuilder(UserRole.PARTICIPANT)
@@ -1044,7 +1139,11 @@ export class TestScenario {
 
     // Build page-scoped actions
     const buildPageActions = (targetPage: Page): PageActions => ({
-      loginAs: (user: User) => actions.loginAs(targetPage, user),
+      loginAs: async (user: User) => {
+        store.currentUser = user;
+        await this.overrideSessionAs(targetPage, user);
+        await actions.loginAs(targetPage, user);
+      },
       logout: () => actions.logout(targetPage),
       beginDiscovery: (traceLimit?: number) =>
         actions.beginDiscovery(targetPage, store.workshop!.id, traceLimit, apiUrl),
@@ -1122,6 +1221,7 @@ export class TestScenario {
       browser: this.state.browser,
       workshop: store.workshop!,
       facilitator: usersByRole.facilitator[0],
+      projectSetup: store.projectSetup || {},
       users: usersByRole,
       traces: store.traces,
       rubric: store.rubric,
@@ -1129,7 +1229,11 @@ export class TestScenario {
       annotations: store.annotations,
 
       // Actions on main page
-      loginAs: (user: User) => actions.loginAs(page, user),
+      loginAs: async (user: User) => {
+        store.currentUser = user;
+        await this.overrideSessionAs(page, user);
+        await actions.loginAs(page, user);
+      },
       logout: () => actions.logout(page),
       advanceToPhase: (phase: WorkshopPhase) =>
         actions.advanceToPhase(page, store.workshop!.id, phase, apiUrl),

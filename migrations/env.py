@@ -12,6 +12,7 @@ import os
 
 from alembic import context
 from sqlalchemy import create_engine
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
 
 from server.database import Base
@@ -83,8 +84,9 @@ def run_migrations_online() -> None:
     else:
         # Set search_path at the PostgreSQL protocol level so migrations
         # create tables in the app schema from the very first statement.
-        app_name = os.getenv("PGAPPNAME", "human_eval_workshop")
-        schema_name = app_name.replace("-", "_")
+        from server.db_config import get_lakebase_schema_name
+
+        schema_name = get_lakebase_schema_name()
         connect_args = {"options": f"-csearch_path={schema_name},public"}
 
     engine = create_engine(url, connect_args=connect_args, poolclass=NullPool)
@@ -95,19 +97,29 @@ def run_migrations_online() -> None:
         if not is_sqlite:
             from sqlalchemy import text
 
-            app_name = os.getenv("PGAPPNAME", "human_eval_workshop")
-            schema_name = app_name.replace("-", "_")
+            from server.db_config import get_lakebase_schema_name
+
+            schema_name = get_lakebase_schema_name()
             pg_user = os.getenv("PGUSER", "")
 
             # Create schema with ownership if it doesn't exist
             connection.execute(
                 text(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}" AUTHORIZATION "{pg_user}"')
             )
-            # Grant privileges on the schema to PGUSER
+
+            # Lakebase may provide a usable schema without granting the app
+            # service principal ownership/grant-option privileges. In that
+            # case, GRANT back to the current PGUSER fails even though the app
+            # can still use the schema. Treat the grant as best-effort so a
+            # pre-existing schema does not prevent startup.
             if pg_user:
-                connection.execute(
-                    text(f'GRANT ALL PRIVILEGES ON SCHEMA "{schema_name}" TO "{pg_user}"')
-                )
+                try:
+                    connection.execute(
+                        text(f'GRANT ALL PRIVILEGES ON SCHEMA "{schema_name}" TO "{pg_user}"')
+                    )
+                except ProgrammingError as e:
+                    connection.rollback()
+                    print(f"Warning: Could not grant schema privileges on {schema_name}: {e}")
             connection.execute(text(f'SET search_path TO "{schema_name}", public'))
             connection.commit()
 
@@ -125,12 +137,18 @@ def run_migrations_online() -> None:
         if not is_sqlite:
             configure_kwargs["version_table_schema"] = schema_name
 
-            # Widen the alembic_version.version_num column if it exists and is
-            # too narrow for our revision IDs (Alembic default is VARCHAR(32),
-            # but some revision slugs exceed that).
+            # Alembic creates version_num as VARCHAR(32) by default, but this
+            # repo has longer revision IDs. Create the table wide on first run,
+            # and widen it if it already exists from an older bootstrap.
             try:
                 from sqlalchemy import text as _text
 
+                connection.execute(
+                    _text(
+                        f'CREATE TABLE IF NOT EXISTS "{schema_name}".alembic_version '
+                        "(version_num VARCHAR(128) NOT NULL, CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
+                    )
+                )
                 connection.execute(
                     _text(
                         f'ALTER TABLE IF EXISTS "{schema_name}".alembic_version '

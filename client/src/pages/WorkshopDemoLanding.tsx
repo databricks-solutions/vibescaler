@@ -7,10 +7,8 @@ import { WorkshopHeader } from '@/components/WorkshopHeader';
 import { useUser, useRoleCheck } from '@/context/UserContext';
 import { useWorkflowContext } from '@/context/WorkflowContext';
 import { useWorkshopContext } from '@/context/WorkshopContext';
-import { useWorkshop, useRubric, useCreateWorkshop } from '@/hooks/useWorkshopApi';
-import { WorkshopsService } from '@/client';
+import { useWorkshopPhase, useRubric, useCreateWorkshop, useWorkshopDiscoveryConfig } from '@/hooks/useWorkshopApi';
 import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 // Component imports
 import { TraceViewerDemo } from './TraceViewerDemo';
@@ -18,16 +16,11 @@ import { RubricCreationDemo } from './RubricCreationDemo';
 import { AnnotationDemo } from './AnnotationDemo';
 import { IRRResultsDemo } from './IRRResultsDemo';
 import { JudgeTuningPage } from './JudgeTuningPage';
-import { DBSQLExportPage } from './DBSQLExportPage';
-import { UnityVolumePage } from './UnityVolumePage';
 
 import { IntakePage } from './IntakePage';
 import { AppSidebar } from '@/components/AppSidebar';
-import { AnnotationAssignmentManager } from '@/components/AnnotationAssignmentManager';
 import { FacilitatorDashboard } from '@/components/FacilitatorDashboard';
 import { FacilitatorUserManager } from '@/components/FacilitatorUserManager';
-import { UserLogin } from '@/components/UserLogin';
-import { ProductionLogin } from '@/components/ProductionLogin';
 import { WorkshopCreationPage } from '@/components/WorkshopCreationPage';
 import { RubricWaitingView } from '@/components/RubricWaitingView';
 import { RubricViewPage } from '@/components/RubricViewPage';
@@ -43,6 +36,7 @@ import { PhasePausedView } from '@/components/PhasePausedView';
 import { GeneralDashboard } from '@/components/GeneralDashboard';
 import { ErrorBoundary, PageErrorFallback } from '@/components/ErrorBoundary';
 import { FacilitatorDiscoveryWorkspace } from '@/components/discovery/FacilitatorDiscoveryWorkspace';
+import { EvalModeWorkspace } from '@/components/eval/EvalModeWorkspace';
 
 
 
@@ -54,13 +48,14 @@ export function WorkshopDemoLanding() {
   // ALL HOOKS MUST BE CALLED FIRST (React Rules of Hooks)
   // ========================================
   const { workshopId, setWorkshopId } = useWorkshopContext();
-  const { currentPhase, completedPhases, setCurrentPhase } = useWorkflowContext();
-  const { user, setUser } = useUser();
+  const { currentPhase, completedPhases, setCurrentPhase, supportsPerTraceCriteria } = useWorkflowContext();
+  const { user } = useUser();
   const { isFacilitator, isSME, canCreateRubric, canAnnotate, canViewResults, canViewRubric, canViewAllAnnotations } = useRoleCheck();
   const queryClient = useQueryClient();
   
-  const { data: workshop, error: workshopError } = useWorkshop(workshopId || '');
+  const { data: workshop, error: workshopError } = useWorkshopPhase(workshopId || '');
   const { data: rubric } = useRubric(workshopId || '');
+  const { data: discoveryConfig } = useWorkshopDiscoveryConfig(workshopId || '');
   
   // State hooks - MUST be before any conditional returns
   const [isManualNavigation, setIsManualNavigation] = React.useState(false);
@@ -103,13 +98,12 @@ export function WorkshopDemoLanding() {
           return 'annotation-monitor';
         case 'results': return 'results-view';
         case 'judge_tuning': return 'judge-tuning';
-        case 'unity_volume': return 'unity-volume';
         default: return 'dashboard-general';
       }
     }
     
     // SME/PARTICIPANT - Handle facilitator-only phases first
-    if (['intake', 'rubric', 'results', 'judge_tuning', 'unity_volume'].includes(requestedPhase)) {
+    if (['intake', 'rubric', 'results', 'judge_tuning'].includes(requestedPhase)) {
       return 'facilitator-screen-share';
     }
     
@@ -126,7 +120,7 @@ export function WorkshopDemoLanding() {
       case 'discovery': 
         if (isPhaseActive('discovery')) return 'discovery-participate';
         if (state.currentPhase === 'discovery') return 'discovery-complete'; // Paused
-        if (['rubric', 'annotation', 'results', 'judge_tuning', 'unity_volume'].includes(state.currentPhase)) return 'discovery-complete';
+        if (['rubric', 'annotation', 'results', 'judge_tuning'].includes(state.currentPhase)) return 'discovery-complete';
         return 'discovery-pending';
       case 'annotation':
         if (isPhaseActive('annotation')) {
@@ -135,7 +129,7 @@ export function WorkshopDemoLanding() {
         if (state.currentPhase === 'annotation') {
           return 'annotation-review'; // Paused
         }
-        if (['results', 'judge_tuning', 'unity_volume'].includes(state.currentPhase)) {
+        if (['results', 'judge_tuning'].includes(state.currentPhase)) {
           return 'annotation-review';
         }
         return 'annotation-pending';
@@ -166,7 +160,6 @@ export function WorkshopDemoLanding() {
         
         // Clear the invalid workshop ID and all related data
         localStorage.removeItem('workshop_id');
-        localStorage.removeItem('workshop_user');
         // Clear any other workshop-related data
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith('workshop_') || key.includes('trace') || key.includes('annotation')) {
@@ -285,13 +278,6 @@ export function WorkshopDemoLanding() {
           discovery_started: workshop.discovery_started || false,
           annotation_started: workshop.annotation_started || false
         });
-      } else if (currentPhase === 'unity_volume') {
-        view = getViewForPhaseWithState(user.role, 'unity_volume', {
-          currentPhase,
-          completedPhases: workshop.completed_phases || [],
-          discovery_started: workshop.discovery_started || false,
-          annotation_started: workshop.annotation_started || false
-        });
       } else {
         view = getViewForPhaseWithState(user.role, 'discovery', {
           currentPhase,
@@ -322,7 +308,14 @@ export function WorkshopDemoLanding() {
   
   // Early return for no user
   if (!user) {
-    return <ProductionLogin />;
+    return (
+      <Card className="m-6">
+        <CardHeader>
+          <CardTitle>Authentication required</CardTitle>
+          <CardDescription>Open this app through Databricks to continue.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   // Check if this is a temporary workshop ID for creation mode
@@ -333,7 +326,14 @@ export function WorkshopDemoLanding() {
     if (isFacilitator) {
       return <WorkshopCreationPage />;
     } else {
-      return <ProductionLogin />;
+      return (
+        <Card className="m-6">
+          <CardHeader>
+            <CardTitle>User workspace coming soon</CardTitle>
+            <CardDescription>Your onboarding, home, and feed workspace will appear here.</CardDescription>
+          </CardHeader>
+        </Card>
+      );
     }
   }
   
@@ -420,7 +420,6 @@ export function WorkshopDemoLanding() {
         const handleGoToLogin = () => {
           // Clear invalid workshop data and redirect to login
           localStorage.removeItem('workshop_id');
-          localStorage.removeItem('workshop_user');
           setWorkshopId(null);
           window.history.replaceState({}, '', '/');
           window.location.reload();
@@ -507,6 +506,9 @@ export function WorkshopDemoLanding() {
       case 'discovery-monitor':
         return <FacilitatorDiscoveryWorkspace onNavigate={handleNavigation} />;
       case 'discovery-participate':
+        if (discoveryConfig?.discovery_mode === 'social') {
+          return <FacilitatorDiscoveryWorkspace onNavigate={handleNavigation} />;
+        }
         return <TraceViewerDemo />;
       case 'discovery-complete':
         return <PhasePausedView phase="discovery" onBack={user?.role === 'facilitator' ? () => handleNavigation('discovery') : undefined} />;
@@ -518,10 +520,16 @@ export function WorkshopDemoLanding() {
       case 'annotation-pending':
         return <AnnotationPendingPage />;
       case 'rubric-create':
+        if (supportsPerTraceCriteria) {
+          return <EvalModeWorkspace />;
+        }
         return <RubricCreationDemo />;
       case 'rubric-waiting':
         return <RubricWaitingView />;
       case 'rubric-view':
+        if (supportsPerTraceCriteria) {
+          return <EvalModeWorkspace />;
+        }
         return <RubricViewPage />;
       case 'annotation-monitor':
         return <FacilitatorDashboard onNavigate={handleNavigation} focusPhase={'annotation'} />;
@@ -534,19 +542,16 @@ export function WorkshopDemoLanding() {
       case 'annotation-review':
         return <PhasePausedView phase="annotation" onBack={user?.role === 'facilitator' ? () => handleNavigation('annotation') : undefined} />;
       case 'results-view':
+        if (supportsPerTraceCriteria) {
+          return <EvalModeWorkspace />;
+        }
         return <IRRResultsDemo />;
       case 'results-waiting':
         return <ResultsWaitingView />;
       case 'judge-tuning':
         return <JudgeTuningPage />;
-      case 'dbsql-export':
-        return <DBSQLExportPage />;
-      case 'unity-volume':
-        return <UnityVolumePage />;
       case 'findings-review':
         return <FacilitatorDiscoveryWorkspace onNavigate={handleNavigation} />;
-      case 'assign-annotations':
-        return <AnnotationAssignmentManager />;
       case 'user-management':
         return <FacilitatorUserManager />;
 

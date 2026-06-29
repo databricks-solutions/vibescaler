@@ -515,7 +515,7 @@ class TestRubricRequiredForAnnotation:
                 from fastapi import HTTPException
 
                 with pytest.raises(HTTPException) as exc_info:
-                    asyncio.get_event_loop().run_until_complete(
+                    asyncio.run(
                         advance_to_annotation("ws-1", mock_db)
                     )
                 assert exc_info.value.status_code == 400
@@ -542,7 +542,7 @@ class TestRubricRequiredForAnnotation:
                 mock_phase.RUBRIC = "rubric"
                 mock_phase.ANNOTATION = "annotation"
 
-                result = asyncio.get_event_loop().run_until_complete(
+                result = asyncio.run(
                     advance_to_annotation("ws-1", mock_db)
                 )
                 assert result["phase"] == "annotation"
@@ -583,7 +583,7 @@ class TestAISuggestionGeneration:
             }]
         }
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             svc.generate_rubric_suggestions("ws-1")
         )
 
@@ -604,7 +604,7 @@ class TestAISuggestionGeneration:
         svc.db_service.get_participant_notes.return_value = []
 
         with pytest.raises(ValueError, match="No discovery feedback available"):
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 svc.generate_rubric_suggestions("ws-1")
             )
 

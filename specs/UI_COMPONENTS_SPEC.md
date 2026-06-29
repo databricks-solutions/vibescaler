@@ -1,8 +1,31 @@
+---
+id: UI_COMPONENTS_SPEC
+title: UI Components Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # UI Components Specification
 
 ## Overview
 
 This specification defines reusable UI components in the Human Evaluation Workshop, including the pagination system, trace data viewer, and common interaction patterns. These components follow consistent design principles and accessibility standards.
+
+## Project Setup Shared Atoms
+
+The project setup UI should compose existing shared atoms before introducing setup-specific primitives.
+
+| Atom | Setup Usage |
+|------|-------------|
+| `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent` | Page panels, setup progress container, and grouped setup fields |
+| `Button` | Primary setup submission, retry, and secondary navigation actions |
+| `Input`, `Textarea`, `Label` | Project name, agent/app description, facilitator identity, and Databricks UC trace table path |
+| Form message or field error component | Required-field and API validation feedback |
+| `Badge` | Setup status, trace provider label, and current step labels |
+| `Alert` | Recoverable enqueue failure and non-field API errors |
+| Progress or step-list component | Pending/running setup job steps in the facilitator root workspace |
+
+Setup-specific components such as `SetupForm`, `SetupProgressCard`, and `SetupStepList` may wrap these atoms, but should not fork their visual styling or interaction behavior.
 
 ## Pagination Component
 
@@ -335,6 +358,8 @@ const debouncedSearch = useDebouncedCallback(
 ---
 
 ## Success Criteria
+
+<SpecCoverage spec="UI_COMPONENTS_SPEC" />
 
 ### Pagination
 - [ ] Page navigation works correctly (first, prev, next, last)

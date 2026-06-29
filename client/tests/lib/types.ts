@@ -12,10 +12,16 @@ export type { User } from '../../src/client/models/User';
 export { UserRole } from '../../src/client/models/UserRole';
 export { UserStatus } from '../../src/client/models/UserStatus';
 export type { UserCreate } from '../../src/client/models/UserCreate';
-export type { UserLogin } from '../../src/client/models/UserLogin';
 export type { UserPermissions } from '../../src/client/models/UserPermissions';
-export type { AuthResponse } from '../../src/client/models/AuthResponse';
+// AuthResponse is no longer generated (password login removed in the
+// provider-resolved auth refactor); kept locally for legacy mock builders.
+export interface AuthResponse {
+  user: import('../../src/client/models/User').User;
+  is_preconfigured_facilitator?: boolean;
+  message?: string;
+}
 
+export type { ProjectSetupState } from '../../src/client/models/ProjectSetupState';
 export type { Workshop } from '../../src/client/models/Workshop';
 export type { WorkshopCreate } from '../../src/client/models/WorkshopCreate';
 export { WorkshopPhase } from '../../src/client/models/WorkshopPhase';
@@ -38,6 +44,7 @@ export type { IRRResult } from '../../src/client/models/IRRResult';
 
 // Import concrete types for use in interfaces
 import type { User } from '../../src/client/models/User';
+import type { ProjectSetupState } from '../../src/client/models/ProjectSetupState';
 import type { UserRole } from '../../src/client/models/UserRole';
 import type { Workshop } from '../../src/client/models/Workshop';
 import type { WorkshopPhase } from '../../src/client/models/WorkshopPhase';
@@ -135,6 +142,9 @@ export interface BuiltScenario {
 
   /** The facilitator user (first one if multiple) */
   facilitator: User;
+
+  /** Project setup state backing the V2 setup gates */
+  projectSetup: ProjectSetupState;
 
   /** All users organized by role */
   users: UsersByRole;

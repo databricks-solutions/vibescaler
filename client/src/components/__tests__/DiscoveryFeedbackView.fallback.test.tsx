@@ -58,6 +58,58 @@ describe('@spec:DISCOVERY_SPEC Fallback warning banner visibility', () => {
     expect(screen.queryByText(/LLM generation unavailable/)).not.toBeInTheDocument();
   });
 
+  it('shows a neutral "Standard question" indicator to participants when fallback is active', async () => {
+    mockGenerateQuestion.mutateAsync.mockResolvedValue({
+      question: 'Fallback question for participant?',
+      is_fallback: true,
+    });
+
+    render(
+      <DiscoveryFeedbackView
+        {...defaultProps}
+        isFacilitator={false}
+        existingFeedback={{
+          feedback_label: 'good',
+          comment: 'Nice response',
+          followup_qna: [],
+        } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Fallback question for participant?')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Standard question')).toBeInTheDocument();
+    // Neutral indicator only — no amber diagnostics for participants
+    expect(screen.queryByText(/LLM generation unavailable/)).not.toBeInTheDocument();
+  });
+
+  it('does NOT show the "Standard question" indicator when questions are LLM-generated', async () => {
+    mockGenerateQuestion.mutateAsync.mockResolvedValue({
+      question: 'Tailored question for participant?',
+      is_fallback: false,
+    });
+
+    render(
+      <DiscoveryFeedbackView
+        {...defaultProps}
+        isFacilitator={false}
+        existingFeedback={{
+          feedback_label: 'good',
+          comment: 'Nice response',
+          followup_qna: [],
+        } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Tailored question for participant?')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Standard question')).not.toBeInTheDocument();
+  });
+
   it('shows fallback warning banner for facilitators when fallback is active', async () => {
     // Generate question returns is_fallback: true
     mockGenerateQuestion.mutateAsync.mockResolvedValue({
@@ -86,5 +138,7 @@ describe('@spec:DISCOVERY_SPEC Fallback warning banner visibility', () => {
     expect(
       screen.getByText(/LLM generation unavailable/),
     ).toBeInTheDocument();
+    // The neutral indicator is visible to facilitators as well
+    expect(screen.getByText('Standard question')).toBeInTheDocument();
   });
 });

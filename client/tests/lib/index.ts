@@ -29,6 +29,7 @@ export { TestScenario } from './scenario-builder';
 export type {
   // Model types (re-exported from client)
   User,
+  ProjectSetupState,
   UserRole,
   UserStatus,
   Workshop,
@@ -59,6 +60,7 @@ export * as actions from './actions';
 // Mock utilities (for advanced use cases)
 export {
   ApiMocker,
+  buildFacilitator,
   UserBuilder,
   WorkshopBuilder,
   TraceBuilder,

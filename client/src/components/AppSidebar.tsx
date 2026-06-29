@@ -3,7 +3,6 @@ import { useUser, useRoleCheck } from '@/context/UserContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -13,8 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { RoleBasedWorkflow } from '@/components/RoleBasedWorkflow';
-import { ChevronDown, LogOut, Settings, User, PanelLeftClose } from 'lucide-react';
+import { BookOpen, ChevronDown, Settings, User, PanelLeftClose } from 'lucide-react';
 import appIcon from '../../assets/favicon-48x48.png';
 
 interface AppSidebarProps {
@@ -24,8 +22,8 @@ interface AppSidebarProps {
   onToggleCollapse?: () => void;
 }
 
-export function AppSidebar({ onNavigate, showUserSwitching = false, collapsed = false, onToggleCollapse }: AppSidebarProps) {
-  const { user, setUser } = useUser();
+export function AppSidebar({ onNavigate: _onNavigate, collapsed = false, onToggleCollapse }: AppSidebarProps) {
+  const { user } = useUser();
   const { isFacilitator, isSME } = useRoleCheck();
 
   const getUserInitials = () => {
@@ -72,10 +70,15 @@ export function AppSidebar({ onNavigate, showUserSwitching = false, collapsed = 
         )}
       </div>
 
-      {/* Workflow Steps - Scrollable */}
-      <ScrollArea className="flex-1 px-3 py-4">
-        <RoleBasedWorkflow onNavigate={onNavigate} />
-      </ScrollArea>
+      <div className="px-3 py-3">
+        <a
+          href="/docs/"
+          className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-gray-200 hover:bg-white hover:text-gray-900 hover:shadow-sm"
+        >
+          <BookOpen className="h-4 w-4 shrink-0" />
+          Documentation
+        </a>
+      </div>
 
       <Separator />
 
@@ -122,15 +125,6 @@ export function AppSidebar({ onNavigate, showUserSwitching = false, collapsed = 
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </DropdownMenuItem>
-            {showUserSwitching && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setUser(null)} className="text-gray-700 hover:text-gray-900">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Switch User</span>
-                </DropdownMenuItem>
-              </>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

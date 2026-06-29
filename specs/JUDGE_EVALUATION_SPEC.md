@@ -1,3 +1,10 @@
+---
+id: JUDGE_EVALUATION_SPEC
+title: Judge Evaluation Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Judge Evaluation Specification
 
 ## Overview
@@ -369,9 +376,9 @@ MemAlign uses two types of memory to improve judge alignment:
 from mlflow.genai.judges.optimizers import MemAlignOptimizer
 
 optimizer = MemAlignOptimizer(
-    reflection_lm="openai:/gpt-4o-mini",  # Model for guideline distillation
+    reflection_lm=alignment_model_uri,  # Same model used for judge evaluation
     retrieval_k=5,  # Examples to retrieve
-    embedding_model="databricks:/databricks-gte-large-en",
+    embedding_model="databricks:/databricks-gte-large-en",  # Configurable, defaults to GTE Large
 )
 
 aligned_judge = judge.align(traces, optimizer)
@@ -384,7 +391,7 @@ aligned_judge = judge.align(traces, optimizer)
 
 ### Scale-Specific Behavior
 
-MemAlign works universally across all judge types (binary, likert, freeform) without requiring type-specific configuration. The optimizer automatically adapts to the feedback patterns.
+MemAlign works universally across all judge types (binary, likert) without requiring type-specific configuration. The optimizer automatically adapts to the feedback patterns.
 
 ### Feedback Aggregation
 
@@ -574,6 +581,8 @@ Features:
 
 ## Success Criteria
 
+<SpecCoverage spec="JUDGE_EVALUATION_SPEC" />
+
 ### Judge Evaluation
 - [ ] Likert judges return values 1-5
 - [ ] Binary judges return values 0 or 1
@@ -635,7 +644,7 @@ Check that:
 ### Auto-Evaluation Not Starting
 
 Check that:
-1. MLflow configuration is set up (Databricks host, token)
+1. MLflow configuration is set up (Databricks host, experiment ID) and SDK auth is working
 2. Rubric exists for the workshop
 3. Auto-evaluation toggle is enabled
 4. Model is selected in dropdown
@@ -649,13 +658,15 @@ Check that:
 
 ### Guideline Distillation Fails
 
-Databricks models may not support the JSON schema format required for guideline distillation. Options:
-1. Use OpenAI model (gpt-4o-mini) for `reflection_lm`
-2. Alignment will still work using episodic memory only
-3. Set `OPENAI_API_KEY` environment variable for automatic fallback
+Databricks models may not support the JSON schema format required for guideline distillation. In this case:
+1. Alignment still succeeds using episodic memory (example-based learning)
+2. Semantic memory (distilled guidelines) will be empty
+3. The aligned judge uses original instructions + retrieved examples at evaluation time
 
 ## Implementation Log
 
 | Date | Plan | Status | Summary |
 |------|------|--------|---------|
 | 2026-03-13 | [Trace Tag Key Separation](../.claude/plans/2026-03-13-trace-tag-key-separation.md) | complete | Fix eval/align tag mutual destruction by using dedicated MLflow tag keys |
+| 2026-04-10 | [SDK Auth Migration](../.claude/plans/2026-04-10-sdk-auth-migration.md) | complete | Replace PAT token fallback in judge/alignment services with SDK auth; remove `os.environ["DATABRICKS_TOKEN"]` mutations |
+| 2026-04-13 | [Critical Judge Eval Fixes](../.claude/plans/2026-04-13-critical-judge-eval-fixes.md) | complete | Fix re-eval aligned judge, preserve eval history, reject unparseable output, consolidate storage into AlignmentService |

@@ -1,22 +1,34 @@
-# Workshop Annotation Platform
+# VibeScaler
 
-A collaborative platform for annotating and evaluating LLM traces with MLflow integration, discovery phases, and inter-rater reliability analysis.
+**Collaborate with your team to define what good agent behavior looks like, then turn that judgment into an automated grader that runs at scale.**
+
+Anyone building an AI agent eventually hits the same question: is it actually doing a good job? The people who really know are the subject matter experts, the claims adjuster, the support lead, the clinician, but they can't read thousands of responses, and an off-the-shelf grader has no idea what "good" means for your business. VibeScaler is a Databricks App that closes that gap. It walks your experts through real examples of your agent to define what quality means for your use case, then aligns an LLM judge to their judgment so it scores new responses the way they would, automatically. Engineers get an evaluator they can trust and run continuously; SMEs get their standards encoded without writing code.
+
+## How it works
+
+VibeScaler runs an evaluation project in four stages:
+
+1. **Discovery.** Before writing any rubric, participants investigate real examples to surface what high and low quality actually mean for their use case. Generic measures like correctness or groundedness get defined in terms of the team's own business knowledge.
+2. **Annotation.** Multiple raters label real MLflow traces against the discovered criteria. The app measures inter-rater reliability so you can see where experts agree and where the definition of quality is still fuzzy.
+3. **Alignment.** VibeScaler applies optimization techniques to align the LLM judge to your team's labels, so it scores the way your experts do. You get agreement metrics between the judge and your experts, so judge quality is a number you can track instead of a vibe.
+4. **Evaluate at scale.** Run the aligned judge across your traces in MLflow and keep iterating as the agent and the criteria evolve.
+
+The judges you build are standard MLflow judges. You can run them directly with MLflow, in or out of this app.
 
 ## 📚 Documentation
 
 For detailed documentation, see the [/doc](doc/) folder:
 
-- **[Facilitator Guide](doc/FACILITATOR_GUIDE.md)** - A comprehensive guide for facilitators to deploy, configure, and run the workshop.
-- **[Release Notes](doc/RELEASE_NOTES.md)** - Latest release information and quick start
+- **[Facilitator Guide](doc/FACILITATOR_GUIDE.md)** - A comprehensive guide for facilitators to deploy, configure, and run a project.
+- **[Release Notes](doc/RELEASE_NOTES.md)** - Latest release information and quick start.
+- **[Changelog](doc/CHANGELOG.md)** - Full version history.
+- **[All Documentation](doc/README.md)** - Complete documentation index.
 
 ## 🚀 Quick Start (Recommended)
 
-For production use, we recommend using the **latest stable release**:
+For production use, deploy the **latest stable release** to Databricks Apps, or install it from the Databricks Marketplace. To deploy it yourself, see [Deploying to Databricks Apps](#-deploying-to-databricks-apps) below.
 
-> 💡 **Tip:** View all releases at [Releases Page](https://github.com/databricks-solutions/project-0xfffff/releases)
-
-## Installation
-Download project-with-build.zip which includes pre-built frontend assets.
+To develop locally instead, jump to [Local Development](#-local-development).
 
 ## 📋 Prerequisites
 
@@ -29,9 +41,24 @@ Download project-with-build.zip which includes pre-built frontend assets.
    - [Installation](https://just.systems/man/en/packages.html)
    - It's possible to use without this, but the majority of useful scripts use just.
 
-
-
 ## 🚀 Local Development
+
+### Full Stack With `just`
+
+The easiest local workflow starts both the FastAPI backend and Vite frontend:
+
+```bash
+just dev
+```
+
+By default this uses the local SQLite database. To develop against Lakebase Postgres, create a dedicated Lakebase branch such as `local`, copy that branch's PostgreSQL `DATABASE_URL` from the Lakebase Connect modal, then run:
+
+```bash
+just configure-lakebase-local
+just dev postgres
+```
+
+`just configure-lakebase-local` writes `.env.lakebase.local` (git-ignored), parses the branch `DATABASE_URL` into `PGHOST`, `PGDATABASE`, `PGPORT`, and `PGSSLMODE`, and uses your Databricks CLI user as `PGUSER`. The Lakebase branch provides isolation, while `PGAPPNAME` defaults to `human-eval-workshop` so the app schema name stays consistent with deployment.
 
 ### Frontend Setup
 
@@ -119,7 +146,7 @@ just e2e-servers   # start API+UI against .e2e-workshop.db
 just e2e-test      # run tests (assumes servers are already running)
 ```
 
-## 🚢 Deploying to Databricks Apps Manually
+## 🚢 Deploying to Databricks Apps
 
 ### 0. Prerequisites
 
@@ -133,7 +160,7 @@ databricks current-user me  # Verify authentication
 ### 1. Create a Databricks App
 
 ```bash
-databricks apps create human-eval-workshop
+databricks apps create vibescaler
 ```
 
 ### 2. Build the Frontend
@@ -148,7 +175,7 @@ This creates an optimized production build in `client/build/`
 
 ```bash
 DATABRICKS_USERNAME=$(databricks current-user me | jq -r .userName)
-databricks sync . "/Workspace/Users/$DATABRICKS_USERNAME/human-eval-workshop"
+databricks sync . "/Workspace/Users/$DATABRICKS_USERNAME/vibescaler"
 ```
 
 Refer to the [Databricks Apps deploy documentation](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/deploy?language=Databricks+CLI#deploy-the-app) for more info.
@@ -156,8 +183,8 @@ Refer to the [Databricks Apps deploy documentation](https://docs.databricks.com/
 ### 4. Deploy the App
 
 ```bash
-databricks apps deploy human-eval-workshop \
-  --source-code-path /Workspace/Users/$DATABRICKS_USERNAME/human-eval-workshop
+databricks apps deploy vibescaler \
+  --source-code-path /Workspace/Users/$DATABRICKS_USERNAME/vibescaler
 ```
 
 ### 5. Access Your App
@@ -190,6 +217,18 @@ security:
     refresh_token_expiry_days: 7
 ```
 
+## 🛠 Built on MLflow
+
+VibeScaler is an orchestration layer over open-source MLflow. It reads traces from your MLflow experiments, stores human annotations alongside them, and uses MLflow's GenAI evaluation primitives (judges and the alignment optimizer, which needs `mlflow[genai]>=3.9`) to turn expert labels into an aligned judge. Prompt optimization runs on DSPy. Because the output is a standard MLflow judge, nothing about your evals is locked into this app.
+
+## 🤝 Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up your environment, run the tests, and open a pull request. Bug reports and feature requests go in [Issues](https://github.com/databricks-solutions/project-0xfffff/issues).
+
+## 🔒 Security
+
+For security policies and how to report a vulnerability, see [SECURITY.md](SECURITY.md).
+
 ## 📄 License
 
-See LICENSE.MD file for details.
+See the [LICENSE.md](LICENSE.md) file for details.

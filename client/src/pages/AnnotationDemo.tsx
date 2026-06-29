@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { TraceViewer, TraceData } from '@/components/TraceViewer';
+import { TraceViewer, type TraceData } from '@/components/TraceViewer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,10 +25,11 @@ import {
 } from 'lucide-react';
 import { useWorkshopContext } from '@/context/WorkshopContext';
 import { useUser, useRoleCheck } from '@/context/UserContext';
-import { useTraces, useRubric, useUserAnnotations, useSubmitAnnotation, useMLflowConfig, refetchAllWorkshopQueries, useWorkshop, useParticipantNotes, useSubmitParticipantNote, useDeleteParticipantNote } from '@/hooks/useWorkshopApi';
+import { useTraces, useRubric, useUserAnnotations, useSubmitAnnotation, useMLflowConfig, refetchAllWorkshopQueries, useWorkshopAnnotationConfig, useParticipantNotes, useSubmitParticipantNote, useDeleteParticipantNote } from '@/hooks/useWorkshopApi';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Trace, Rubric, Annotation } from '@/client';
 import { parseRubricQuestions as parseQuestions } from '@/utils/rubricUtils';
+import { convertTraceToTraceData } from '@/utils/traceUtils';
 import { toast } from 'sonner';
 
 /**
@@ -122,18 +123,6 @@ const FormattedRubricDescription: React.FC<{ description: string }> = ({ descrip
   );
 };
 
-// Convert API trace to TraceData format
-const convertTraceToTraceData = (trace: Trace): TraceData => ({
-  id: trace.id,
-  input: trace.input,
-  output: trace.output,
-  context: trace.context || undefined,
-  mlflow_trace_id: trace.mlflow_trace_id || undefined,
-  mlflow_url: trace.mlflow_url || undefined,
-  mlflow_host: trace.mlflow_host || undefined,
-  mlflow_experiment_id: trace.mlflow_experiment_id || undefined
-});
-
 // Parse rubric question from API format - includes judgeType for each question
 const parseRubricQuestions = (rubric: Rubric) => {
   if (!rubric || !rubric.question) return [];
@@ -167,6 +156,7 @@ export function AnnotationDemo() {
   const [comment, setComment] = useState<string>('');
   const [submittedAnnotations, setSubmittedAnnotations] = useState<Set<string>>(new Set());
   const [hasNavigatedManually, setHasNavigatedManually] = useState(false);
+  const [annotationComplete, setAnnotationComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const previousTraceId = useRef<string | null>(null);
@@ -231,7 +221,7 @@ export function AnnotationDemo() {
   const queryClient = useQueryClient();
 
   // Workshop data (for show_participant_notes flag)
-  const { data: workshopData } = useWorkshop(workshopId || '');
+  const { data: workshopData } = useWorkshopAnnotationConfig(workshopId || '');
   const notesEnabled = workshopData?.show_participant_notes ?? false;
 
   // Annotation notes (only fetch when enabled)
@@ -377,6 +367,7 @@ export function AnnotationDemo() {
     setComment('');
     setCurrentTraceIndex(0);
     setHasNavigatedManually(false);
+    setAnnotationComplete(false);
     previousTraceId.current = null;
     hasInitialized.current = false;
   }, [currentUserId]);
@@ -857,14 +848,14 @@ export function AnnotationDemo() {
         if (hasRatings) {
           const success = await saveAnnotation(currentTraceId, false, ratingsToSave, freeformToSave, commentToSave);
           if (success) {
-            toast.success('All complete', { description: 'All traces annotated successfully!' });
+            setAnnotationComplete(true);
           } else {
             toast.error('Save failed', { description: 'Please try again.' });
           }
         } else {
           // No ratings but still mark as submitted to update progress
           setSubmittedAnnotations(prev => new Set([...prev, currentTraceId]));
-          toast.success('All complete', { description: 'All traces annotated successfully!' });
+          setAnnotationComplete(true);
         }
       } catch (error) {
         console.error('nextTrace: Error saving final annotation:', error);
@@ -1114,6 +1105,42 @@ export function AnnotationDemo() {
     );
   }
 
+  if (annotationComplete) {
+    return (
+      <div
+        className="min-h-screen bg-gray-50 p-6 flex items-center justify-center"
+        data-testid="annotation-complete-screen"
+      >
+        <div className="text-center max-w-md space-y-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto">
+            <CheckCircle className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">All Annotations Complete!</h1>
+          <p className="text-sm text-gray-600">
+            You've rated all {traceData.length} assigned traces. The facilitator will review the
+            results and share next steps.
+          </p>
+          <Badge className="bg-green-100 text-green-800 px-3 py-1">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            {completedCount}/{traceData.length} traces annotated
+          </Badge>
+          <div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setHasNavigatedManually(true);
+                setAnnotationComplete(false);
+              }}
+              data-testid="review-annotations-button"
+            >
+              Review my annotations
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 h-full flex flex-col">
       <div className="max-w-7xl mx-auto w-full flex flex-col flex-1 min-h-0 gap-6">
@@ -1172,9 +1199,9 @@ export function AnnotationDemo() {
                     if (currentTrace.mlflow_url) {
                       // Use the pre-generated MLflow URL from the trace
                       window.open(currentTrace.mlflow_url, '_blank');
-                    } else if (mlflowConfig) {
+                    } else if (currentTrace.mlflow_host && mlflowConfig) {
                       // Fallback: construct URL using mlflowConfig
-                      const host = mlflowConfig.databricks_host;
+                      const host = currentTrace.mlflow_host;
                       const experiment_id = mlflowConfig.experiment_id;
                       const trace_id = currentTrace.mlflow_trace_id;
                       const mlflowUrl = `${host}/ml/experiments/${experiment_id}/traces?selectedEvaluationId=${trace_id}`;

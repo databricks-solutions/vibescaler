@@ -1,3 +1,10 @@
+---
+id: ASSISTED_FACILITATION_SPEC
+title: Assisted Facilitation Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Assisted Facilitation Specification
 
 ## Overview
@@ -253,6 +260,8 @@ class DraftRubricItem:
 
 ## Success Criteria
 
+<SpecCoverage spec="ASSISTED_FACILITATION_SPEC" />
+
 - [ ] Findings are classified in real-time as participants submit them
 - [ ] Facilitators see per-trace structured view with category breakdown
 - [ ] Facilitators can generate targeted questions that broadcast to all participants
@@ -260,3 +269,9 @@ class DraftRubricItem:
 - [ ] Participants see only fuzzy progress (no category bias)
 - [ ] Findings can be promoted to draft rubric staging area
 - [ ] Thresholds are configurable per category per trace
+
+## Implementation Log
+
+| Date | Plan | Status | Summary |
+|------|------|--------|---------|
+| 2026-04-13 | [Critical Judge Eval Fixes](../.claude/plans/2026-04-13-critical-judge-eval-fixes.md) | complete | Fix promote_finding silent DB error swallowing |

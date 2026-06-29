@@ -87,103 +87,32 @@ async function selectWorkshopFromDropdown(page: Page, workshopId: string): Promi
  * For participants/SMEs: selects the workshop from dropdown if workshop_id is provided
  */
 export async function loginAs(page: Page, user: User): Promise<void> {
-  // Always navigate to login page explicitly
-  await page.goto('/');
+  // V2 (provider-resolved auth): there is no login page. Identity comes from
+  // GET /api/auth/session (mocked per-scenario) plus the legacy workshop_user
+  // localStorage key that pre-provider components still read.
+  const serialized = JSON.stringify(user);
+  await page.addInitScript((value) => {
+    window.localStorage.setItem('workshop_user', value);
+  }, serialized);
+
+  const target = user.workshop_id ? `/workshop/${user.workshop_id}` : '/';
+  await page.goto(target);
 
   // Wait for React to mount
   await page.waitForSelector('#root > *', { timeout: 10000 });
+  await page.evaluate((value) => {
+    window.localStorage.setItem('workshop_user', value);
+  }, serialized).catch(() => {});
   await page.waitForLoadState('networkidle');
 
-  // Wait for login page to be visible
-  await expect(page.getByText('Workshop Portal')).toBeVisible({ timeout: 10000 });
-
-  // Fill email
-  await page.locator('#email').fill(user.email);
-
-  // Facilitators need password
-  if (user.role === UserRole.FACILITATOR) {
-    const passwordField = page.locator('#password');
-    if (await passwordField.isVisible().catch(() => false)) {
-      // Use default facilitator password if this is the default facilitator
-      const password =
-        user.email === DEFAULT_FACILITATOR.email
-          ? DEFAULT_FACILITATOR.password
-          : 'password123';
-      await passwordField.fill(password);
-    }
-
-    // Wait for workshop options to load - wait for "Loading workshops..." to disappear
-    const loadingText = page.getByText(/Loading workshops/i);
-    await expect(loadingText).not.toBeVisible({ timeout: 10000 }).catch(() => {});
-
-    // For facilitators, check if we need to click "Create New" or select existing workshop
-    const createNewButton = page.getByRole('button', { name: /Create New/i });
-    const joinExistingButton = page.getByRole('button', { name: /Join Existing/i });
-
-    if (await createNewButton.isVisible().catch(() => false)) {
-      // If user has a workshop_id, try to join existing; otherwise create new
-      if (user.workshop_id) {
-        // Click "Join Existing" if it's visible AND enabled, then select the workshop
-        const isJoinExistingEnabled = await joinExistingButton.isEnabled().catch(() => false);
-        if (isJoinExistingEnabled) {
-          await joinExistingButton.click();
-          await page.waitForTimeout(300);
-          await selectWorkshopFromDropdown(page, user.workshop_id);
-        } else {
-          // If Join Existing is disabled (no workshops), just click Create New
-          // The workshop will be created after login
-          await createNewButton.click();
-        }
-      } else {
-        // Click "Create New" to enable submit button for workshop creation
-        await createNewButton.click();
-      }
-    }
-  } else {
-    // For participants/SMEs, need to select workshop from dropdown
-    if (user.workshop_id) {
-      // Wait for workshops to load - wait for "Loading workshops..." to disappear
-      const loadingText = page.getByText(/Loading workshops/i);
-      await expect(loadingText).not.toBeVisible({ timeout: 10000 }).catch(() => {});
-      await selectWorkshopFromDropdown(page, user.workshop_id);
+  // If a workshop landing with cards is shown, enter the user's workshop.
+  if (user.workshop_id) {
+    const workshopCard = page.locator(`[data-testid="workshop-card-${user.workshop_id}"]`);
+    if (await workshopCard.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await workshopCard.click();
+      await page.waitForURL(/\?workshop=/, { timeout: 10000 }).catch(() => {});
     }
   }
-
-  // Submit login form
-  await page.locator('button[type="submit"]').click();
-
-  // Wait for navigation away from login page
-  // The login page shows "Workshop Portal" - wait for that to disappear
-  await expect(page.getByText('Workshop Portal')).not.toBeVisible({ timeout: 10000 });
-
-  // For facilitators with a workshop_id, we need to navigate into the workshop
-  // After login, facilitators land on the "Welcome, Facilitator" page showing workshop cards
-  if (user.role === UserRole.FACILITATOR && user.workshop_id) {
-    // Check if we're on the workshop selection page
-    const welcomeFacilitator = page.getByText('Welcome, Facilitator');
-    if (await welcomeFacilitator.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Wait for workshops to load on this page
-      const loadingWorkshops = page.getByText(/Loading workshops/i);
-      await expect(loadingWorkshops).not.toBeVisible({ timeout: 10000 }).catch(() => {});
-
-      // Click on the workshop card to enter the workshop
-      // The card has data-testid="workshop-card-{id}"
-      const workshopCard = page.locator(`[data-testid="workshop-card-${user.workshop_id}"]`);
-      if (await workshopCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await workshopCard.click();
-        // Wait for URL to update with workshop ID
-        await page.waitForURL(/\?workshop=/, { timeout: 10000 });
-      } else {
-        // Fallback: try clicking on any workshop card that's visible
-        const anyCard = page.locator('[data-testid^="workshop-card-"]').first();
-        if (await anyCard.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await anyCard.click();
-          await page.waitForURL(/\?workshop=/, { timeout: 10000 });
-        }
-      }
-    }
-  }
-
 }
 
 /**
@@ -192,24 +121,13 @@ export async function loginAs(page: Page, user: User): Promise<void> {
  * This assumes the facilitator wants to create a new workshop.
  */
 export async function loginAsFacilitator(page: Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.getByText('Workshop Portal')).toBeVisible({ timeout: 10000 });
-
-  await page.locator('#email').fill(DEFAULT_FACILITATOR.email);
-  await page.locator('#password').fill(DEFAULT_FACILITATOR.password);
-
-  // Wait for workshop options to load
-  await page.waitForTimeout(500);
-
-  // Click "Create New" to enable submit button for workshop creation
-  const createNewButton = page.getByRole('button', { name: /Create New/i });
-  if (await createNewButton.isVisible().catch(() => false)) {
-    await createNewButton.click();
-  }
-
-  await page.locator('button[type="submit"]').click();
-
-  await expect(page.getByText(/Welcome, Facilitator/i)).toBeVisible({ timeout: 10000 });
+  await loginAs(page, {
+    id: 'facilitator-default',
+    email: DEFAULT_FACILITATOR.email,
+    name: DEFAULT_FACILITATOR.name,
+    role: UserRole.FACILITATOR,
+    workshop_id: null,
+  } as User);
 }
 
 /**
@@ -236,8 +154,10 @@ export async function logout(page: Page): Promise<void> {
     }
   }
 
-  // Verify we're back at login
-  await expect(page.getByText('Workshop Portal')).toBeVisible({ timeout: 10000 });
+  // V2 has no login page; verify the session storage is cleared instead.
+  await page.evaluate(() => {
+    localStorage.removeItem('workshop_user');
+  }).catch(() => {});
 }
 
 /**

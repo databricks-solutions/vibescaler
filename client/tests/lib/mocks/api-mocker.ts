@@ -8,6 +8,7 @@
 import type { Page, Route } from '@playwright/test';
 import type {
   User,
+  ProjectSetupState,
   Workshop,
   Trace,
   Rubric,
@@ -91,6 +92,8 @@ export interface MockDataStore {
   discoveryComplete: Map<string, boolean>;
   customLlmProvider?: CustomLLMProviderConfig;
   discoveryAnalyses: MockDiscoveryAnalysis[];
+  projectSetup?: ProjectSetupState;
+  currentUser?: User;
 }
 
 /**
@@ -760,6 +763,22 @@ export class ApiMocker {
    * Install all route handlers on the page
    */
   async install(): Promise<void> {
+    // V2 deployment gate: report a configured deployment so the app mounts.
+    await this.page.route('**/deployment/status', async (route) => {
+      await route.fulfill({
+        json: { lakebase_configured: true, setup_required: false },
+      });
+    });
+
+    // Handle V2 app-shell gates (provider auth session + project setup)
+    await this.page.route('**/api/auth/**', async (route) => {
+      await this.handleAuthSessionRoute(route);
+    });
+
+    await this.page.route('**/api/project/**', async (route) => {
+      await this.handleProjectRoute(route);
+    });
+
     // Handle /users/** routes
     await this.page.route('**/users/**', async (route) => {
       await this.handleRoute(route);
@@ -787,4 +806,107 @@ export class ApiMocker {
     if (updates.findings) this.store.findings = updates.findings;
     if (updates.annotations) this.store.annotations = updates.annotations;
   }
+
+  /**
+   * V2 provider-resolved auth session (GET /api/auth/session).
+   * Returns the scenario facilitator as the resolved identity so the
+   * provider-auth UserContext can hydrate without a login flow.
+   */
+  private async handleAuthSessionRoute(route: Route): Promise<void> {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/auth/session' && route.request().method() === 'GET') {
+      const facilitator =
+        this.store.currentUser ||
+        this.store.users.find((u) => u.role === UserRole.FACILITATOR) ||
+        this.store.users[0];
+      await route.fulfill({
+        json: {
+          user: facilitator ?? null,
+          permissions: facilitator ? buildPermissions(facilitator.role) : null,
+          provider: 'local_dev',
+          provider_role: 'CAN_MANAGE',
+          project: this.store.projectSetup
+            ? {
+                id: this.store.projectSetup.project_id || 'project-1',
+                name: this.store.projectSetup.name,
+                setup_status: this.store.projectSetup.setup_status || 'completed',
+              }
+            : null,
+        },
+      });
+      return;
+    }
+    await route.fallback();
+  }
+
+  /**
+   * V2 project setup endpoints (GET/PATCH /api/project/setup, GET /api/project/setup-status).
+   */
+  private async handleProjectRoute(route: Route): Promise<void> {
+    const url = new URL(route.request().url());
+    const method = route.request().method();
+
+    if (url.pathname === '/api/project/setup' && method === 'GET') {
+      if (this.store.projectSetup) {
+        await route.fulfill({ json: this.store.projectSetup });
+      } else {
+        await route.fulfill({ status: 404, json: { detail: 'Project not found' } });
+      }
+      return;
+    }
+
+    if (url.pathname === '/api/project/setup' && method === 'PATCH') {
+      if (!this.store.projectSetup) {
+        await route.fulfill({ status: 404, json: { detail: 'Project not found' } });
+        return;
+      }
+      const body = route.request().postDataJSON();
+      this.store.projectSetup = {
+        ...this.store.projectSetup,
+        name: body?.name ?? this.store.projectSetup.name,
+        description: body?.description ?? this.store.projectSetup.description,
+        agent_description: body?.agent_description ?? this.store.projectSetup.agent_description,
+        trace_uc_table_path: body?.trace_uc_table_path ?? this.store.projectSetup.trace_uc_table_path,
+      };
+      await route.fulfill({ json: this.store.projectSetup });
+      return;
+    }
+
+    if (url.pathname === '/api/project/setup-status' && method === 'GET') {
+      if (this.store.projectSetup) {
+        await route.fulfill({
+          json: {
+            project_id: this.store.projectSetup.project_id,
+            setup_job_id: this.store.projectSetup.setup_job_id || 'setup-job-1',
+            status: this.store.projectSetup.setup_status || 'completed',
+            current_step: 'bootstrap_completed',
+            message: 'Project setup bootstrap completed',
+            queue_job_id: 'dev-unqueued:setup-job-1',
+            delegated_run_ids: [],
+            details: {},
+          },
+        });
+      } else {
+        await route.fulfill({ status: 404, json: { detail: 'Setup job not found' } });
+      }
+      return;
+    }
+
+    await route.fallback();
+  }
 }
+
+/**
+ * Build a standalone facilitator user (V2 project-setup scenarios).
+ */
+export function buildFacilitator(overrides: Partial<User> = {}): User {
+  return {
+    id: 'facilitator-1',
+    email: 'facilitator@example.com',
+    name: 'Facilitator One',
+    role: UserRole.FACILITATOR,
+    workshop_id: null,
+    ...overrides,
+  };
+}
+

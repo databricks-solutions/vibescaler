@@ -1,3 +1,10 @@
+---
+id: DESIGN_SYSTEM_SPEC
+title: Design System Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Design System Specification
 
 ## Overview
@@ -307,6 +314,8 @@ className="bg-purple-500 text-purple-50"
 ```
 
 ## Success Criteria
+
+<SpecCoverage spec="DESIGN_SYSTEM_SPEC" />
 
 - [ ] Primary purple consistent across all components
 - [ ] Dark mode fully functional

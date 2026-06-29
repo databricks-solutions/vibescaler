@@ -226,10 +226,14 @@ def detect_problematic_patterns(annotations: list[Annotation], db=None, question
 
     # Helper function to get rating from annotation
     # Prefers per-question ratings dict, falls back to legacy rating
-    def get_rating(ann: Annotation) -> int:
+    def get_rating(ann: Annotation) -> int | None:
+        if question_id:
+            # Only consider annotations that actually rated this question;
+            # never substitute another metric's rating or the legacy rating
+            if ann.ratings:
+                return ann.ratings.get(question_id)
+            return None
         if ann.ratings and len(ann.ratings) > 0:
-            if question_id and question_id in ann.ratings:
-                return ann.ratings[question_id]
             # Return first rating if no specific question_id
             return next(iter(ann.ratings.values()))
         return ann.rating
