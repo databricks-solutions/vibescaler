@@ -29,6 +29,10 @@ server-dir := "server"
 db-pypi-index := env_var_or_default("DB_PYPI_INDEX", "https://pypi.org/simple")
 db-npm-registry := env_var_or_default("DB_NPM_REGISTRY", "https://registry.npmjs.org/")
 
+# Note: the repo-wide `export UV_FROZEN := "1"` above already satisfies the supply-chain
+# lockdown requirement that uv never silently updates the lockfile, so a separate
+# UV_LOCKED guard is unnecessary. The `lock-dependencies` recipe overrides UV_FROZEN.
+
 # Default target: show available recipes
 _default:
   @just --list
@@ -100,6 +104,22 @@ setup-client:
   else \
     npm -C {{client-dir}} exec playwright install chromium; \
   fi
+
+# Build the wheel with a hash-verified, pinned build backend (supply-chain lockdown).
+# Equivalent to the policy Makefile `build` target.
+[group('build')]
+build:
+  uv build --require-hashes --build-constraints=.build-constraints.txt
+
+# Regenerate the dependency and build-backend lockfiles. This is the ONLY place
+# allowed to update them, so it must override the repo-wide UV_FROZEN guard.
+# Commit uv.lock and .build-constraints.txt together. Equivalent to the policy
+# Makefile `lock-dependencies` target.
+[group('build')]
+lock-dependencies:
+  UV_FROZEN=0 uv lock
+  uv run python -c "import tomllib; print(chr(10).join(tomllib.load(open('pyproject.toml','rb'))['build-system']['requires']))" \
+    | uv pip compile --generate-hashes --universal --no-header - > .build-constraints.txt
 
 # Interactive Databricks configuration + .env.local management
 configure:
