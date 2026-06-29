@@ -38,6 +38,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -364,6 +365,9 @@ def format_json_output(summaries: list[TestSummary], spec_filter: str | None = N
         "passed": total_passed,
         "failed": total_failed,
         "duration_ms": total_duration,
+        # Consumers (e.g. the docs site's spec-health rendering) use this to
+        # show how fresh the underlying test run is.
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
 
     if total_failed > 0:

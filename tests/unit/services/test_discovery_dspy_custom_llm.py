@@ -2,6 +2,11 @@
 
 Covers LM construction with openai/ prefix, duplicate-prefix avoidance,
 custom temperature, and TypeError fallback.
+
+build_custom_llm is the shipped consumer of custom LLM provider configs
+(Discovery follow-up generation), so the core construction tests are tagged
+to CUSTOM_LLM_PROVIDER_SPEC; the remaining tests stay on DISCOVERY_SPEC's
+model-selection criterion.
 """
 
 from unittest.mock import MagicMock, patch
@@ -16,8 +21,8 @@ from server.services.discovery_dspy import build_custom_llm
 # ============================================================================
 
 
-@pytest.mark.spec("DISCOVERY_SPEC")
-@pytest.mark.req("Facilitator can select LLM model for follow-up question generation in Discovery dashboard")
+@pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("When the Discovery follow-up model is set to custom, follow-up questions are generated through the configured endpoint via build_custom_llm")
 @pytest.mark.unit
 def test_build_custom_llm_creates_lm_with_openai_prefix():
     """build_custom_llm prepends 'openai/' and passes api_key, api_base, temperature."""
@@ -46,8 +51,8 @@ def test_build_custom_llm_creates_lm_with_openai_prefix():
     assert result is sentinel
 
 
-@pytest.mark.spec("DISCOVERY_SPEC")
-@pytest.mark.req("Facilitator can select LLM model for follow-up question generation in Discovery dashboard")
+@pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("When the Discovery follow-up model is set to custom, follow-up questions are generated through the configured endpoint via build_custom_llm")
 @pytest.mark.unit
 def test_build_custom_llm_skips_prefix_if_already_openai():
     """build_custom_llm does not double-prefix when model_name starts with 'openai/'."""

@@ -1,4 +1,5 @@
 // @spec DESIGN_SYSTEM_SPEC
+// @req `cn()` utility merges class names and resolves Tailwind conflicts (later value wins)
 import { describe, expect, it } from 'vitest';
 import { cn } from './utils';
 

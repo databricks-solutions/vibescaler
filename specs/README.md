@@ -1,3 +1,11 @@
+---
+id: README
+title: Specifications Index
+slug: /
+sidebar_position: 1
+sidebar_label: Specs Index
+---
+
 # Specifications Index
 
 This directory contains declarative specifications for the Human Evaluation Workshop system. Each spec defines the expected behavior, data models, and implementation requirements for a specific domain.
@@ -6,14 +14,14 @@ This directory contains declarative specifications for the Human Evaluation Work
 
 | Spec | Domain | Key Concepts |
 |------|--------|--------------|
-| [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md) | Discovery & Facilitation | discovery, facilitation, findings, classification, promotion, rubric bridge |
+| [DISCOVERY_SPEC](./DISCOVERY_SPEC.md) | Discovery Workspace | discovery workspace, social threads, milestones, facilitator modes, assistant mentions, agent mentions, trace assignment, per-user order, findings, promotion |
 | [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md) | Auth & Sessions | login, permissions, session, Databricks auth, fallback |
 | [ANNOTATION_SPEC](./ANNOTATION_SPEC.md) | Annotation System | annotation, rating, editing, MLflow feedback, comments |
 | [DATASETS_SPEC](./DATASETS_SPEC.md) | Trace Datasets | dataset, labeling dataset, composition, randomization, per-user order |
-| [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md) | Trace Assignment | trace, assignment, phase, round, visibility, participant |
 | [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md) | Roles & Permissions | role, facilitator, SME, participant, permission, for_role, phase advancement |
 | [RUBRIC_SPEC](./RUBRIC_SPEC.md) | Rubric Management | rubric, question, parsing, delimiter, scale, binary, Likert |
 | [JUDGE_EVALUATION_SPEC](./JUDGE_EVALUATION_SPEC.md) | Judge & Alignment | judge, evaluation, MLflow, binary, SIMBA, IRR, alignment |
+| [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md) | Eval Mode | per-example rubric, benchmark, hurdle, weighted criteria, offline eval, per-trace criteria |
 | [CUSTOM_LLM_PROVIDER_SPEC](./CUSTOM_LLM_PROVIDER_SPEC.md) | Custom LLM Providers | custom provider, OpenAI-compatible, proxy_url, Azure, vLLM |
 | [UI_COMPONENTS_SPEC](./UI_COMPONENTS_SPEC.md) | UI Components | pagination, trace viewer, table, export, keyboard shortcuts |
 | [BUILD_AND_DEPLOY_SPEC](./BUILD_AND_DEPLOY_SPEC.md) | Build & Deploy | build, deploy, Alembic, migrations, database, bootstrap |
@@ -21,6 +29,14 @@ This directory contains declarative specifications for the Human Evaluation Work
 | [DESIGN_SYSTEM_SPEC](./DESIGN_SYSTEM_SPEC.md) | Design System | color, theme, purple, indigo, dark mode, accessibility |
 | [TRACE_DISPLAY_SPEC](./TRACE_DISPLAY_SPEC.md) | Trace Display | JSONPath, input extraction, output extraction, preview, facilitator settings |
 | [TRACE_INGESTION_SPEC](./TRACE_INGESTION_SPEC.md) | Trace Ingestion | ingest, intake, CSV upload, content extraction, deduplication, mlflow_trace_id, upsert |
+| [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md) | Trace Summarization | milestone view, executive summary, LLM summarization, batch summarization, job tracking, progress UI, re-summarize, summary indicators |
+
+### Retired Specs
+
+| Retired Spec | Date | Where it went |
+|--------------|------|---------------|
+| `ASSISTED_FACILITATION_SPEC` | 2026-06 | Folded into [DISCOVERY_SPEC](./DISCOVERY_SPEC.md) ("Alternative Approaches (Assisted Facilitation — Roadmap)"). The real-time classification/thresholds/fuzzy-progress backend never shipped to the UI; it is documented as roadmap with no success criteria. |
+| `DISCOVERY_TRACE_ASSIGNMENT_SPEC` | 2026-06 | Folded into [DISCOVERY_SPEC](./DISCOVERY_SPEC.md) ("Trace Assignment & Ordering"). Shipped behavior (active trace lists, per-user deterministic ordering) kept its criteria there; the unbuilt dataset-composition/round-metadata model is roadmap. |
 
 ---
 
@@ -28,26 +44,26 @@ This directory contains declarative specifications for the Human Evaluation Work
 
 Use this index to find relevant specs by keyword.
 
-### Discovery & Assisted Facilitation
-- **discovery** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md), [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **assisted facilitation** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **finding** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **classification** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **themes** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **edge_cases** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **boundary_conditions** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **failure_modes** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **disagreement** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **promote** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **promotion** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **draft rubric** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **progress bar** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **fuzzy progress** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **question generation** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **broadcast** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **DSPy** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **TraceDiscoveryState** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
-- **ClassifiedFinding** → [ASSISTED_FACILITATION_SPEC](./ASSISTED_FACILITATION_SPEC.md)
+### Discovery & Facilitation
+- **discovery** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **discovery workspace** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **social thread** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **comment thread** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **upvote** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **downvote** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **@assistant** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **@agent** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **follow-up questions** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **assisted facilitation** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md) (roadmap section; standalone spec retired)
+- **finding** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **disagreement** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **promote** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **promotion** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **draft rubric** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **question generation** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **DSPy** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **analysis template** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **DiscoveryAnalysis** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
 
 ### Authentication & Authorization
 - **login** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
@@ -60,12 +76,20 @@ Use this index to find relevant specs by keyword.
 - **UserContext** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
 - **credentials** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
 - **fallback permissions** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
+- **PAT** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
+- **SDK auth** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
+- **resolve_databricks_token** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
+- **service principal** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md), [BUILD_AND_DEPLOY_SPEC](./BUILD_AND_DEPLOY_SPEC.md)
+- **DATABRICKS_TOKEN** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md), [BUILD_AND_DEPLOY_SPEC](./BUILD_AND_DEPLOY_SPEC.md)
+- **DATABRICKS_CLIENT_ID** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md), [BUILD_AND_DEPLOY_SPEC](./BUILD_AND_DEPLOY_SPEC.md)
+- **OAuth** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
+- **CLI profile** → [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
 
 ### Roles & Permissions
 - **role** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md)
-- **facilitator** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md), [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
+- **facilitator** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md), [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
 - **SME** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md)
-- **participant** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md), [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
+- **participant** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md), [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
 - **permission** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md), [AUTHENTICATION_SPEC](./AUTHENTICATION_SPEC.md)
 - **for_role** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md)
 - **UserPermissions** → [ROLE_PERMISSIONS_SPEC](./ROLE_PERMISSIONS_SPEC.md)
@@ -108,18 +132,14 @@ Use this index to find relevant specs by keyword.
 - **bias reduction** → [DATASETS_SPEC](./DATASETS_SPEC.md)
 
 ### Trace Assignment & Phases
-- **trace** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md), [DATASETS_SPEC](./DATASETS_SPEC.md)
-- **trace assignment** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **phase** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **round** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **discovery phase** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **annotation phase** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **visibility** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **facilitator** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **participant** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **annotator** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **active_discovery_trace_ids** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
-- **active_annotation_trace_ids** → [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md)
+- **trace** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md), [DATASETS_SPEC](./DATASETS_SPEC.md)
+- **trace assignment** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **discovery phase** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **annotation phase** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md), [ANNOTATION_SPEC](./ANNOTATION_SPEC.md)
+- **visibility** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **annotator** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **active_discovery_trace_ids** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
+- **active_annotation_trace_ids** → [DISCOVERY_SPEC](./DISCOVERY_SPEC.md)
 
 ### Rubric System
 - **rubric** → [RUBRIC_SPEC](./RUBRIC_SPEC.md)
@@ -257,6 +277,48 @@ Use this index to find relevant specs by keyword.
 - **add_traces** → [TRACE_INGESTION_SPEC](./TRACE_INGESTION_SPEC.md)
 - **_extract_content_from_json** → [TRACE_INGESTION_SPEC](./TRACE_INGESTION_SPEC.md)
 
+### Trace Summarization
+- **summarization** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **milestone** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **milestone view** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **executive summary** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **trace summary** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **trace agent** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **summarization_enabled** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **summarization_model** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **summarization_guidance** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **TraceSummarizationService** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **resummarize** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **batch summarization** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **summarization status** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **summarization progress** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **SummarizationJob** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **SummarizationJobDB** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **summarization_job_id** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **re-summarize button** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **summary indicator** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **summarization-status** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+- **DiscoveryTraceCard summary** → [TRACE_SUMMARIZATION_SPEC](./TRACE_SUMMARIZATION_SPEC.md)
+
+### Eval Mode & Benchmarking
+- **eval mode** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **benchmark mode** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **per-example rubric** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **per-trace criteria** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **hurdle** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **hurdle criterion** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **weighted criteria** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **criterion_type** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **TraceCriterion** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **CriterionEvaluation** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **TraceEvalScore** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **offline eval** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **eval export** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **scoring aggregation** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **HealthBench** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **ACE benchmark** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+- **workshop mode** → [EVAL_MODE_SPEC](./EVAL_MODE_SPEC.md)
+
 ### Build and Deployment
 - **SQLite rescue** → [BUILD_AND_DEPLOY_SPEC](./BUILD_AND_DEPLOY_SPEC.md)
 - **Volume backup** → [BUILD_AND_DEPLOY_SPEC](./BUILD_AND_DEPLOY_SPEC.md)
@@ -288,12 +350,12 @@ Issues where the spec documents intended behavior but the implementation diverge
 |------|-------------|----------------------|-----------|
 | ROLE_PERMISSIONS_SPEC | Phase advancement has no backend role enforcement | All phase-advance endpoints accept any request; "(facilitator only)" is docstring-only | Only facilitators can advance workshop phases |
 | ROLE_PERMISSIONS_SPEC | Annotation endpoint has no backend permission check | `POST /workshops/{id}/annotations` accepts from any role | Annotation requires `can_annotate` permission |
-| DISCOVERY_TRACE_ASSIGNMENT_SPEC | `update_workshop_participant` is a no-op | Function queries DB but discards result, no commit | Trace assignments should persist |
+| DISCOVERY_SPEC (Trace Assignment & Ordering) | `update_workshop_participant` is a no-op | Function queries DB but discards result, no commit | Trace assignments should persist |
 
 ---
 
 ## Related Documentation
 
-- [doc/CHANGELOG.md](../doc/CHANGELOG.md) - Version history
-- [doc/RELEASE_NOTES.md](../doc/RELEASE_NOTES.md) - Release documentation
-- [README.md](../README.md) - Project overview
+- [CHANGELOG](/CHANGELOG) — version history
+- [Facilitator Guide](/FACILITATOR_GUIDE) — deployment and workshop facilitation
+- [Lakebase Setup](/lakebase-setup) — Databricks Apps database setup

@@ -12,11 +12,11 @@ from server.services.database_service import DatabaseService
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
-@pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+@pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
 def test_parse_rubric_questions_with_judge_type_binary():
-    """Parses [JUDGE_TYPE:binary] delimiter format (older format).
+    """Parses the |||JUDGE_TYPE|||binary delimiter format.
 
-    Spec: RUBRIC_SPEC lines 71-91
+    Spec: RUBRIC_SPEC (Per-Question Judge Type)
     - Per-question judge_type can be specified using delimiter
     """
     db_service = DatabaseService(None)
@@ -32,11 +32,11 @@ def test_parse_rubric_questions_with_judge_type_binary():
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
-@pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+@pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
 def test_parse_rubric_questions_with_judge_type_likert():
-    """Parses [JUDGE_TYPE:likert] explicitly.
+    """Parses |||JUDGE_TYPE|||likert explicitly.
 
-    Spec: RUBRIC_SPEC lines 71-91
+    Spec: RUBRIC_SPEC (Per-Question Judge Type)
     """
     db_service = DatabaseService(None)
 
@@ -49,7 +49,7 @@ def test_parse_rubric_questions_with_judge_type_likert():
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
-@pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+@pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
 def test_parse_rubric_questions_default_to_likert():
     """Defaults to 'likert' when no judge type specified.
 
@@ -97,11 +97,13 @@ def test_parse_rubric_questions_mixed_types():
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
-@pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
-def test_parse_rubric_questions_with_freeform():
-    """Parses freeform judge type.
+@pytest.mark.req("Legacy `freeform` judge type coerces to likert at the parse boundary")
+def test_parse_rubric_questions_coerces_freeform_to_likert():
+    """Legacy 'freeform' judge type coerces to 'likert' at the parse boundary.
 
-    Spec: RUBRIC_SPEC lines 71-91
+    Spec: RUBRIC_SPEC (Per-Question Judge Type / Migration Considerations)
+    - Free-form criteria are no longer creatable; legacy rows stay readable
+      but parse as likert, mirroring parseRubricQuestions in rubricUtils.ts.
     """
     db_service = DatabaseService(None)
 
@@ -109,7 +111,11 @@ def test_parse_rubric_questions_with_freeform():
     questions = db_service._parse_rubric_questions(raw)
 
     assert len(questions) == 1
-    assert questions[0]['judge_type'] == 'freeform'
+    # Legacy row stays readable...
+    assert questions[0]['title'] == 'Feedback'
+    assert questions[0]['description'] == 'Provide detailed feedback'
+    # ...but the type is coerced; 'freeform' never escapes the parser.
+    assert questions[0]['judge_type'] == 'likert'
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
@@ -150,7 +156,7 @@ def test_parse_rubric_questions_multiline_description():
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
-@pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+@pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
 def test_reconstruct_rubric_questions_with_judge_type():
     """Reconstructs questions with judge type delimiter.
 

@@ -32,7 +32,7 @@ export const parseRubricQuestions = (questionText: string): RubricQuestion[] => 
   const questionParts = questionText.split(QUESTION_DELIMITER);
   
   return questionParts
-    .map((questionText, index) => {
+    .map((questionText, index): RubricQuestion | null => {
       const trimmedText = questionText.trim();
       if (!trimmedText) return null;
       
@@ -44,7 +44,7 @@ export const parseRubricQuestions = (questionText: string): RubricQuestion[] => 
         const [contentPart, typePart] = trimmedText.split(JUDGE_TYPE_DELIMITER);
         content = contentPart.trim();
         const parsedType = typePart?.trim() as JudgeType;
-        if (parsedType === JudgeType.LIKERT || parsedType === JudgeType.BINARY || parsedType === JudgeType.FREEFORM) {
+        if (parsedType === JudgeType.LIKERT || parsedType === JudgeType.BINARY) {
           judgeType = parsedType;
         }
       }
@@ -80,9 +80,70 @@ export const parseRubricQuestions = (questionText: string): RubricQuestion[] => 
  */
 export const formatRubricQuestions = (questions: RubricQuestion[]): string => {
   if (!questions || questions.length === 0) return '';
-  
+
   return questions
     .map(q => `${q.title}: ${q.description}${JUDGE_TYPE_DELIMITER}${q.judgeType}`)
     .join(QUESTION_DELIMITER);
+};
+
+export interface CriterionDescriptionFields {
+  definition: string;
+  positive: string;
+  negative: string;
+  examples: string;
+}
+
+const POSITIVE_PREFIX = 'Positive: ';
+const NEGATIVE_PREFIX = 'Negative: ';
+const EXAMPLES_PREFIX = 'Examples: ';
+
+/**
+ * Build a serialized criterion description from structured fields.
+ * Multi-line field values are preserved as-is.
+ */
+export const buildCriterionDescription = (fields: CriterionDescriptionFields): string => {
+  const parts: string[] = [];
+  if (fields.definition.trim()) parts.push(fields.definition.trim());
+  if (fields.positive.trim()) parts.push(`${POSITIVE_PREFIX}${fields.positive.trim()}`);
+  if (fields.negative.trim()) parts.push(`${NEGATIVE_PREFIX}${fields.negative.trim()}`);
+  if (fields.examples.trim()) parts.push(`${EXAMPLES_PREFIX}${fields.examples.trim()}`);
+  return parts.join('\n');
+};
+
+/**
+ * Parse a serialized criterion description back into structured fields.
+ * Section markers (Positive/Negative/Examples) start a section; subsequent
+ * lines belong to that section so multi-line values round-trip intact.
+ */
+export const parseCriterionDescription = (description: string): CriterionDescriptionFields => {
+  const sections: Record<keyof CriterionDescriptionFields, string[]> = {
+    definition: [],
+    positive: [],
+    negative: [],
+    examples: [],
+  };
+  let current: keyof CriterionDescriptionFields = 'definition';
+
+  for (const line of (description || '').split('\n')) {
+    if (line.startsWith(POSITIVE_PREFIX)) {
+      current = 'positive';
+      sections[current].push(line.slice(POSITIVE_PREFIX.length));
+    } else if (line.startsWith(NEGATIVE_PREFIX)) {
+      current = 'negative';
+      sections[current].push(line.slice(NEGATIVE_PREFIX.length));
+    } else if (line.startsWith(EXAMPLES_PREFIX)) {
+      current = 'examples';
+      sections[current].push(line.slice(EXAMPLES_PREFIX.length));
+    } else {
+      sections[current].push(line);
+    }
+  }
+
+  return {
+    definition: sections.definition.join('\n').trim(),
+    positive: sections.positive.join('\n').trim(),
+    negative: sections.negative.join('\n').trim(),
+    examples: sections.examples.join('\n').trim(),
+  };
 };
 

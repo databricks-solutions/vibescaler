@@ -56,19 +56,22 @@ def _dataset_subtract(base: list[str], to_remove: list[str]) -> list[str]:
 TRACE_IDS = [f"trace-{i}" for i in range(10)]
 
 
+# NOTE: TestDatasetUnion and TestDatasetSubtract exercise only the
+# _dataset_union/_dataset_subtract helpers defined in this test file.
+# No production code implements dataset union/subtract yet — the
+# corresponding DATASETS_SPEC criteria are roadmap items. These tests
+# carry no @req tags so they do not count as spec coverage.
 @pytest.mark.spec("DATASETS_SPEC")
 @pytest.mark.unit
 class TestDatasetUnion:
     """Union operation combines traces from multiple datasets."""
 
-    @pytest.mark.req("Union operation combines traces from multiple datasets")
     def test_union_two_disjoint_datasets(self):
         dataset_a = ["T1", "T2", "T3"]
         dataset_b = ["T4", "T5", "T6"]
         result = _dataset_union(dataset_a, dataset_b)
         assert result == ["T1", "T2", "T3", "T4", "T5", "T6"]
 
-    @pytest.mark.req("Union operation combines traces from multiple datasets")
     def test_union_overlapping_datasets_deduplicates(self):
         dataset_a = ["T1", "T2", "T3"]
         dataset_b = ["T3", "T4", "T5"]
@@ -113,14 +116,12 @@ class TestDatasetUnion:
 class TestDatasetSubtract:
     """Subtract operation removes specified traces from a dataset."""
 
-    @pytest.mark.req("Subtract operation removes specified traces")
     def test_subtract_removes_specified_traces(self):
         all_traces = ["T1", "T2", "T3", "T4", "T5"]
         problematic = ["T2", "T5"]
         result = _dataset_subtract(all_traces, problematic)
         assert result == ["T1", "T3", "T4"]
 
-    @pytest.mark.req("Subtract operation removes specified traces")
     def test_subtract_preserves_order_of_remaining(self):
         all_traces = ["T5", "T3", "T1", "T4", "T2"]
         to_remove = ["T3", "T4"]

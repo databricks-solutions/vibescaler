@@ -49,7 +49,7 @@ WORKSHOP_ID = "ws-1"
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("REQ-TRACE-MLFLOW-FIELDS")
+@pytest.mark.req("`mlflow_url`, `mlflow_host`, and `mlflow_experiment_id` are persisted on ingest")
 class TestMlflowFieldsPersisted:
     """mlflow_url, mlflow_host, mlflow_experiment_id are stored on ingest."""
 
@@ -82,7 +82,7 @@ class TestMlflowFieldsPersisted:
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("REQ-TRACE-UPSERT")
+@pytest.mark.req("Traces are deduplicated by `(workshop_id, mlflow_trace_id)` — re-ingest updates, not duplicates")
 class TestReIngestUpdatesExisting:
     """Re-ingest with same mlflow_trace_id updates existing trace."""
 
@@ -134,7 +134,7 @@ class TestReIngestUpdatesExisting:
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("REQ-TRACE-UPSERT")
+@pytest.mark.req("Traces are deduplicated by `(workshop_id, mlflow_trace_id)` — re-ingest updates, not duplicates")
 class TestDifferentTraceIdsCreateSeparate:
     """Different mlflow_trace_id values create separate traces."""
 
@@ -151,7 +151,7 @@ class TestDifferentTraceIdsCreateSeparate:
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("REQ-TRACE-UPSERT")
+@pytest.mark.req("Traces without `mlflow_trace_id` get a generated UUID and insert normally")
 class TestNullTraceIdAlwaysInserts:
     """Null mlflow_trace_id always inserts a new row."""
 
@@ -169,7 +169,7 @@ class TestNullTraceIdAlwaysInserts:
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("REQ-TRACE-UPSERT-FK")
+@pytest.mark.req("Re-ingesting traces preserves existing `DiscoveryFindingDB` FK references")
 class TestFkSurvivesReIngest:
     """FK references (DiscoveryFindingDB) survive re-ingest."""
 

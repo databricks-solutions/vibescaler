@@ -34,10 +34,12 @@ import {
   Check
 } from "lucide-react";
 import { toast } from 'sonner';
-import { useInvalidateTraces, useWorkshop } from '@/hooks/useWorkshopApi';
+import { useInvalidateTraces, useWorkshopDisplayConfig } from '@/hooks/useWorkshopApi';
 import { useMLflowConfig } from '@/hooks/useWorkshopApi';
 import { useWorkshopContext } from '@/context/WorkshopContext';
 import { useJsonPathExtraction } from '@/hooks/useJsonPathExtraction';
+import { MilestoneView } from './MilestoneView';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 
 // ============================================================================
 // LOCAL TYPE DEFINITIONS — minimal interfaces to eliminate `any`
@@ -791,6 +793,15 @@ const extractLLMResponseContent = (output: unknown): { content: string | null; m
     return { content: null, metadata: null };
   }
 
+  // Bail out for bare messages arrays ([{role, content}, ...]) so SmartValueRenderer
+  // can render them as individual cards instead of extracting a single message.
+  if (Array.isArray(output) && output.length > 0 &&
+      output.every((item: unknown) =>
+        typeof item === 'object' && item !== null && 'role' in item && 'content' in item
+      )) {
+    return { content: null, metadata: null };
+  }
+
   // After the type guard above, narrow to a record for property access.
   const out = output as Record<string, unknown>;
 
@@ -1319,54 +1330,58 @@ const CitationsDisplay: React.FC<{
  * ChatCompletion and other LLM response formats. Only if that fails
  * does it fall back to the JSONPath-transformed displayOutput.
  */
+const extractOutputLLMContent = (
+  rawOutput: string | object
+): { content: string | null; metadata: Record<string, unknown> | null } => {
+  // First, try to extract judge result from malformed JSON string
+  if (typeof rawOutput === 'string') {
+    const judgeResult = extractJudgeResultFromMalformed(rawOutput);
+    if (judgeResult && judgeResult.rationale) {
+      const resultLabel = judgeResult.result !== undefined ? `**Rating: ${String(judgeResult.result)}**\n\n` : '';
+      const content = resultLabel + judgeResult.rationale;
+
+      // Extract basic metadata from the raw string
+      const idMatch = rawOutput.match(/"id":\s*"([^"]+)"/);
+      const modelMatch = rawOutput.match(/"model":\s*"([^"]+)"/);
+      const metadata: Record<string, unknown> = {};
+      if (idMatch) metadata.id = idMatch[1];
+      if (modelMatch) metadata.model = modelMatch[1];
+
+      return { content, metadata: Object.keys(metadata).length > 0 ? metadata : null };
+    }
+  }
+
+  try {
+    // Handle both string and already-parsed object
+    let parsed: unknown;
+    if (typeof rawOutput === 'string') {
+      parsed = JSON.parse(rawOutput);
+      // Handle double-stringified JSON (string containing JSON string)
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          // It was a regular string, not double-encoded
+        }
+      }
+    } else if (typeof rawOutput === 'object' && rawOutput !== null) {
+      parsed = rawOutput;
+    } else {
+      return { content: null, metadata: null };
+    }
+
+    return extractLLMResponseContent(parsed);
+  } catch {
+    return { content: null, metadata: null };
+  }
+};
+
 const OutputRenderer: React.FC<{
   rawOutput: string | object;
   displayOutput: string;
 }> = ({ rawOutput, displayOutput }) => {
   // Try to extract LLM content from the raw output first
-  const llmExtraction = useMemo(() => {
-    // First, try to extract judge result from malformed JSON string
-    if (typeof rawOutput === 'string') {
-      const judgeResult = extractJudgeResultFromMalformed(rawOutput);
-      if (judgeResult && judgeResult.rationale) {
-        const resultLabel = judgeResult.result !== undefined ? `**Rating: ${String(judgeResult.result)}**\n\n` : '';
-        const content = resultLabel + judgeResult.rationale;
-
-        // Extract basic metadata from the raw string
-        const idMatch = rawOutput.match(/"id":\s*"([^"]+)"/);
-        const modelMatch = rawOutput.match(/"model":\s*"([^"]+)"/);
-        const metadata: Record<string, unknown> = {};
-        if (idMatch) metadata.id = idMatch[1];
-        if (modelMatch) metadata.model = modelMatch[1];
-
-        return { content, metadata: Object.keys(metadata).length > 0 ? metadata : null };
-      }
-    }
-
-    try {
-      // Handle both string and already-parsed object
-      let parsed: unknown;
-      if (typeof rawOutput === 'string') {
-        parsed = JSON.parse(rawOutput);
-        // Handle double-stringified JSON (string containing JSON string)
-        if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(parsed);
-          } catch {
-            // It was a regular string, not double-encoded
-          }
-        }
-      } else if (typeof rawOutput === 'object' && rawOutput !== null) {
-        parsed = rawOutput;
-      } else {
-        return { content: null, metadata: null };
-      }
-
-      return extractLLMResponseContent(parsed);
-    } catch {
-      return { content: null, metadata: null };
-    }
-  }, [rawOutput]);
+  const llmExtraction = useMemo(() => extractOutputLLMContent(rawOutput), [rawOutput]);
 
   // If we found LLM content in raw output, render it prominently
   if (llmExtraction.content) {
@@ -1397,6 +1412,26 @@ export interface TraceData {
   mlflow_url?: string;
   mlflow_experiment_id?: string;
   mlflow_host?: string;
+  summary?: {
+    executive_summary: string;
+    milestones: Array<{
+      number: number;
+      title: string;
+      summary: string;
+      inputs: Array<{
+        span_name: string;
+        field: 'inputs' | 'outputs';
+        jsonpath?: string | null;
+        value?: unknown;
+      }>;
+      outputs: Array<{
+        span_name: string;
+        field: 'inputs' | 'outputs';
+        jsonpath?: string | null;
+        value?: unknown;
+      }>;
+    }>;
+  } | null;
 }
 
 interface TraceViewerProps {
@@ -1406,6 +1441,186 @@ interface TraceViewerProps {
   /** Optional JSONPath for extracting output display (from workshop settings) */
   outputJsonPath?: string | null;
 }
+
+/** Extracted trace detail content used in both tabbed and non-tabbed views. */
+const TraceDetailContent: React.FC<{
+  trace: TraceData;
+  showConversationHistory: boolean;
+  setShowConversationHistory: (v: boolean) => void;
+  showRetrievedContent: boolean;
+  setShowRetrievedContent: (v: boolean) => void;
+  showRawOutput: boolean;
+  setShowRawOutput: (v: boolean) => void;
+  displayInput: string;
+  displayOutput: string;
+  isInputJson: boolean;
+  isOutputJson: boolean;
+}> = ({
+  trace,
+  showConversationHistory,
+  setShowConversationHistory,
+  showRetrievedContent,
+  setShowRetrievedContent,
+  showRawOutput,
+  setShowRawOutput,
+  displayInput,
+  displayOutput,
+  isInputJson,
+  isOutputJson,
+}) => {
+  const rawOutputText = useMemo(() => {
+    if (typeof trace.output === 'string') {
+      try {
+        return JSON.stringify(JSON.parse(trace.output), null, 2);
+      } catch {
+        return trace.output;
+      }
+    }
+    return JSON.stringify(trace.output, null, 2);
+  }, [trace.output]);
+
+  const formattedOutputText = useMemo(() => {
+    const { content } = extractOutputLLMContent(trace.output);
+    return content ?? displayOutput;
+  }, [trace.output, displayOutput]);
+
+  return (
+  <>
+    {/* Context sections */}
+    {trace.context?.conversation_history && (
+      <Card className="border-l-4 border-purple-500 shadow-sm">
+        <button
+          onClick={() => setShowConversationHistory(!showConversationHistory)}
+          className="w-full flex items-center justify-between p-4 text-left hover:bg-purple-50 transition-all duration-200"
+        >
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-purple-600" />
+            <span className="font-medium text-purple-800">Conversation History</span>
+            <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+              {trace.context.conversation_history.length}
+            </span>
+          </div>
+          <ChevronDown className={`h-4 w-4 text-purple-400 transition-transform duration-200 ${showConversationHistory ? 'rotate-180' : ''}`} />
+        </button>
+        {showConversationHistory && (
+          <div className="border-t border-purple-100 bg-purple-50/30 p-4">
+            <div className="space-y-4">
+              {trace.context.conversation_history.map((turn, index) => (
+                <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-purple-100">
+                  {turn.role === 'user' ? (
+                    <User className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <Bot className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      {turn.role}
+                    </span>
+                    <div className="text-sm text-gray-800 mt-2 prose prose-sm max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {turn.content}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+    )}
+
+    {trace.context?.retrieved_content && (
+      <Card className="border-l-4 border-orange-500 shadow-sm">
+        <button
+          onClick={() => setShowRetrievedContent(!showRetrievedContent)}
+          className="w-full flex items-center justify-between p-4 text-left hover:bg-orange-50 transition-all duration-200"
+        >
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-orange-600" />
+            <span className="font-medium text-orange-800">Retrieved Content</span>
+          </div>
+          <ChevronDown className={`h-4 w-4 text-orange-400 transition-transform duration-200 ${showRetrievedContent ? 'rotate-180' : ''}`} />
+        </button>
+        {showRetrievedContent && (
+          <div className="border-t border-orange-100 bg-orange-50/30 p-4">
+            <div className="text-gray-800 leading-relaxed text-sm prose prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {trace.context.retrieved_content}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
+      </Card>
+    )}
+
+    {/* Input */}
+    <Card className="border-l-4 border-blue-500 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-base">
+          <div className="flex items-center gap-2">
+            <User className="h-5 w-5 text-blue-600" />
+            <span className="text-blue-900">Input</span>
+            {isInputJson && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-normal">
+                Structured
+              </span>
+            )}
+          </div>
+          <CopyButton text={displayInput} label="Copy Input" />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+          <SmartJsonRenderer data={displayInput} />
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Output */}
+    <Card className="border-l-4 border-green-500 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-base">
+          <div className="flex items-center gap-2">
+            <Bot className="h-5 w-5 text-green-600" />
+            <span className="text-green-900">Output</span>
+            {isOutputJson && (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-normal">
+                Structured
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowRawOutput(!showRawOutput)}
+              className="text-xs text-gray-600 hover:text-gray-900 h-8"
+            >
+              {showRawOutput ? 'Show Formatted' : 'Show Raw JSON'}
+            </Button>
+            <CopyButton
+              text={showRawOutput ? rawOutputText : formattedOutputText}
+              label="Copy Output"
+            />
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="bg-green-50/50 p-4 rounded-lg border border-green-100">
+          {showRawOutput ? (
+            <pre className="text-sm text-gray-800 whitespace-pre-wrap overflow-x-auto font-mono bg-white p-3 rounded border border-green-200">
+              {rawOutputText}
+            </pre>
+          ) : (
+            <OutputRenderer rawOutput={trace.output} displayOutput={displayOutput} />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  </>
+  );
+};
 
 export const TraceViewer: React.FC<TraceViewerProps> = ({
   trace,
@@ -1418,7 +1633,12 @@ export const TraceViewer: React.FC<TraceViewerProps> = ({
   const invalidateTraces = useInvalidateTraces();
   const { workshopId } = useWorkshopContext();
   const { data: mlflowConfig } = useMLflowConfig(workshopId!);
-  const { data: workshop } = useWorkshop(workshopId!);
+  const { data: workshop } = useWorkshopDisplayConfig(workshopId!);
+
+  const hasSummary = !!trace.summary?.milestones?.length;
+  const [viewMode, setViewMode] = useState<'milestone' | 'trace'>(
+    hasSummary ? 'milestone' : 'trace'
+  );
 
   // Apply span attribute filter: if configured, use matching span's inputs/outputs
   const { baseInput, baseOutput } = useMemo(() => {
@@ -1513,7 +1733,7 @@ export const TraceViewer: React.FC<TraceViewerProps> = ({
     }
 
     // Build from trace fields or workshop MLflow config as fallback
-    const hostCandidate = trace.mlflow_host || mlflowConfig?.databricks_host;
+    const hostCandidate = trace.mlflow_host;
     const experimentId = trace.mlflow_experiment_id || mlflowConfig?.experiment_id;
     const traceId = trace.mlflow_trace_id;
 
@@ -1576,158 +1796,50 @@ export const TraceViewer: React.FC<TraceViewerProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Context sections */}
-        {trace.context?.conversation_history && (
-          <Card className="border-l-4 border-purple-500 shadow-sm">
-            <button
-              onClick={() => setShowConversationHistory(!showConversationHistory)}
-              className="w-full flex items-center justify-between p-4 text-left hover:bg-purple-50 transition-all duration-200"
-            >
-              <div className="flex items-center gap-2">
-                <History className="h-5 w-5 text-purple-600" />
-                <span className="font-medium text-purple-800">Conversation History</span>
-                <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                  {trace.context.conversation_history.length}
-                </span>
-              </div>
-              <ChevronDown className={`h-4 w-4 text-purple-400 transition-transform duration-200 ${showConversationHistory ? 'rotate-180' : ''}`} />
-            </button>
-            {showConversationHistory && (
-              <div className="border-t border-purple-100 bg-purple-50/30 p-4">
-                <div className="space-y-4">
-                  {trace.context.conversation_history.map((turn, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-purple-100">
-                      {turn.role === 'user' ? (
-                        <User className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                      ) : (
-                        <Bot className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          {turn.role}
-                        </span>
-                        <div className="text-sm text-gray-800 mt-2 prose prose-sm max-w-none">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {turn.content}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
+        {hasSummary && (
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'milestone' | 'trace')}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="milestone">Milestone View</TabsTrigger>
+              <TabsTrigger value="trace">Trace Details</TabsTrigger>
+            </TabsList>
+            <TabsContent value="milestone">
+              <MilestoneView
+                executiveSummary={trace.summary!.executive_summary}
+                milestones={trace.summary!.milestones}
+              />
+            </TabsContent>
+            <TabsContent value="trace" className="space-y-6">
+              <TraceDetailContent
+                trace={trace}
+                showConversationHistory={showConversationHistory}
+                setShowConversationHistory={setShowConversationHistory}
+                showRetrievedContent={showRetrievedContent}
+                setShowRetrievedContent={setShowRetrievedContent}
+                showRawOutput={showRawOutput}
+                setShowRawOutput={setShowRawOutput}
+                displayInput={displayInput}
+                displayOutput={displayOutput}
+                isInputJson={isInputJson}
+                isOutputJson={isOutputJson}
+              />
+            </TabsContent>
+          </Tabs>
         )}
-
-        {trace.context?.retrieved_content && (
-          <Card className="border-l-4 border-orange-500 shadow-sm">
-            <button
-              onClick={() => setShowRetrievedContent(!showRetrievedContent)}
-              className="w-full flex items-center justify-between p-4 text-left hover:bg-orange-50 transition-all duration-200"
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-orange-600" />
-                <span className="font-medium text-orange-800">Retrieved Content</span>
-              </div>
-              <ChevronDown className={`h-4 w-4 text-orange-400 transition-transform duration-200 ${showRetrievedContent ? 'rotate-180' : ''}`} />
-            </button>
-            {showRetrievedContent && (
-              <div className="border-t border-orange-100 bg-orange-50/30 p-4">
-                <div className="text-gray-800 leading-relaxed text-sm prose prose-sm max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {trace.context.retrieved_content}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            )}
-          </Card>
+        {!hasSummary && (
+          <TraceDetailContent
+            trace={trace}
+            showConversationHistory={showConversationHistory}
+            setShowConversationHistory={setShowConversationHistory}
+            showRetrievedContent={showRetrievedContent}
+            setShowRetrievedContent={setShowRetrievedContent}
+            showRawOutput={showRawOutput}
+            setShowRawOutput={setShowRawOutput}
+            displayInput={displayInput}
+            displayOutput={displayOutput}
+            isInputJson={isInputJson}
+            isOutputJson={isOutputJson}
+          />
         )}
-
-        {/* Input */}
-        <Card className="border-l-4 border-blue-500 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
-              <div className="flex items-center gap-2">
-                <User className="h-5 w-5 text-blue-600" />
-                <span className="text-blue-900">Input</span>
-                {isInputJson && (
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-normal">
-                    Structured
-                  </span>
-                )}
-              </div>
-              <CopyButton text={displayInput} label="Copy Input" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
-              <SmartJsonRenderer data={displayInput} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Output */}
-        <Card className="border-l-4 border-green-500 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base">
-              <div className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-green-600" />
-                <span className="text-green-900">Output</span>
-                {isOutputJson && (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-normal">
-                    Structured
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowRawOutput(!showRawOutput)}
-                  className="text-xs text-gray-600 hover:text-gray-900 h-8"
-                >
-                  {showRawOutput ? 'Show Formatted' : 'Show Raw JSON'}
-                </Button>
-                <CopyButton
-                  text={showRawOutput
-                    ? (typeof trace.output === 'string'
-                        ? (() => {
-                            try {
-                              return JSON.stringify(JSON.parse(trace.output), null, 2);
-                            } catch {
-                              return trace.output;
-                            }
-                          })()
-                        : JSON.stringify(trace.output, null, 2))
-                    : displayOutput
-                  }
-                  label="Copy Output"
-                />
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="bg-green-50/50 p-4 rounded-lg border border-green-100">
-              {showRawOutput ? (
-                <pre className="text-sm text-gray-800 whitespace-pre-wrap overflow-x-auto font-mono bg-white p-3 rounded border border-green-200">
-                  {typeof trace.output === 'string'
-                    ? (() => {
-                        try {
-                          return JSON.stringify(JSON.parse(trace.output), null, 2);
-                        } catch {
-                          return trace.output;
-                        }
-                      })()
-                    : JSON.stringify(trace.output, null, 2)
-                  }
-                </pre>
-              ) : (
-                <OutputRenderer rawOutput={trace.output} displayOutput={displayOutput} />
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </CardContent>
     </Card>
   );

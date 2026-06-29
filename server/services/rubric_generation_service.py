@@ -360,9 +360,14 @@ Task: Generate 3-5 evaluation criteria as a JSON array. Focus on the use case co
                 if examples and len(examples) > 500:
                     examples = examples[:497] + "..."
 
-                # Validate and sanitize judge type
+                # Validate and sanitize judge type.
+                # Legacy 'freeform' is accepted but coerced to 'likert' (free-form
+                # criteria are no longer creatable); anything else defaults to 'likert'.
                 judge_type = suggestion.get("judgeType", "likert").lower()
-                if judge_type not in ["likert", "binary", "freeform"]:
+                if judge_type == "freeform":
+                    logger.info("Legacy judgeType 'freeform' coerced to 'likert'")
+                    judge_type = "likert"
+                elif judge_type not in ["likert", "binary"]:
                     logger.warning(f"Invalid judgeType '{judge_type}', defaulting to 'likert'")
                     judge_type = "likert"
 

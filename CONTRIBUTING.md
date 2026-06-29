@@ -241,11 +241,10 @@ just db-bootstrap    # Reset with sample data
 
 ## Adding a New Spec
 
-1. Create `/specs/NEW_SPEC.md` following existing format
+1. Create `/specs/NEW_SPEC.md` following existing format (specs are discovered automatically from `specs/*_SPEC.md` — no registration needed)
 2. Add to `/specs/README.md` index with keywords
-3. Add to `KNOWN_SPECS` in `tools/spec_coverage_analyzer.py`
-4. Write tests tagged to the new spec
-5. Run `uv run spec-coverage-analyzer`
+3. Write tests tagged to the new spec
+4. Run `uv run spec-coverage-analyzer`
 
 ---
 

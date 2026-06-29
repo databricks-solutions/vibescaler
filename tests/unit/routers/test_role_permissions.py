@@ -374,18 +374,21 @@ async def test_facilitator_can_create_invitation(async_client, app):
 
 
 # ===========================================================================
-# Requirement 11: Only facilitators can advance workshop phases
+# Requirement 11: Phase advancement succeeds when prerequisites are met
+# (NOTE: the advancement endpoints perform NO server-side role check; the
+# facilitator-only behavior is client-side gating, asserted in
+# client/src/components/FacilitatorDashboard.roleGate.test.tsx)
 # ===========================================================================
 
 
 @pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("Only facilitators can advance workshop phases")
+@pytest.mark.req("Phase advancement validates prerequisites before transitioning")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_phase_advancement_endpoint_exists_and_responds(
     async_client, override_get_db, monkeypatch
 ):
-    """Phase advancement endpoints exist and are documented as facilitator-only."""
+    """Positive path of prerequisite validation: advancing succeeds when prerequisites are met."""
     import server.routers.workshops as workshops_router
 
     # Create a fake trace so prerequisite is met
@@ -639,12 +642,13 @@ async def test_facilitator_authenticates_via_yaml(async_client, app):
 
 
 # ===========================================================================
-# Requirement 15: SMEs and participants authenticate via database credentials
+# Requirement 15: SMEs and participants authenticate via database email lookup
+# (no password verification — workshop access is invitation-controlled)
 # ===========================================================================
 
 
 @pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("SMEs and participants authenticate via database credentials")
+@pytest.mark.req("SMEs and participants authenticate via database email lookup (no password verification)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_sme_authenticates_via_database(async_client, app):
@@ -681,7 +685,7 @@ async def test_sme_authenticates_via_database(async_client, app):
 
 
 @pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
-@pytest.mark.req("SMEs and participants authenticate via database credentials")
+@pytest.mark.req("SMEs and participants authenticate via database email lookup (no password verification)")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_participant_authenticates_via_database(async_client, app):
@@ -715,6 +719,70 @@ async def test_participant_authenticates_via_database(async_client, app):
         assert body["user"]["role"] == "participant"
     finally:
         app.dependency_overrides.pop(users_router.get_database_service, None)
+
+
+@pytest.mark.spec("ROLE_PERMISSIONS_SPEC")
+@pytest.mark.req("SMEs and participants authenticate via database email lookup (no password verification)")
+@pytest.mark.unit
+def test_database_auth_is_email_only_for_smes_and_participants():
+    """DatabaseService.authenticate_user ignores the password for SME/participant
+    roles (email lookup only) but still verifies it for facilitator DB users.
+
+    This is the real (un-mocked) service behavior behind the router fallback
+    tests above: workshop access for SMEs/participants is controlled by
+    invitation, not by a password.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from server.database import Base, UserDB
+    from server.services.database_service import DatabaseService
+    from server.utils.password import hash_password
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    try:
+        session.add_all(
+            [
+                UserDB(
+                    id="u-sme",
+                    email="sme@example.com",
+                    name="SME",
+                    role="sme",
+                    password_hash=hash_password("real-password"),
+                ),
+                UserDB(
+                    id="u-part",
+                    email="part@example.com",
+                    name="Part",
+                    role="participant",
+                    password_hash=None,
+                ),
+                UserDB(
+                    id="u-fac",
+                    email="fac@example.com",
+                    name="Fac",
+                    role="facilitator",
+                    password_hash=hash_password("fac-password"),
+                ),
+            ]
+        )
+        session.commit()
+        service = DatabaseService(session)
+
+        # SME and participant: wrong/empty password still authenticates (email-only)
+        assert service.authenticate_user("sme@example.com", "wrong-password") is not None
+        assert service.authenticate_user("part@example.com", "") is not None
+
+        # Facilitator DB users still require the correct password
+        assert service.authenticate_user("fac@example.com", "wrong-password") is None
+        assert service.authenticate_user("fac@example.com", "fac-password") is not None
+
+        # Unknown email never authenticates
+        assert service.authenticate_user("nobody@example.com", "anything") is None
+    finally:
+        session.close()
 
 
 # ===========================================================================

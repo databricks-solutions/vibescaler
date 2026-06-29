@@ -23,7 +23,6 @@ from server.services.irr_utils import (
 from server.services.krippendorff_alpha import (
     calculate_krippendorff_alpha,
     calculate_krippendorff_alpha_per_metric,
-    get_krippendorff_improvement_suggestions,
     interpret_krippendorff_alpha,
     is_krippendorff_alpha_acceptable,
 )
@@ -71,8 +70,20 @@ def calculate_irr_for_workshop(workshop_id: str, annotations: list[Annotation], 
         else:
             result = _calculate_krippendorff_alpha_result(annotations, analysis)
 
-        # Add diagnostic information
-        result["problematic_patterns"] = detect_problematic_patterns(annotations, db)
+        # Add diagnostic information, gated per metric so findings only surface
+        # for the metric whose ratings actually show the pattern
+        per_metric_scores = result.get("per_metric_scores", {})
+        if per_metric_scores:
+            for question_id, metric_result in per_metric_scores.items():
+                metric_result["problematic_patterns"] = detect_problematic_patterns(
+                    annotations, db, question_id=question_id
+                )
+            all_patterns = [
+                pattern for metric_result in per_metric_scores.values() for pattern in metric_result["problematic_patterns"]
+            ]
+            result["problematic_patterns"] = list(dict.fromkeys(all_patterns))
+        else:
+            result["problematic_patterns"] = detect_problematic_patterns(annotations, db)
 
         logger.info(f"IRR calculated for workshop {workshop_id}: {result['metric_used']} = {result['score']}")
 
@@ -114,23 +125,12 @@ def _calculate_cohens_kappa_result(annotations: list[Annotation], analysis: dict
     # Calculate overall Cohen's Kappa for the main score
     kappa = calculate_cohens_kappa(annotations)
     interpretation = interpret_cohens_kappa(kappa)
-    ready_to_proceed = is_cohens_kappa_acceptable(kappa)
-
-    # Generate suggestions if needed
-    suggestions = []
-    if not ready_to_proceed:
-        suggestions = [
-            "Consider revising the rubric to reduce ambiguity",
-            "Provide additional training on the rating scale",
-            "Discuss specific examples where disagreement occurred",
-            "Ensure both raters understand the evaluation criteria identically",
-        ]
 
     result = format_irr_result(
         metric_name="Cohen's Kappa",
         score=kappa,
         interpretation=interpretation,
-        suggestions=suggestions,
+        suggestions=[],
         analysis=analysis,
     )
 
@@ -189,27 +189,25 @@ def _calculate_krippendorff_alpha_result(annotations: list[Annotation], analysis
         alpha = sum(per_metric_scores.values()) / len(per_metric_scores) if per_metric_scores else 0.0
 
     interpretation = interpret_krippendorff_alpha(alpha)
-    suggestions = get_krippendorff_improvement_suggestions(alpha)
 
     result = format_irr_result(
         metric_name="Krippendorff's Alpha",
         score=alpha,
         interpretation=interpretation,
-        suggestions=suggestions,
+        suggestions=[],
         analysis=analysis,
     )
 
-    # Add per-metric scores to the result with individual suggestions
+    # Add per-metric scores to the result
     result["per_metric_scores"] = {}
     for question_id, score in per_metric_scores.items():
         # Detect if this metric uses binary scale
         is_binary = _is_binary_metric(annotations, question_id)
-        metric_suggestions = get_krippendorff_improvement_suggestions(score, is_binary=is_binary)
         result["per_metric_scores"][question_id] = {
             "score": score,
             "interpretation": interpret_krippendorff_alpha(score),
             "acceptable": is_krippendorff_alpha_acceptable(score),
-            "suggestions": metric_suggestions,
+            "suggestions": [],
             "is_binary": is_binary,  # Include for frontend display
         }
 

@@ -1,5 +1,8 @@
 // @spec DISCOVERY_SPEC
-// @req Facilitator selects analysis template (Evaluation Criteria or Themes & Patterns) before running
+// AUDIT (2026-06): @req tag removed — DiscoveryAnalysisTab is not mounted anywhere in
+// the live app (FacilitatorDiscoveryWorkspace replaced it). Tests of an unmounted
+// component must not carry spec criteria; equivalent live-workspace tests carry them
+// where the live UI implements the behavior.
 import { describe, expect, it, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { DiscoveryAnalysisTab } from './DiscoveryAnalysisTab';
@@ -33,6 +36,7 @@ vi.mock('@/hooks/useWorkshopApi', () => ({
   useDiscoveryAnalyses: () => mockAnalyses,
   useRunDiscoveryAnalysis: () => mockRunAnalysis,
   useCreateDraftRubricItem: () => ({ mutate: vi.fn(), isPending: false }),
+  useAvailableModels: () => ({ data: [{ name: 'test-model', state: 'READY', task: 'llm/v1/chat' }] }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({

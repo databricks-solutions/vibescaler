@@ -1,4 +1,9 @@
 // @spec UI_COMPONENTS_SPEC
+// @req JSON arrays render as tables
+// NOTE: the analyzer supports only ONE file-level @req per Vitest file. This file
+// also genuinely exercises SQL formatting, CSV/SQL export buttons, copy buttons,
+// and the invalid-JSON error fallback — those criteria stay uncovered until the
+// analyzer supports per-test @req for Vitest.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.spec("TESTING_SPEC")
+@pytest.mark.req("Test isolation (no shared state between tests)")
 class TestConftestProvidesIsolatedDb:
     """SC: Test isolation (no shared state between tests)."""
 
@@ -41,8 +42,9 @@ class TestConftestProvidesIsolatedDb:
 
 
 @pytest.mark.spec("TESTING_SPEC")
+@pytest.mark.req("pytest `--spec` option filters collection to tests tagged for the requested spec")
 class TestSpecFilteringCollectsCorrectTests:
-    """SC: Tests run in CI on every PR (spec-based filtering works)."""
+    """SC: pytest --spec option filters collection to tagged tests."""
 
     def test_conftest_has_spec_option(self):
         """conftest.py defines the --spec option for pytest."""
@@ -73,6 +75,7 @@ class TestSpecFilteringCollectsCorrectTests:
 
 
 @pytest.mark.spec("TESTING_SPEC")
+@pytest.mark.req("Tests run in CI on every PR")
 class TestCIWorkflowIncludesPytestAndPlaywright:
     """SC: Tests run in CI on every PR."""
 

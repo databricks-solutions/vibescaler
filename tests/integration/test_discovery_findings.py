@@ -24,6 +24,7 @@ async def test_submit_finding(client, seed_workshop, seed_trace):
     assert data["insight"] == "Model hallucinates dates"
 
 
+@pytest.mark.req("Discovery finding upsert semantics verified at DB level")
 async def test_finding_upsert_same_user_same_trace(client, seed_workshop, seed_trace):
     """Submitting again for same (workshop, trace, user) updates the insight."""
     ws = seed_workshop()
@@ -53,6 +54,7 @@ async def test_finding_upsert_same_user_same_trace(client, seed_workshop, seed_t
     assert findings[0]["insight"] == "Revised thought"
 
 
+@pytest.mark.req("Discovery finding upsert semantics verified at DB level")
 async def test_finding_different_users_create_separate_records(
     client, seed_workshop, seed_trace
 ):

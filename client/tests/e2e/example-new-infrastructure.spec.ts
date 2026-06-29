@@ -9,12 +9,8 @@ import { test, expect } from '@playwright/test';
 import { TestScenario } from '../lib';
 import { UserRole, WorkshopPhase } from '../lib/types';
 
-test.describe.skip('TestScenario Infrastructure Examples', {
-  tag: ['@spec:ASSISTED_FACILITATION_SPEC'],
-}, () => {
-  test('facilitator login with mocked API', {
-    tag: ['@spec:ASSISTED_FACILITATION_SPEC'],
-  }, async ({ page }) => {
+test.describe.skip('TestScenario Infrastructure Examples', () => {
+  test('facilitator login with mocked API', async ({ page }) => {
     // Create a scenario with workshop and facilitator
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Test Workshop' })
@@ -32,9 +28,7 @@ test.describe.skip('TestScenario Infrastructure Examples', {
     await scenario.cleanup();
   });
 
-  test('workshop with multiple participants', {
-    tag: ['@spec:ASSISTED_FACILITATION_SPEC'],
-  }, async ({ page }) => {
+  test('workshop with multiple participants', async ({ page }) => {
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Multi-User Workshop' })
       .withFacilitator({ email: 'facilitator@test.com' })

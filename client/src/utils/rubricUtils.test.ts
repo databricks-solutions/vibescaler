@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatRubricQuestions, parseRubricQuestions, QUESTION_DELIMITER, type RubricQuestion } from './rubricUtils';
+import {
+  buildCriterionDescription,
+  formatRubricQuestions,
+  parseCriterionDescription,
+  parseRubricQuestions,
+  QUESTION_DELIMITER,
+  type RubricQuestion,
+} from './rubricUtils';
 import { JudgeType } from '@/client';
 
 // @spec RUBRIC_SPEC
@@ -69,10 +76,10 @@ describe('@spec:RUBRIC_SPEC rubricUtils', () => {
       expect(parsed[0].judgeType).toBe('binary');
     });
 
-    it('parses freeform judge type', () => {
+    it('coerces legacy freeform judge type to likert (freeform removed)', () => {
       const text = 'Feedback: Provide detailed feedback|||JUDGE_TYPE|||freeform';
       const parsed = parseRubricQuestions(text);
-      expect(parsed[0].judgeType).toBe('freeform');
+      expect(parsed[0].judgeType).toBe('likert');
     });
 
     it('ignores invalid judge type and defaults to likert', () => {
@@ -106,8 +113,9 @@ describe('@spec:RUBRIC_SPEC rubricUtils', () => {
       expect(parsed[1].title).toBe('Safety Check');
       expect(parsed[1].judgeType).toBe('binary');
 
+      // Legacy freeform questions still parse without crashing, coerced to likert
       expect(parsed[2].title).toBe('Improvement Suggestions');
-      expect(parsed[2].judgeType).toBe('freeform');
+      expect(parsed[2].judgeType).toBe('likert');
     });
 
     it('preserves descriptions with judge type metadata', () => {
@@ -185,9 +193,10 @@ describe('@spec:RUBRIC_SPEC rubricUtils', () => {
       expect(parsed[1].description).toBe('Check safety');
       expect(parsed[1].judgeType).toBe('binary');
 
+      // Legacy freeform content round-trips, but the type coerces to likert
       expect(parsed[2].title).toBe('Feedback');
       expect(parsed[2].description).toBe('Provide feedback');
-      expect(parsed[2].judgeType).toBe('freeform');
+      expect(parsed[2].judgeType).toBe('likert');
     });
 
     it('round-trips with multi-line descriptions', () => {
@@ -219,6 +228,77 @@ describe('@spec:RUBRIC_SPEC rubricUtils', () => {
       expect(parsed[0].title).toBe('Simple Check');
       expect(parsed[0].description).toBe('');
       expect(parsed[0].judgeType).toBe('binary');
+    });
+  });
+
+  describe('Criterion description fields (build/parse)', () => {
+    it('round-trips single-line structured fields', () => {
+      const fields = {
+        definition: 'Measures helpfulness',
+        positive: 'Directly answers the question',
+        negative: 'Vague or off-topic',
+        examples: 'Good: step-by-step answer',
+      };
+
+      const built = buildCriterionDescription(fields);
+      expect(parseCriterionDescription(built)).toEqual(fields);
+    });
+
+    it('round-trips multi-line text in every field without truncation', () => {
+      const fields = {
+        definition: 'Line one of definition\nLine two of definition',
+        positive: 'Pass when:\n- accurate\n- complete',
+        negative: 'Fail when:\n- hallucinated\n- incomplete',
+        examples: 'Good: "Here are 3 steps..."\nBad: "Not sure, search online."',
+      };
+
+      const built = buildCriterionDescription(fields);
+      const parsed = parseCriterionDescription(built);
+
+      expect(parsed.definition).toBe(fields.definition);
+      expect(parsed.positive).toBe(fields.positive);
+      expect(parsed.negative).toBe(fields.negative);
+      expect(parsed.examples).toBe(fields.examples);
+    });
+
+    it('keeps multi-line custom text intact through full rubric serialization for binary criteria', () => {
+      const description = buildCriterionDescription({
+        definition: 'Binary check',
+        positive: 'Pass line 1\nPass line 2',
+        negative: 'Fail line 1\nFail line 2',
+        examples: '',
+      });
+      const questions: RubricQuestion[] = [
+        { id: 'q_1', title: 'Safety', description, judgeType: JudgeType.BINARY },
+      ];
+
+      const parsedQuestions = parseRubricQuestions(formatRubricQuestions(questions));
+      const parsedFields = parseCriterionDescription(parsedQuestions[0].description);
+
+      expect(parsedQuestions[0].judgeType).toBe('binary');
+      expect(parsedFields.positive).toBe('Pass line 1\nPass line 2');
+      expect(parsedFields.negative).toBe('Fail line 1\nFail line 2');
+    });
+
+    it('parses legacy descriptions with single-line sections', () => {
+      const legacy = 'What it measures\nPositive: good things\nNegative: bad things\nExamples: example text';
+      const parsed = parseCriterionDescription(legacy);
+
+      expect(parsed.definition).toBe('What it measures');
+      expect(parsed.positive).toBe('good things');
+      expect(parsed.negative).toBe('bad things');
+      expect(parsed.examples).toBe('example text');
+    });
+
+    it('handles empty and missing sections', () => {
+      expect(parseCriterionDescription('')).toEqual({
+        definition: '',
+        positive: '',
+        negative: '',
+        examples: '',
+      });
+      expect(parseCriterionDescription('Only a definition').definition).toBe('Only a definition');
+      expect(buildCriterionDescription({ definition: '', positive: '', negative: '', examples: '' })).toBe('');
     });
   });
 

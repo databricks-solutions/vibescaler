@@ -1,9 +1,9 @@
 """Tests for DatabaseService discovery questions methods.
 
-@spec ASSISTED_FACILITATION_SPEC
-
-Per the spec, generated questions (Q2+) are stored per-user/per-trace to allow
-personalized question generation. The database layer must support:
+NOTE: These cover the dormant v1 assisted-facilitation per-user question
+storage (no UI caller). The ASSISTED_FACILITATION_SPEC was retired
+(folded into DISCOVERY_SPEC as roadmap), so these tests carry no spec
+tags — they remain as regression coverage for the retained backend code:
 
 1. get_discovery_questions(workshop_id, trace_id, user_id) - retrieve questions
 2. add_discovery_question(workshop_id, trace_id, user_id, prompt, placeholder, category) - create questions
@@ -11,7 +11,6 @@ personalized question generation. The database layer must support:
 
 import pytest
 
-pytestmark = pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -59,8 +58,6 @@ def trace(test_db, workshop):
     return trace
 
 
-@pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
-@pytest.mark.req("Facilitators can generate targeted questions that broadcast to all participants")
 class TestDiscoveryQuestionsDatabase:
     """Tests for discovery questions database operations.
 
@@ -68,7 +65,6 @@ class TestDiscoveryQuestionsDatabase:
     supports the question generation workflow described in the spec.
     """
 
-    @pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
     def test_get_discovery_questions_empty(self, database_service, workshop, trace):
         """Test getting questions when none exist returns empty list."""
         result = database_service.get_discovery_questions(
@@ -78,7 +74,6 @@ class TestDiscoveryQuestionsDatabase:
         )
         assert result == []
 
-    @pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
     def test_add_discovery_question_creates_question(self, database_service, workshop, trace):
         """Test adding a discovery question creates it with correct fields."""
         result = database_service.add_discovery_question(
@@ -95,7 +90,6 @@ class TestDiscoveryQuestionsDatabase:
         assert result["placeholder"] == "Enter your observations about edge cases..."
         assert result["category"] == "edge_cases"
 
-    @pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
     def test_add_discovery_question_increments_question_id(self, database_service, workshop, trace):
         """Test that question_id increments correctly for each new question."""
         # Add first question
@@ -128,7 +122,6 @@ class TestDiscoveryQuestionsDatabase:
         )
         assert q3["id"] == "q_4"
 
-    @pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
     def test_get_discovery_questions_returns_all_for_user(self, database_service, workshop, trace):
         """Test getting questions returns all questions for a specific user."""
         # Add multiple questions for user-1
@@ -159,7 +152,6 @@ class TestDiscoveryQuestionsDatabase:
         assert result[1]["id"] == "q_3"
         assert result[1]["prompt"] == "Question 2"
 
-    @pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
     def test_get_discovery_questions_isolates_by_user(self, database_service, workshop, trace):
         """Test that questions are isolated per-user."""
         # Add questions for user-1
@@ -198,7 +190,6 @@ class TestDiscoveryQuestionsDatabase:
         assert len(user2_questions) == 1
         assert user2_questions[0]["prompt"] == "User 2 question"
 
-    @pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
     def test_get_discovery_questions_isolates_by_trace(self, database_service, workshop, test_db):
         """Test that questions are isolated per-trace."""
         # Create second trace
@@ -244,7 +235,6 @@ class TestDiscoveryQuestionsDatabase:
         assert len(trace2_questions) == 1
         assert trace2_questions[0]["prompt"] == "Trace 2 question"
 
-    @pytest.mark.spec("ASSISTED_FACILITATION_SPEC")
     def test_add_discovery_question_with_optional_fields(self, database_service, workshop, trace):
         """Test adding a question with optional placeholder and category as None."""
         result = database_service.add_discovery_question(
