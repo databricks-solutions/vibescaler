@@ -1850,7 +1850,6 @@ async def begin_annotation_phase(workshop_id: str, request: dict | None = None, 
                         # Wait for MLflow tag indexing (eventual consistency)
                         # Tags were just set via mlflow.set_trace_tag but search_traces
                         # may not find them immediately due to index lag
-                        import os as _os
                         import time as _time
 
                         try:
@@ -2500,8 +2499,8 @@ async def generate_rubric_suggestions(
         logger.info(f"Generated {len(suggestions)} rubric suggestions for workshop {workshop_id}")
         return suggestions
 
-    except ValueError as e:
-        # User-facing error (e.g., no discovery data)
+    except (ValueError, RuntimeError) as e:
+        # User-facing error (e.g., no discovery data or missing Databricks config)
         logger.warning(f"Cannot generate suggestions: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
@@ -3222,7 +3221,7 @@ async def ingest_mlflow_traces(workshop_id: str, ingest_request: dict, db: Sessi
                         len(batch),
                         workshop.summarization_model,
                     )
-            except Exception as e:
+            except Exception:
                 logger.warning("Failed to start background summarization", exc_info=True)
 
         return {
@@ -3477,7 +3476,6 @@ async def upload_csv_and_log_to_mlflow(
     """
     import csv
     import io
-    import os
 
     db_service = DatabaseService(db)
     workshop = db_service.get_workshop(workshop_id)
@@ -3488,9 +3486,13 @@ async def upload_csv_and_log_to_mlflow(
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV file")
 
-    from server.services.databricks_service import get_experiment_id, normalize_experiment_id
+    from server.services.databricks_service import get_databricks_host, get_experiment_id, normalize_experiment_id
 
     exp_id = normalize_experiment_id(experiment_id) or get_experiment_id()
+    try:
+        host = get_databricks_host()
+    except RuntimeError:
+        host = None
 
     try:
         import mlflow
@@ -3674,7 +3676,7 @@ async def analyze_discovery(
 
     try:
         databricks_service = DatabricksService()
-    except ValueError as e:
+    except (ValueError, RuntimeError) as e:
         raise HTTPException(
             status_code=400,
             detail=f"Databricks configuration required: {e!s}",
@@ -4562,12 +4564,10 @@ async def start_simple_evaluation(
                             ]
                             fail_keywords = [
                                 "fail",
-                                "no",
                                 "incorrect",
                                 "does not meet",
                                 "unacceptable",
                                 "reject",
-                                "bad",
                                 "does not satisfy",
                                 # Common negated-pass phrases (whole-word match, checked first)
                                 "not good",

@@ -169,9 +169,9 @@ class FollowUpQuestionService:
                     continue
                 number = milestone.get("number")
                 title = str(milestone.get("title") or "").strip()
-                description = str(milestone.get("description") or "").strip()
+                summary = str(milestone.get("summary") or milestone.get("description") or "").strip()
                 milestone_id = f"M{number}" if number is not None else "M?"
-                detail = title or description
+                detail = ": ".join(part for part in (title, summary) if part)
                 if detail:
                     parts.append(f"- {milestone_id}: {detail}")
 

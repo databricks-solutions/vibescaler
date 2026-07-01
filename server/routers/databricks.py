@@ -14,7 +14,6 @@ from server.models import (
     DatabricksEndpointInfo,
     DatabricksResponse,
 )
-from server.services.database_service import DatabaseService
 from server.services.databricks_service import DatabricksService, create_databricks_service
 
 router = APIRouter()
@@ -172,13 +171,8 @@ async def evaluate_judge_prompt(request: dict, db: Session = Depends(get_db)) ->
     try:
         endpoint_name = request.get("endpoint_name")
         prompt = request.get("prompt")
-        config_data = request.get("config", {})
         temperature = request.get("temperature", 0.0)
         max_tokens = request.get("max_tokens", 10)
-        workshop_id = request.get("workshop_id")
-
-        # Resolve workspace URL from MLflow config or request config
-        workspace_url = config_data.get("workspace_url")
         service = create_databricks_service()
 
         # Call the serving endpoint with judge-specific parameters using SDK (same as intake)

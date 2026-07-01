@@ -15,10 +15,22 @@ def on_starting(server):
     still serve the setup docs while Lakebase is being configured or waking up.
     """
     from server.db_bootstrap import bootstrap_database
+    from server.db_config import LakebaseConfig
 
     try:
         bootstrap_database(full=True)
     except Exception:
+        # Optimistic startup is intentional ONLY while Lakebase is unconfigured: the
+        # app must still serve /docs and the setup-status gate. But if Lakebase IS
+        # configured, a bootstrap/migration failure means workers would fork onto a
+        # broken or partially-migrated schema while the master reports a healthy
+        # start (500s on DB-backed routes). Fail loudly in that case (D7).
+        if LakebaseConfig.from_env() is not None:
+            server.log.exception(
+                "Database bootstrap failed on a configured Lakebase target; aborting "
+                "startup so workers do not serve a partially-migrated schema."
+            )
+            raise
         server.log.exception(
             "Database bootstrap failed; continuing startup so /docs remains available. "
             "Database-backed routes may return errors until Lakebase is configured."

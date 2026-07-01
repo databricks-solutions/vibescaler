@@ -86,7 +86,7 @@ export const formatRubricQuestions = (questions: RubricQuestion[]): string => {
     .join(QUESTION_DELIMITER);
 };
 
-export interface CriterionDescriptionFields {
+interface CriterionDescriptionFields {
   definition: string;
   positive: string;
   negative: string;

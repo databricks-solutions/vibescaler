@@ -108,3 +108,58 @@ def test_workshop_mode_is_immutable(test_db):
 
     with pytest.raises(ValueError, match="immutable"):
         service.update_workshop_mode(created.id, WorkshopMode.EVAL)
+
+
+@pytest.mark.spec("EVAL_MODE_SPEC")
+@pytest.mark.req("Deleting all traces removes eval-mode criteria and evaluations")
+def test_delete_all_traces_removes_eval_mode_rows(test_db):
+    """delete_all_traces must cascade to trace_criteria and criterion_evaluations.
+
+    Regression for B3: these eval-mode tables (migration 0020) were omitted from
+    delete_all_traces. FK ondelete=CASCADE is a no-op because the app runs SQLite
+    without PRAGMA foreign_keys=ON and uses bulk deletes, so the rows were orphaned
+    and resurfaced after re-ingest.
+    """
+    from server.database import CriterionEvaluationDB, TraceCriterionDB, TraceDB
+
+    service = DatabaseService(test_db)
+    workshop = service.create_workshop(
+        WorkshopCreate(
+            name="Eval workshop",
+            description="Per-trace criteria workshop",
+            facilitator_id="fac-1",
+            mode=WorkshopMode.EVAL,
+        )
+    )
+
+    test_db.add_all(
+        [
+            TraceDB(id="trace-1", workshop_id=workshop.id, input="in", output="out"),
+            TraceCriterionDB(
+                id="crit-1",
+                trace_id="trace-1",
+                workshop_id=workshop.id,
+                text="States a concrete recommendation",
+                criterion_type="standard",
+                created_by="fac-1",
+            ),
+            CriterionEvaluationDB(
+                id="eval-1",
+                criterion_id="crit-1",
+                trace_id="trace-1",
+                workshop_id=workshop.id,
+                judge_model="gpt-4",
+                met=True,
+            ),
+        ]
+    )
+    test_db.commit()
+
+    assert test_db.query(TraceCriterionDB).count() == 1
+    assert test_db.query(CriterionEvaluationDB).count() == 1
+
+    deleted = service.delete_all_traces(workshop.id)
+
+    assert deleted == 1
+    assert test_db.query(TraceCriterionDB).count() == 0
+    assert test_db.query(CriterionEvaluationDB).count() == 0

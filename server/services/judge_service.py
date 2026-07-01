@@ -1,7 +1,6 @@
 """Service for managing judge prompt evaluation and tuning."""
 
 import json
-import os
 import random
 import uuid
 from typing import Any

@@ -238,6 +238,10 @@ class TestViteConfigTerserMinification:
         )
 
 
+@pytest.mark.skip(
+    reason="release-build.yml removed per Databricks Labs lockdown policy "
+    "(release workflows stay removed); obsolete pending BUILD_AND_DEPLOY_SPEC update."
+)
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
 @pytest.mark.req("No sensitive files in artifact")
 class TestReleaseWorkflowExclusions:
@@ -360,6 +364,10 @@ class TestLakebaseMigrationSchemaSetup:
         )
 
 
+@pytest.mark.skip(
+    reason="release-build.yml removed per Databricks Labs lockdown policy "
+    "(release workflows stay removed); obsolete pending BUILD_AND_DEPLOY_SPEC update."
+)
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
 @pytest.mark.req("Release workflow creates zip artifact")
 class TestReleaseWorkflowCreatesArtifact:
@@ -387,6 +395,10 @@ class TestReleaseWorkflowCreatesArtifact:
 class TestPreBuiltClientInRelease:
     """SC: Release includes pre-built frontend assets."""
 
+    @pytest.mark.skip(
+        reason="release-build.yml removed per Databricks Labs lockdown policy "
+        "(release workflows stay removed); obsolete pending BUILD_AND_DEPLOY_SPEC update."
+    )
     def test_workflow_builds_frontend_before_zip(self):
         """Release workflow runs npm build before creating zip."""
         workflow = PROJECT_ROOT / ".github" / "workflows" / "release-build.yml"

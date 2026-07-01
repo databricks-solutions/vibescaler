@@ -66,6 +66,7 @@ from server.models import (
   ParticipantNoteCreate,
   Rubric,
   RubricCreate,
+  SummarizationJob,
   Trace,
   TraceUpload,
   User,
@@ -404,8 +405,6 @@ class DatabaseService:
 
   def create_summarization_job(self, workshop_id: str, total: int) -> "SummarizationJob":
     """Create a new summarization job for tracking batch progress."""
-    from server.models import SummarizationJob
-
     db_job = SummarizationJobDB(
       workshop_id=workshop_id,
       status="pending",
@@ -490,8 +489,6 @@ class DatabaseService:
 
   def _job_from_db(self, db_job: SummarizationJobDB) -> "SummarizationJob":
     """Convert a SummarizationJobDB row to a Pydantic model."""
-    from server.models import SummarizationJob
-
     return SummarizationJob(
       id=db_job.id,
       workshop_id=db_job.workshop_id,
@@ -4274,6 +4271,11 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       self.db.query(DisagreementDB).filter(DisagreementDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
       self.db.query(TraceDiscoveryQuestionDB).filter(TraceDiscoveryQuestionDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
       self.db.query(TraceDiscoveryThresholdDB).filter(TraceDiscoveryThresholdDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      # Eval-mode tables (migration 0020). FK ondelete=CASCADE is a no-op here: the app runs
+      # SQLite without PRAGMA foreign_keys=ON and uses bulk deletes, so delete explicitly.
+      # Delete evaluations before criteria (evaluations.criterion_id -> trace_criteria.id).
+      self.db.query(CriterionEvaluationDB).filter(CriterionEvaluationDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(TraceCriterionDB).filter(TraceCriterionDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
 
     # Delete workshop-level child data (no trace FK, just workshop FK)
     self.db.query(UserTraceOrderDB).filter(UserTraceOrderDB.workshop_id == workshop_id).delete(synchronize_session=False)

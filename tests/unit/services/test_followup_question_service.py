@@ -127,8 +127,8 @@ def test_extract_fields_includes_trace_summary_context():
     trace.summary = {
         "executive_summary": "Agent validated context before answering.",
         "milestones": [
-            {"number": 1, "title": "Parse request", "description": "Captured key constraints"},
-            {"number": 2, "title": "Query policy", "description": "Loaded policy context"},
+            {"number": 1, "title": "Parse request", "summary": "Captured key constraints"},
+            {"number": 2, "title": "Query policy", "summary": "Loaded policy context"},
         ],
     }
     feedback = _make_feedback()
@@ -138,6 +138,10 @@ def test_extract_fields_includes_trace_summary_context():
     assert "Executive summary: Agent validated context before answering." in summary_context
     assert "- M1: Parse request" in summary_context
     assert "- M2: Query policy" in summary_context
+    # Milestone narratives live in the `summary` field (Milestone model), not `description`.
+    # They must survive into the follow-up context, not just the titles.
+    assert "Captured key constraints" in summary_context
+    assert "Loaded policy context" in summary_context
 
 
 # ============================================================================

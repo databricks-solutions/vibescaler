@@ -46,6 +46,7 @@ from server.services.trace_summarization_service import (
     get_trace_overview,
     list_spans,
 )
+from server.utils.trace_display_utils import get_display_text
 
 logger = logging.getLogger(__name__)
 
@@ -450,7 +451,7 @@ class DiscoveryService:
             }
 
     def set_discovery_questions_model(self, workshop_id: str, model_name: str) -> str:
-        workshop = self._get_workshop_or_404(workshop_id)
+        self._get_workshop_or_404(workshop_id)
         updated = self.db_service.update_discovery_questions_model_name(workshop_id, model_name)
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update discovery questions model")
@@ -805,7 +806,7 @@ class DiscoveryService:
             raise HTTPException(status_code=502, detail=f"Failed to generate summaries: {e!s}") from e
 
     def get_discovery_summaries(self, workshop_id: str) -> dict[str, Any]:
-        workshop = self._get_workshop_or_404(workshop_id)
+        self._get_workshop_or_404(workshop_id)
         cached = self.db_service.get_latest_discovery_summary(workshop_id)
         if not cached or not isinstance(cached.get("payload"), dict):
             raise HTTPException(status_code=404, detail="No discovery summaries found for this workshop")
@@ -815,7 +816,7 @@ class DiscoveryService:
     # Findings
     # ---------------------------------------------------------------------
     def submit_finding(self, workshop_id: str, finding: DiscoveryFindingCreate) -> DiscoveryFinding:
-        workshop = self._get_workshop_or_404(workshop_id)
+        self._get_workshop_or_404(workshop_id)
         return self.db_service.add_finding(workshop_id, finding)
 
     def get_findings(self, workshop_id: str, user_id: str | None = None) -> list[DiscoveryFinding]:

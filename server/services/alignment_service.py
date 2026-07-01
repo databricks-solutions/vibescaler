@@ -9,7 +9,6 @@ semantic guidelines inline and stores episodic trace IDs for lazy reconstruction
 
 import logging
 import math
-import os
 import threading
 import time
 from collections import Counter
@@ -19,6 +18,7 @@ from typing import Any
 import pandas as pd
 from sklearn.metrics import accuracy_score, cohen_kappa_score, confusion_matrix
 
+from server.models import JudgePrompt
 from server.services.database_service import DatabaseService
 from server.utils.trace_display_utils import get_display_text
 

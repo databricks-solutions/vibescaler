@@ -20,6 +20,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INTERNAL_HOST_MARKERS = ("pypi-proxy.", ".databricks.com")
 PUBLIC_PYPI_REGISTRY = "https://pypi.org/simple"
 
+# npm lockfiles pin proxy hosts in `resolved` URLs (e.g. npm-proxy.cloud.databricks.com);
+# public installs must not reference the internal Databricks proxy.
+INTERNAL_PROXY_SUFFIX = ".databricks.com"
+
 
 @pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
 @pytest.mark.req("Lockfiles resolve against public registries (no internal proxy URLs)")

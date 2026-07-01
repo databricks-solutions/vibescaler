@@ -15,7 +15,7 @@ interface DeploymentStatus {
 }
 
 /** Keep setup redirects on the browser's public origin (never an internal localhost URL). */
-export function sameOriginDocsUrl(docsUrl: string): string {
+function sameOriginDocsUrl(docsUrl: string): string {
   const fallbackPath = '/docs/lakebase-setup/';
   try {
     const path = docsUrl.startsWith('http://') || docsUrl.startsWith('https://')

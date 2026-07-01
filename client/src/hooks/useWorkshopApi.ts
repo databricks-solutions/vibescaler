@@ -1348,7 +1348,7 @@ export interface DiscoveryCommentData {
   updated_at: string;
 }
 
-export interface DiscoveryAgentRunData {
+interface DiscoveryAgentRunData {
   id: string;
   workshop_id: string;
   trace_id: string;

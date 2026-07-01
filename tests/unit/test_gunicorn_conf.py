@@ -30,7 +30,29 @@ class TestOnStartingHook:
 
         mock_server = MagicMock()
 
-        with patch("server.db_bootstrap.bootstrap_database", side_effect=RuntimeError("migration failed")):
+        with (
+            patch("server.db_bootstrap.bootstrap_database", side_effect=RuntimeError("migration failed")),
+            patch("server.db_config.LakebaseConfig.from_env", return_value=None),
+        ):
             on_starting(mock_server)
+
+        mock_server.log.exception.assert_called_once()
+
+    def test_on_starting_reraises_when_lakebase_configured(self):
+        """If Lakebase IS configured and bootstrap fails, startup aborts (D7).
+
+        A migration/connection failure on a configured target must not let workers
+        fork onto a partially-migrated schema while the master reports a healthy start.
+        """
+        from gunicorn_conf import on_starting
+
+        mock_server = MagicMock()
+
+        with (
+            patch("server.db_bootstrap.bootstrap_database", side_effect=RuntimeError("migration failed")),
+            patch("server.db_config.LakebaseConfig.from_env", return_value=object()),
+        ):
+            with pytest.raises(RuntimeError, match="migration failed"):
+                on_starting(mock_server)
 
         mock_server.log.exception.assert_called_once()
