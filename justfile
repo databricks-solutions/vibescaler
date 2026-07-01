@@ -1050,8 +1050,11 @@ e2e mode="headless" workers="1" *args:
 
   echo "Using ports: API=$API_PORT, UI=$UI_PORT"
 
-  # Always start from a clean DB for isolation
-  rm -f "$DB_PATH"
+  # Always start from a clean DB for isolation. Include the WAL/SHM sidecars and
+  # bootstrap lock: a stale ".db-shm" left by a prior run makes SQLite raise
+  # SQLITE_IOERR ("disk I/O error") against the fresh DB, which 500s every login
+  # and mass-fails the suite.
+  rm -f "$DB_PATH" "$DB_PATH"-shm "$DB_PATH"-wal "$DB_PATH".bootstrap.lock
 
   # Start servers through a small wrapper so expected teardown after tests
   # doesn't print `just`'s "Interrupted by SIGTERM" noise.
