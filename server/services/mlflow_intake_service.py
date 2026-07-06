@@ -149,23 +149,41 @@ class MLflowIntakeService:
       trace_uploads = []
       preview_only_ids: list[str] = []
       self.last_ingest_preview_only = 0
+
+      def _ingest_preview_only(info: MLflowTraceInfo) -> None:
+        fallback = self._preview_only_upload(info, experiment_id)
+        if fallback is not None:
+          trace_uploads.append(fallback)
+          preview_only_ids.append(info.trace_id)
+        else:
+          print(f'Warning: Trace {info.trace_id} skipped — spans unreachable and no previews available')
+
+      # Span payloads are served via signed Databricks storage-proxy URLs; if
+      # this environment's egress can't reach that host (e.g. restricted
+      # Databricks Apps networking), each get_trace call burns minutes in
+      # connection retries. Probe once up front and skip straight to the
+      # preview-only path for every trace when the host is unreachable.
+      storage_blocked = self._probe_storage_proxy(trace_infos[0].trace_id) is False
+      if storage_blocked:
+        print(
+          "⚠️  MLflow span storage is unreachable from this environment; "
+          "ingesting all traces with server-side previews only (skipping span downloads)."
+        )
+
       for trace_info in trace_infos:
         try:
-          # Get full trace data. Span payloads are served via signed Databricks
-          # storage-proxy URLs; if this environment's egress can't reach that
-          # host (e.g. restricted Databricks Apps networking), fall back to
-          # ingesting the server-side previews so intake still works.
+          if storage_blocked:
+            _ingest_preview_only(trace_info)
+            continue
+          # Get full trace data, falling back to server-side previews if the
+          # storage proxy turns out to be unreachable mid-run.
           try:
             full_trace = mlflow.get_trace(trace_info.trace_id)
           except Exception as fetch_error:
             if not _is_storage_connectivity_error(fetch_error):
               raise
-            fallback = self._preview_only_upload(trace_info, experiment_id)
-            if fallback is not None:
-              trace_uploads.append(fallback)
-              preview_only_ids.append(trace_info.trace_id)
-            else:
-              print(f'Warning: Trace {trace_info.trace_id} skipped — spans unreachable and no previews available')
+            storage_blocked = True  # stop hammering the unreachable host for the rest
+            _ingest_preview_only(trace_info)
             continue
 
           # Extract content from JSON input/output
@@ -246,6 +264,44 @@ class MLflowIntakeService:
       else:
         raise ValueError(f'Failed to ingest traces: {error_msg}')
 
+  def _probe_storage_proxy(self, trace_id: str) -> "bool | None":
+    """Cheaply test whether MLflow's span-download host is reachable.
+
+    Vends the signed download URL for one trace via the workspace API (which is
+    always reachable), then attempts a short TCP connect to the URL's host.
+    Returns False when egress is blocked — letting ingest skip per-trace retry
+    storms — True when reachable, and None when undetermined (e.g. UC/V4
+    traces have no v3 credential endpoint), in which case the normal span
+    download path is used.
+    """
+    try:
+      import socket
+      from urllib.parse import quote, urlparse
+
+      import requests
+
+      from server.services.databricks_service import resolve_databricks_token
+
+      host = get_databricks_host().rstrip('/')
+      token = resolve_databricks_token()
+      resp = requests.get(
+        f"{host}/api/2.0/mlflow/traces/{quote(str(trace_id), safe='')}/credentials-for-data-download",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=15,
+      )
+      resp.raise_for_status()
+      signed_uri = ((resp.json().get("credential_info") or {}).get("signed_uri")) or ""
+      target = urlparse(signed_uri).hostname
+      if not target:
+        return None
+      try:
+        with socket.create_connection((target, 443), timeout=4):
+          return True
+      except OSError:
+        return False
+    except Exception:
+      return None
+
   def _fetch_server_previews(self, trace_id: str) -> "tuple[str, str] | None":
     """Fetch untruncated server-side previews for a trace via the workspace API.
 
@@ -258,10 +314,12 @@ class MLflowIntakeService:
 
       from server.services.databricks_service import resolve_databricks_token
 
+      from urllib.parse import quote
+
       host = get_databricks_host().rstrip('/')
       token = resolve_databricks_token()
       resp = requests.get(
-        f"{host}/api/2.0/mlflow/traces/{trace_id}",
+        f"{host}/api/2.0/mlflow/traces/{quote(str(trace_id), safe='')}",
         headers={"Authorization": f"Bearer {token}"},
         timeout=30,
       )
@@ -527,12 +585,25 @@ class MLflowIntakeService:
       print(f'Error parsing JSON: {e}')
       return str(data)
 
-  def _generate_mlflow_url(self, databricks_host: str, experiment_id: str, trace_id: str) -> str:
-    """Generate MLflow URL for an experiment."""
+  def _generate_mlflow_url(self, databricks_host: str, experiment_id: str, trace_id: str) -> "str | None":
+    """Generate MLflow URL for an experiment-backed trace.
+
+    Unity Catalog trace locations (``catalog.schema``) have no
+    ``/ml/experiments/{id}`` page — return None instead of a broken link.
+    V4 trace IDs (``trace:/<location>/<id>``) contain '/' and ':' and are
+    URL-encoded when embedded.
+    """
+    if not experiment_id or '.' in str(experiment_id):
+      return None
+    from urllib.parse import quote
+
     # Remove protocol if present and trailing slash
     host = databricks_host.replace('https://', '').replace('http://', '').rstrip('/')
     # Use the experiment URL format: https://{host}/ml/experiments/{experiment_id}
-    return f'https://{host}/ml/experiments/{experiment_id}/traces?selectedEvaluationId={trace_id}'
+    return (
+      f'https://{host}/ml/experiments/{experiment_id}/traces'
+      f'?selectedEvaluationId={quote(str(trace_id), safe="")}'
+    )
 
   def test_connection(self, config: MLflowIntakeConfig) -> Dict[str, Any]:
     """Test MLflow connection and return experiment info."""

@@ -169,6 +169,7 @@ def test_ingest_falls_back_to_preview_only_when_spans_unreachable(monkeypatch):
 
     import server.services.mlflow_intake_service as intake_module
 
+    monkeypatch.setattr(service, "_probe_storage_proxy", lambda trace_id: None)  # undetermined
     monkeypatch.setattr(intake_module.mlflow, "get_trace", _refused)
     monkeypatch.setattr(intake_module, "get_databricks_host", lambda: "https://dbc.example.com")
 
@@ -182,6 +183,117 @@ def test_ingest_falls_back_to_preview_only_when_spans_unreachable(monkeypatch):
     assert upload.context["preview_only"] is True
     assert upload.context["spans"] == []
     assert upload.trace_metadata["preview_only"] is True
+
+
+@pytest.mark.spec("TRACE_INGESTION_SPEC")
+def test_ingest_probe_blocked_skips_span_downloads_entirely(monkeypatch):
+    """A failed storage-proxy probe routes every trace to preview-only ingest.
+
+    Without the probe, each get_trace call burns minutes retrying the
+    unreachable host; with it, no span download is attempted at all.
+    """
+    db_service = _DummyDbService()
+    service = MLflowIntakeService(db_service)
+    config = MLflowIntakeConfig(experiment_id="exp-1", max_traces=2, filter_string=None)
+
+    monkeypatch.setattr(
+        service,
+        "search_traces",
+        lambda _config: [
+            MLflowTraceInfo(
+                trace_id=f"tr-{i}",
+                request_preview="req",
+                response_preview="resp",
+                status="OK",
+                timestamp_ms=1,
+            )
+            for i in (1, 2)
+        ],
+    )
+    monkeypatch.setattr(service, "_probe_storage_proxy", lambda trace_id: False)
+    monkeypatch.setattr(
+        service,
+        "_fetch_server_previews",
+        lambda trace_id: (f"input for {trace_id}", f"output for {trace_id}"),
+    )
+
+    def _never_called(trace_id):
+        raise AssertionError("get_trace must not be called when the probe reports blocked egress")
+
+    import server.services.mlflow_intake_service as intake_module
+
+    monkeypatch.setattr(intake_module.mlflow, "get_trace", _never_called)
+    monkeypatch.setattr(intake_module, "get_databricks_host", lambda: "https://dbc.example.com")
+
+    ingested = service.ingest_traces("ws-1", config)
+
+    assert ingested == 2
+    assert service.last_ingest_preview_only == 2
+    assert all(u.context["preview_only"] for u in db_service.added_traces)
+
+
+@pytest.mark.spec("TRACE_INGESTION_SPEC")
+def test_unity_catalog_traces_flow_through_intake(monkeypatch):
+    """UC trace locations (catalog.schema) and V4 trace IDs pass through intact.
+
+    Search over a UC location yields V4 IDs (trace:/<location>/<id>); ingest
+    must hand the exact same ID back to mlflow.get_trace (which routes to the
+    workspace-host BatchGetTraces endpoint — no storage proxy involved), and
+    no broken /ml/experiments URL may be fabricated for UC locations.
+    """
+    db_service = _DummyDbService()
+    service = MLflowIntakeService(db_service)
+    config = MLflowIntakeConfig(experiment_id="main.eval_schema", max_traces=5, filter_string=None)
+    captured = {}
+
+    v4_id = "trace:/main.eval_schema/abc123"
+    fake_trace = SimpleNamespace(
+        info=SimpleNamespace(
+            request_id=v4_id,
+            request_preview='{"messages": [{"role": "user", "content": "uc input"}]}',
+            response_preview='{"messages": [{"role": "assistant", "content": "uc output"}]}',
+            execution_time_ms=7,
+            status="OK",
+            timestamp_ms=1,
+            tags={},
+        ),
+        data=None,
+    )
+
+    def _fake_search_traces(**kwargs):
+        captured.update(kwargs)
+        return [fake_trace]
+
+    fetched_ids = []
+    span = SimpleNamespace(
+        name="s", span_type="LLM", inputs={}, outputs={}, start_time_ns=1, end_time_ns=2
+    )
+    full_trace = SimpleNamespace(
+        data=SimpleNamespace(spans=[span], request='{"messages": []}', response='{"messages": []}'),
+        info=SimpleNamespace(execution_time_ms=7, status="OK", tags={}),
+    )
+
+    def _fake_get_trace(trace_id):
+        fetched_ids.append(trace_id)
+        return full_trace
+
+    import server.services.mlflow_intake_service as intake_module
+
+    monkeypatch.setattr(intake_module.mlflow, "search_traces", _fake_search_traces)
+    monkeypatch.setattr(intake_module.mlflow, "get_trace", _fake_get_trace)
+    monkeypatch.setattr(intake_module, "get_databricks_host", lambda: "https://dbc.example.com")
+
+    ingested = service.ingest_traces("ws-1", config)
+
+    # UC location is passed through untouched (no experiment-id mangling)
+    assert captured["locations"] == ["main.eval_schema"]
+    # V4 trace ID is handed back to get_trace verbatim
+    assert fetched_ids == [v4_id]
+    assert ingested == 1
+    upload = db_service.added_traces[0]
+    assert upload.mlflow_trace_id == v4_id
+    # No fabricated /ml/experiments URL for UC locations
+    assert upload.mlflow_url is None
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
