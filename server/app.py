@@ -4,8 +4,8 @@ import logging
 import os
 import sys
 import time
-from logging import StreamHandler
 from contextlib import asynccontextmanager
+from logging import StreamHandler
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
@@ -220,6 +220,35 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"ℹ️  PostgreSQL privilege grant skipped: {e}")
 
+        # Ownership audit: Postgres requires table OWNERSHIP (not just privileges)
+        # for ALTER TABLE, so migrations will fail on tables still owned by a
+        # previous identity (rotated service principal, manual bootstrap as a human
+        # user). Surface exactly what an admin must run instead of failing later
+        # mid-migration with a bare InsufficientPrivilege.
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        "SELECT tablename, tableowner FROM pg_tables "
+                        "WHERE schemaname = :s AND tableowner != current_user"
+                    ),
+                    {"s": schema_name},
+                ).fetchall()
+            if rows:
+                owners = sorted({r[1] for r in rows})
+                print(
+                    f"⚠️  {len(rows)} tables in schema '{schema_name}' are owned by {owners}, not the app "
+                    "identity — future migrations that ALTER these tables will fail."
+                )
+                for owner in owners:
+                    print(
+                        f'   Remediation (as a member of both roles, or a superuser): '
+                        f'REASSIGN OWNED BY "{owner}" TO "{pg_user}";'
+                    )
+                print("   Or set LAKEBASE_SCHEMA_NAME to a fresh schema name to start clean.")
+        except Exception as e:
+            print(f"ℹ️  Table ownership audit skipped: {e}")
+
         try:
             # Fix: make users.workshop_id nullable (facilitators don't have a workshop)
             # This is needed for existing tables created with NOT NULL constraint
@@ -373,10 +402,37 @@ async def test():
     return {"message": "App is working!"}
 
 
+def _lakebase_schema_access() -> bool | None:
+    """Probe whether the app identity can use its Lakebase schema.
+
+    Returns True (schema exists and is usable), False (schema exists but the app
+    identity lacks USAGE — e.g. a rotated service principal), or None (schema not
+    created yet, or database unreachable — not a stranded-schema condition).
+    """
+    try:
+        from sqlalchemy import text
+
+        from server.database import engine
+        from server.db_config import get_lakebase_schema_name
+
+        schema = get_lakebase_schema_name()
+        with engine.connect() as conn:
+            exists = conn.execute(text("SELECT 1 FROM pg_namespace WHERE nspname = :s"), {"s": schema}).first()
+            if not exists:
+                return None  # bootstrap will create it on next startup
+            usable = conn.execute(
+                text("SELECT has_schema_privilege(current_user, :s, 'USAGE')"), {"s": schema}
+            ).scalar()
+            return bool(usable)
+    except Exception:
+        return None  # unreachable/waking database; the lakebase_configured gate covers this
+
+
 @app.get("/deployment/status")
 async def deployment_status():
     """Return DB-independent deployment setup status for the frontend shell."""
-    from server.db_config import DatabaseBackend, LakebaseConfig, detect_database_backend
+    from server.db_bootstrap import schema_access_remediation
+    from server.db_config import DatabaseBackend, LakebaseConfig, detect_database_backend, get_lakebase_schema_name
 
     lakebase_configured = LakebaseConfig.from_env() is not None
     # Lakebase setup is only required when targeting postgres; sqlite
@@ -384,15 +440,27 @@ async def deployment_status():
     postgres_target = detect_database_backend() == DatabaseBackend.POSTGRESQL or (
         os.getenv("DATABASE_ENV", "sqlite").lower() == "postgres"
     )
-    return {
+    # Stranded-schema detection: the schema exists but the app identity cannot use
+    # it (service principal rotated). Setup is required until an admin remediates.
+    schema_access: bool | None = None
+    if postgres_target and lakebase_configured:
+        schema_access = _lakebase_schema_access()
+    payload = {
         "lakebase_configured": lakebase_configured,
-        "setup_required": postgres_target and not lakebase_configured,
+        "schema_access": schema_access,
+        "setup_required": (postgres_target and not lakebase_configured) or schema_access is False,
         "docs_url": DOCS_SETUP_PATH,
         "docs_build_exists": DOCS_BUILD_DIR.exists(),
         "docs_build_dir": str(DOCS_BUILD_DIR),
         "client_build_exists": CLIENT_BUILD_DIR.exists(),
         "client_build_dir": str(CLIENT_BUILD_DIR),
     }
+    if schema_access is False:
+        payload["setup_reason"] = "schema_access"
+        payload["remediation"] = schema_access_remediation(
+            get_lakebase_schema_name(), os.getenv("PGUSER") or "<app identity>"
+        )
+    return payload
 
 
 # Serve the Docusaurus docs site before the catch-all React mount.

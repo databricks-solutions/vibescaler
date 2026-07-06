@@ -8,16 +8,14 @@ frontend, bootstrap + file locking) with meta-tests that parse config files
 import os
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from server.db_bootstrap import (
-    _bootstrap_plan,
     _interprocess_lock,
     bootstrap_database,
 )
@@ -183,9 +181,8 @@ class TestFileLockPreventsBootstrapRace:
         t.start()
         holder_ready.wait(timeout=5)
 
-        with pytest.raises(TimeoutError):
-            with _interprocess_lock(lock_path, timeout_s=0.3):
-                pass  # Should never get here
+        with pytest.raises(TimeoutError), _interprocess_lock(lock_path, timeout_s=0.3):
+            pass  # Should never get here
 
         holder_release.set()
         t.join(timeout=5)
@@ -573,6 +570,41 @@ class TestDeploymentStatusGate:
         status = self._get_status()
         assert status["lakebase_configured"] is False
         assert status["setup_required"] is True
+
+    def _set_lakebase_env(self, monkeypatch):
+        monkeypatch.setenv("DATABASE_ENV", "postgres")
+        monkeypatch.setenv("PGHOST", "lakebase.example.com")
+        monkeypatch.setenv("PGDATABASE", "databricks_postgres")
+        monkeypatch.setenv("PGUSER", "4db743e5-fe6b-4a94-9366-8d7490c870ea")
+        monkeypatch.setenv("PGAPPNAME", "vibescaler")
+
+    def test_postgres_with_stranded_schema_requires_setup(self, monkeypatch):
+        """Schema exists but the app identity lacks USAGE (rotated SP) -> setup gate."""
+        import server.app as app_mod
+
+        self._set_lakebase_env(monkeypatch)
+        monkeypatch.setattr(app_mod, "_lakebase_schema_access", lambda: False)
+
+        status = self._get_status()
+        assert status["lakebase_configured"] is True
+        assert status["schema_access"] is False
+        assert status["setup_required"] is True
+        assert status["setup_reason"] == "schema_access"
+        assert "GRANT USAGE, CREATE ON SCHEMA" in status["remediation"]
+        assert "REASSIGN OWNED BY" in status["remediation"]
+
+    def test_postgres_with_accessible_schema_does_not_require_setup(self, monkeypatch):
+        """Healthy Lakebase (schema usable by the app identity) -> no gate."""
+        import server.app as app_mod
+
+        self._set_lakebase_env(monkeypatch)
+        monkeypatch.setattr(app_mod, "_lakebase_schema_access", lambda: True)
+
+        status = self._get_status()
+        assert status["lakebase_configured"] is True
+        assert status["schema_access"] is True
+        assert status["setup_required"] is False
+        assert "remediation" not in status
 
 
 _SERVE_FRONTEND_SCRIPT = r'''

@@ -14,11 +14,21 @@ def on_starting(server):
     when the database is available. Startup remains optimistic so the app can
     still serve the setup docs while Lakebase is being configured or waking up.
     """
-    from server.db_bootstrap import bootstrap_database
+    from server.db_bootstrap import SchemaAccessError, bootstrap_database
     from server.db_config import LakebaseConfig
 
     try:
         bootstrap_database(full=True)
+    except SchemaAccessError as e:
+        # Identity/ownership problem (e.g. the app's service principal rotated and a
+        # previous identity still owns the schema). Migrations cannot run, but
+        # crash-looping would hide the fix — start in setup mode instead so
+        # /deployment/status and the logs show the operator exact remediation.
+        server.log.error(
+            "Database schema access problem — starting in SETUP mode; database-backed "
+            "routes will fail until remediated.\n%s",
+            e,
+        )
     except Exception:
         # Optimistic startup is intentional ONLY while Lakebase is unconfigured: the
         # app must still serve /docs and the setup-status gate. But if Lakebase IS

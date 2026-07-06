@@ -41,6 +41,84 @@ def _truthy(v: str | None) -> bool:
     return v.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
 
 
+# Substrings identifying Postgres privilege/ownership failures. These occur when the
+# app's database identity changed (app recreated -> new service principal, resource
+# re-attached, or a manual bootstrap ran as a human user) and a previous identity
+# still owns the schema or its tables.
+_PERMISSION_ERROR_MARKERS = (
+    "permission denied for schema",
+    "must be owner of",
+    "insufficientprivilege",
+)
+
+
+def schema_access_remediation(schema: str, user: str, owner: str | None = None) -> str:
+    """Operator-facing remediation for a schema the app identity cannot use/own."""
+    owner_disp = owner or "<previous owner>"
+    return (
+        f'The app database identity "{user}" cannot fully access schema "{schema}" '
+        f"(owner: {owner_disp}). This usually means the app's service principal changed "
+        "(app recreated, database resource re-attached, or a manual bootstrap ran as a human user).\n"
+        "Fix with ONE of the following, then restart the app:\n"
+        f'  1) Keep data — grant access (run as the schema owner or an admin):\n'
+        f'       GRANT USAGE, CREATE ON SCHEMA "{schema}" TO "{user}";\n'
+        f'       GRANT ALL ON ALL TABLES IN SCHEMA "{schema}" TO "{user}";\n'
+        f'       GRANT ALL ON ALL SEQUENCES IN SCHEMA "{schema}" TO "{user}";\n'
+        "     (unblocks reads/writes; migrations that ALTER existing tables also need step 2)\n"
+        f"  2) Keep data — transfer ownership (run as a member of both roles, or a superuser):\n"
+        f'       REASSIGN OWNED BY "{owner_disp}" TO "{user}";\n'
+        f'     Per-table alternative: ALTER TABLE "{schema}".<table> OWNER TO "{user}";\n'
+        f"  3) Start fresh: set the app env LAKEBASE_SCHEMA_NAME to a new schema name; the app\n"
+        f'     creates and owns it on next startup (previous data stays in "{schema}").'
+    )
+
+
+class SchemaAccessError(RuntimeError):
+    """The app's database identity lacks access to (or ownership of) its schema.
+
+    Raised instead of a raw ProgrammingError so deployment plumbing (gunicorn
+    ``on_starting``, ``/deployment/status``) can start the app in setup mode and
+    show the operator exact remediation, rather than crash-looping or silently
+    serving a broken schema (BUILD_AND_DEPLOY_SPEC: optimistic startup + setup gate).
+    """
+
+    def __init__(self, schema: str, user: str, cause: str, owner: str | None = None):
+        self.schema = schema
+        self.user = user
+        self.owner = owner
+        self.cause = cause
+        message = f"{cause}\n{schema_access_remediation(schema, user, owner)}"
+        super().__init__(message)
+
+
+def _lookup_schema_owner(database_url: str, schema: str) -> str | None:
+    """Best-effort lookup of a schema's owner; never raises."""
+    try:
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(database_url)
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = :s"),
+                {"s": schema},
+            ).first()
+        engine.dispose()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
+def _maybe_schema_access_error(exc: Exception, database_url: str) -> SchemaAccessError | None:
+    """Classify a migration/stamp failure as a schema-access problem, if it is one."""
+    msg = str(exc).lower()
+    if not any(marker in msg for marker in _PERMISSION_ERROR_MARKERS):
+        return None
+    schema = _get_postgres_schema_name()
+    user = os.getenv("PGUSER") or "<app identity>"
+    owner = _lookup_schema_owner(database_url, schema)
+    return SchemaAccessError(schema=schema, user=user, cause=str(exc), owner=owner)
+
+
 def _detect_backend() -> DatabaseBackend:
     """Detect database backend based on environment variables."""
     # Check for Lakebase environment variables
@@ -337,6 +415,9 @@ def _bootstrap_if_missing_postgres(plan: BootstrapPlan) -> None:
             except Exception as recovery_err:
                 print(f"⚠️  Recovery stamp to head also failed (non-fatal): {recovery_err}")
         else:
+            schema_err = _maybe_schema_access_error(e, plan.database_url)
+            if schema_err is not None:
+                raise schema_err from e
             raise
 
 
@@ -395,18 +476,33 @@ def _bootstrap_full_postgres(plan: BootstrapPlan) -> None:
                 _run_alembic_stamp_baseline(plan.database_url, revision="head")
                 print("✅ Recovery successful — stamped to head!")
             else:
+                schema_err = _maybe_schema_access_error(e, plan.database_url)
+                if schema_err is not None:
+                    raise schema_err from e
                 raise
         return
 
     if user_tables and not has_alembic_version:
         # Tables created by Base.metadata.create_all — stamp to head
         print("📌 Stamping database to head (tables created outside Alembic)...")
-        _run_alembic_stamp_baseline(plan.database_url, revision="head")
+        try:
+            _run_alembic_stamp_baseline(plan.database_url, revision="head")
+        except Exception as e:
+            schema_err = _maybe_schema_access_error(e, plan.database_url)
+            if schema_err is not None:
+                raise schema_err from e
+            raise
         print("✅ Stamped to head!")
         return
 
     print("🔄 Applying pending migrations...")
-    _run_alembic_upgrade_head(plan.database_url)
+    try:
+        _run_alembic_upgrade_head(plan.database_url)
+    except Exception as e:
+        schema_err = _maybe_schema_access_error(e, plan.database_url)
+        if schema_err is not None:
+            raise schema_err from e
+        raise
     print("✅ Migrations completed!")
 
 
