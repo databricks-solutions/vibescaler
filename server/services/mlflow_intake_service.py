@@ -28,11 +28,34 @@ def sanitize_for_json(obj: Any) -> Any:
     return obj
 
 
+# Substrings identifying "trace data is unreachable over the network" failures.
+# MLflow serves trace spans via signed Databricks storage-proxy URLs
+# (*.storage.cloud.databricks.com); restricted-egress environments such as
+# Databricks Apps may be unable to reach that host even though the workspace
+# API itself is reachable.
+_STORAGE_CONNECTIVITY_MARKERS = (
+    "connection refused",
+    "failed to establish a new connection",
+    "max retries exceeded",
+    "newconnectionerror",
+    "storage.cloud.databricks.com",
+)
+
+
+def _is_storage_connectivity_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _STORAGE_CONNECTIVITY_MARKERS)
+
+
 class MLflowIntakeService:
   """Service for MLflow trace intake operations."""
 
   def __init__(self, db_service: DatabaseService):
     self.db_service = db_service
+    # Number of traces ingested with server-side previews only (no spans)
+    # during the most recent ingest_traces call. Non-zero when the Databricks
+    # storage proxy is unreachable (restricted app egress).
+    self.last_ingest_preview_only = 0
 
   def configure_mlflow(self) -> None:
     """MLflow is configured once during worker startup."""
@@ -47,28 +70,34 @@ class MLflowIntakeService:
       if not experiment_id:
         raise ValueError("MLflow experiment ID is empty after normalization.")
 
-      # Search for traces with error handling
+      # Search for traces with error handling.
+      # include_spans=False keeps this metadata-only: server-side previews are
+      # enough for the intake list, and skipping the per-trace span download
+      # avoids N fetches through the Databricks storage proxy — which
+      # restricted-egress environments (Databricks Apps) may not be able to
+      # reach at all.
       traces = mlflow.search_traces(
         locations=[experiment_id],
         max_results=config.max_traces or 100,
         filter_string=config.filter_string,
         return_type='list',
+        include_spans=False,
       )
 
       trace_info_list = []
       for trace in traces:
         try:
           if hasattr(trace, 'info') and hasattr(trace.info, 'request_id'):
-            # Extract content from JSON for previews
-            # Safely handle traces with missing or incomplete data
-            input_content = self._extract_content_from_json(
-              getattr(trace.data, 'request', None) if hasattr(trace, 'data') else None,
-              role_hint="input",
+            # Prefer server-side previews (populated at logging time); fall
+            # back to extracting from downloaded trace data for older traces.
+            raw_request = getattr(trace.info, 'request_preview', None) or (
+              getattr(trace.data, 'request', None) if getattr(trace, 'data', None) else None
             )
-            output_content = self._extract_content_from_json(
-              getattr(trace.data, 'response', None) if hasattr(trace, 'data') else None,
-              role_hint="output",
+            raw_response = getattr(trace.info, 'response_preview', None) or (
+              getattr(trace.data, 'response', None) if getattr(trace, 'data', None) else None
             )
+            input_content = self._extract_content_from_json(raw_request, role_hint="input")
+            output_content = self._extract_content_from_json(raw_response, role_hint="output")
 
             trace_info = MLflowTraceInfo(
               trace_id=trace.info.request_id,
@@ -118,10 +147,26 @@ class MLflowIntakeService:
 
       # Convert to TraceUpload objects
       trace_uploads = []
+      preview_only_ids: list[str] = []
+      self.last_ingest_preview_only = 0
       for trace_info in trace_infos:
         try:
-          # Get full trace data
-          full_trace = mlflow.get_trace(trace_info.trace_id)
+          # Get full trace data. Span payloads are served via signed Databricks
+          # storage-proxy URLs; if this environment's egress can't reach that
+          # host (e.g. restricted Databricks Apps networking), fall back to
+          # ingesting the server-side previews so intake still works.
+          try:
+            full_trace = mlflow.get_trace(trace_info.trace_id)
+          except Exception as fetch_error:
+            if not _is_storage_connectivity_error(fetch_error):
+              raise
+            fallback = self._preview_only_upload(trace_info, experiment_id)
+            if fallback is not None:
+              trace_uploads.append(fallback)
+              preview_only_ids.append(trace_info.trace_id)
+            else:
+              print(f'Warning: Trace {trace_info.trace_id} skipped — spans unreachable and no previews available')
+            continue
 
           # Extract content from JSON input/output
           # Safely handle traces with missing or incomplete data
@@ -175,6 +220,16 @@ class MLflowIntakeService:
             print(f'Warning: Failed to process trace {trace_info.trace_id} ({error_type}): {str(trace_error)}')
           continue
 
+      if preview_only_ids:
+        self.last_ingest_preview_only = len(preview_only_ids)
+        print(
+          f"⚠️  {len(preview_only_ids)}/{len(trace_uploads)} traces ingested with server-side previews only: "
+          "MLflow trace data (spans) is unreachable from this environment — egress to the Databricks storage "
+          "proxy (*.storage.cloud.databricks.com) was refused. Annotation works on previews, but spans power "
+          "summarization and judge features. Fix: allow app egress to *.storage.cloud.databricks.com "
+          "(workspace serverless network policy), then delete traces and re-ingest."
+        )
+
       # Add traces to workshop
       if trace_uploads:
         self.db_service.add_traces(workshop_id, trace_uploads)
@@ -190,6 +245,67 @@ class MLflowIntakeService:
         raise ValueError(f'MLflow authentication failed during ingestion: {error_msg}')
       else:
         raise ValueError(f'Failed to ingest traces: {error_msg}')
+
+  def _fetch_server_previews(self, trace_id: str) -> "tuple[str, str] | None":
+    """Fetch untruncated server-side previews for a trace via the workspace API.
+
+    Unlike span downloads (storage proxy), this endpoint is served by the
+    workspace host, which restricted-egress environments can reach.
+    Returns (request_preview, response_preview) or None on any failure.
+    """
+    try:
+      import requests
+
+      from server.services.databricks_service import resolve_databricks_token
+
+      host = get_databricks_host().rstrip('/')
+      token = resolve_databricks_token()
+      resp = requests.get(
+        f"{host}/api/2.0/mlflow/traces/{trace_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30,
+      )
+      resp.raise_for_status()
+      info = (resp.json().get("trace") or {}).get("trace_info") or {}
+      return str(info.get("request_preview") or ""), str(info.get("response_preview") or "")
+    except Exception as e:
+      print(f"Warning: could not fetch server previews for {trace_id}: {e}")
+      return None
+
+  def _preview_only_upload(self, trace_info: MLflowTraceInfo, experiment_id: str) -> "TraceUpload | None":
+    """Build a spans-free TraceUpload from server-side previews (degraded ingest)."""
+    previews = self._fetch_server_previews(trace_info.trace_id)
+    if previews is None:
+      request_preview, response_preview = trace_info.request_preview, trace_info.response_preview
+    else:
+      request_preview, response_preview = previews
+
+    input_content = self._extract_content_from_json(request_preview, role_hint="input") or request_preview
+    output_content = self._extract_content_from_json(response_preview, role_hint="output") or response_preview
+    if not input_content and not output_content:
+      return None
+
+    return TraceUpload(
+      input=input_content,
+      output=output_content,
+      context={
+        'spans': [],
+        'preview_only': True,
+        'execution_time_ms': trace_info.execution_time_ms,
+        'status': trace_info.status,
+        'tags': trace_info.tags or {},
+      },
+      trace_metadata={
+        'mlflow_trace_id': trace_info.trace_id,
+        'mlflow_host': get_databricks_host(),
+        'mlflow_experiment_id': experiment_id,
+        'preview_only': True,
+      },
+      mlflow_trace_id=trace_info.trace_id,
+      mlflow_url=self._generate_mlflow_url(get_databricks_host(), experiment_id, trace_info.trace_id),
+      mlflow_host=get_databricks_host(),
+      mlflow_experiment_id=experiment_id,
+    )
 
   def _truncate_text(self, text: str, max_length: int) -> str:
     """Truncate text to specified length."""

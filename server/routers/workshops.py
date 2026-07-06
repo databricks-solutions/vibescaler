@@ -3225,7 +3225,15 @@ async def ingest_mlflow_traces(workshop_id: str, ingest_request: dict, db: Sessi
                 logger.warning("Failed to start background summarization", exc_info=True)
 
         return {
-            "message": f"Successfully ingested {trace_count} traces from MLflow",
+            "message": (
+                f"Successfully ingested {trace_count} traces from MLflow"
+                + (
+                    f" ({mlflow_service.last_ingest_preview_only} preview-only: trace spans are unreachable "
+                    "from this app — allow egress to *.storage.cloud.databricks.com and re-ingest for full data)"
+                    if getattr(mlflow_service, "last_ingest_preview_only", 0)
+                    else ""
+                )
+            ),
             "trace_count": trace_count,
             "workshop_id": workshop_id,
             "summarization_job_id": summarization_job_id,
