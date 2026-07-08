@@ -242,10 +242,12 @@ class MLflowIntakeService:
         self.last_ingest_preview_only = len(preview_only_ids)
         print(
           f"⚠️  {len(preview_only_ids)}/{len(trace_uploads)} traces ingested with server-side previews only: "
-          "MLflow trace data (spans) is unreachable from this environment — egress to the Databricks storage "
-          "proxy (*.storage.cloud.databricks.com) was refused. Annotation works on previews, but spans power "
-          "summarization and judge features. Fix: allow app egress to *.storage.cloud.databricks.com "
-          "(workspace serverless network policy), then delete traces and re-ingest."
+          "MLflow trace data (spans) is served via the public storage gateway "
+          "(*.storage.cloud.databricks.com), which is not routable from Databricks Apps/serverless "
+          "compute — egress allowlisting does not help. Annotation works on previews, but spans power "
+          "summarization and judge features. For full spans, log traces to a Unity Catalog trace "
+          "location (catalog.schema) or use UC Volume-backed artifact storage for the experiment, "
+          "then delete traces and re-ingest."
         )
 
       # Add traces to workshop

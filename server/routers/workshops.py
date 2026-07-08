@@ -3228,8 +3228,9 @@ async def ingest_mlflow_traces(workshop_id: str, ingest_request: dict, db: Sessi
             "message": (
                 f"Successfully ingested {trace_count} traces from MLflow"
                 + (
-                    f" ({mlflow_service.last_ingest_preview_only} preview-only: trace spans are unreachable "
-                    "from this app — allow egress to *.storage.cloud.databricks.com and re-ingest for full data)"
+                    f" ({mlflow_service.last_ingest_preview_only} preview-only: this app cannot reach MLflow's "
+                    "span storage (public storage gateway) — use a Unity Catalog trace location or UC "
+                    "Volume-backed artifacts, then re-ingest for full data)"
                     if getattr(mlflow_service, "last_ingest_preview_only", 0)
                     else ""
                 )
