@@ -22,3 +22,8 @@ env:
     valueFrom: experiment
   - name: ENDPOINT_NAME
     valueFrom: database
+  # Required for Unity Catalog trace locations (catalog.schema): mlflow searches
+  # UC trace tables through a SQL warehouse. Attach a SQL warehouse resource
+  # named `sql-warehouse` (CAN_USE) to the app to populate this.
+  - name: MLFLOW_TRACING_SQL_WAREHOUSE_ID
+    valueFrom: sql-warehouse
