@@ -42,25 +42,23 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Literal
 
-# All known specs (without .md extension)
-KNOWN_SPECS = [
-    "ANNOTATION_SPEC",
-    "AUTHENTICATION_SPEC",
-    "BUILD_AND_DEPLOY_SPEC",
-    "CUSTOM_LLM_PROVIDER_SPEC",
-    "DATASETS_SPEC",
-    "DESIGN_SYSTEM_SPEC",
-    "DISCOVERY_SPEC",
-    "JUDGE_EVALUATION_SPEC",
-    "ROLE_PERMISSIONS_SPEC",
-    "RUBRIC_SPEC",
-    "TESTING_SPEC",
-    "TRACE_DISPLAY_SPEC",
-    "TRACE_INGESTION_SPEC",
-    "TRACE_SUMMARIZATION_SPEC",
-    "UI_COMPONENTS_SPEC",
-    "EVAL_MODE_SPEC",
-]
+# Repo root (this file lives in tools/)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _discover_known_specs() -> list[str]:
+    """Discover all spec names from specs/*_SPEC.md files.
+
+    Specs are discovered dynamically so newly added spec files are picked up
+    automatically (previously this was a hardcoded list that drifted out of
+    sync with the specs/ directory).
+    """
+    specs_dir = _REPO_ROOT / "specs"
+    return sorted(p.stem for p in specs_dir.glob("*_SPEC.md"))
+
+
+# All known specs (without .md extension), discovered from specs/*_SPEC.md
+KNOWN_SPECS = _discover_known_specs()
 
 TestType = Literal["unit", "integration", "e2e-mocked", "e2e-real"]
 
@@ -1243,7 +1241,7 @@ def print_unknown_specs_warning(unknown_specs: dict[str, int]):
     print(f"WARNING: {total} test tag(s) reference UNKNOWN specs (zero coverage credit):")
     for spec_name, count in sorted(unknown_specs.items()):
         print(f"  - {spec_name}: {count} tagged test(s)")
-    print("Add valid specs to KNOWN_SPECS in tools/spec_coverage_analyzer.py, or fix the tags.")
+    print("Add a specs/<NAME>_SPEC.md file if they are valid (specs are discovered from specs/*_SPEC.md), or fix the tags.")
     print("=" * 90)
     print("")
 
@@ -1360,8 +1358,8 @@ def generate_markdown_report(coverage: dict[str, SpecCoverage], unknown_specs: d
             [
                 "## :rotating_light: Unknown Spec Tags",
                 "",
-                f"**{total_unknown} test tag(s) reference specs not registered in `KNOWN_SPECS`.**",
-                "These tests earn ZERO coverage credit until the spec is registered or the tag is fixed:",
+                f"**{total_unknown} test tag(s) reference specs with no `specs/<NAME>_SPEC.md` file.**",
+                "These tests earn ZERO coverage credit until the spec file is added or the tag is fixed:",
                 "",
                 "| Unknown Spec | Tagged Tests |",
                 "|--------------|--------------|",
