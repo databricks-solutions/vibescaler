@@ -5,6 +5,7 @@ import pytest
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.spec("TESTING_SPEC"),
+    pytest.mark.req("Trace ingestion tested: bulk upload, retrieval, metadata persistence"),
     pytest.mark.asyncio,
 ]
 

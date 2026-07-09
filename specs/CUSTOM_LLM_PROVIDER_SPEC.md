@@ -1,8 +1,17 @@
+---
+id: CUSTOM_LLM_PROVIDER_SPEC
+title: Custom LLM Provider Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Custom LLM Provider Specification
 
 ## Overview
 
-This specification defines how users can configure custom OpenAI-compatible LLM endpoints for judge evaluation when they cannot use Databricks Foundation Model APIs (FMAPI). This enables users with alternative LLM providers (Azure OpenAI, self-hosted models, vLLM, etc.) to use the judge evaluation features.
+This specification defines how users can configure custom OpenAI-compatible LLM endpoints when they cannot use Databricks Foundation Model APIs (FMAPI). This enables users with alternative LLM providers (Azure OpenAI, self-hosted models, vLLM, etc.) to power the workshop's LLM-backed features.
+
+The shipped consumer of a custom provider is **Discovery follow-up question generation** (the Discovery model selector offers a Custom option when a provider is configured). Judge evaluation does **not** yet use custom providers; that integration is tracked under the Roadmap subsection of the Success Criteria.
 
 ## Motivation
 
@@ -18,26 +27,37 @@ This feature provides a no-code configuration path for OpenAI-compatible endpoin
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    Custom LLM Provider Flow                          │
+│                    Custom LLM Provider Flow (shipped)                │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────┐  │
-│  │   Workshop   │    │   Custom     │    │   OpenAI-Compatible  │  │
-│  │   Config UI  │───▶│   Provider   │───▶│   Endpoint           │  │
+│  │   Provider   │    │   Custom     │    │   OpenAI-Compatible  │  │
+│  │   Config UI  │───▶│   Provider   │    │   Endpoint           │  │
 │  │              │    │   Config     │    │   (Azure, vLLM, etc) │  │
 │  └──────────────┘    └──────────────┘    └──────────────────────┘  │
-│                             │                      │                │
+│                             │                      ▲                │
 │                             ▼                      │                │
-│                      ┌──────────────┐              │                │
-│                      │   MLflow     │              │                │
-│                      │   evaluate() │◀─────────────┘                │
-│                      │   proxy_url  │                               │
+│                      ┌──────────────┐    ┌──────────────────────┐  │
+│                      │  Discovery   │    │  dspy.LM built via   │  │
+│                      │  follow-up   │───▶│  build_custom_llm()  │  │
+│                      │  model =     │    │  (api_base, api_key) │  │
+│                      │  "custom"    │    └──────────────────────┘  │
 │                      └──────────────┘                               │
-│                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Integration with MLflow
+### Shipped Integration: Discovery Follow-up Generation
+
+When the facilitator sets the Discovery follow-up question model to `custom`, follow-up question generation runs against the configured custom endpoint:
+
+1. The Discovery model selector (`DiscoveryStartPage`) shows a `Custom: {provider name}` option when a provider is configured and enabled (read from `GET /workshops/{workshop_id}/custom-llm-provider`).
+2. `discovery_service.py` resolves the provider config and the in-memory API key (`custom_llm_{workshop_id}`) when the workshop's `discovery_questions_model_name == "custom"`.
+3. `FollowUpQuestionService.generate()` receives `custom_base_url` / `custom_model_name` / `custom_api_key` and builds the LM via `build_custom_llm()` in `discovery_dspy.py` — a `dspy.LM` constructed with an `openai/`-prefixed model name, `api_base`, and `api_key`.
+4. If the custom endpoint fails after retries, generation falls back to static questions (the same fallback path used for Databricks models).
+
+### Planned Integration: Judge Evaluation via MLflow (roadmap)
+
+> **Status: not implemented.** `judge_service.py` has no custom-provider code path, and `proxy_url` appears nowhere in the codebase. The design below is preserved as the intended approach; its criteria live under Roadmap in the Success Criteria.
 
 MLflow's `make_genai_metric_from_prompt()` supports a `proxy_url` parameter that overrides the default endpoint URL. This is the preferred integration point because:
 
@@ -216,9 +236,11 @@ api_key = token_storage.get_token(f"custom_llm_{workshop_id}")
 
 ## UI Components
 
-### Model Selector Enhancement
+### Model Selectors
 
-The existing model selector in JudgeTuningPage should be enhanced to include custom provider option:
+**Shipped — Discovery model selector.** The follow-up question model selector on `DiscoveryStartPage` includes a `Custom: {provider name}` item whenever a provider is configured and enabled. Selecting it persists `discovery_questions_model_name = "custom"` on the workshop, and the configuration summary line indicates the custom provider is in use.
+
+**Roadmap — Judge model selector.** The model selector in `JudgeTuningPage` does not yet offer a custom provider option (the `CustomLLMProviderConfig` panel renders on that page, but its `onConfigChange` callback is currently a no-op). The planned enhancement:
 
 ```typescript
 interface ModelOption {
@@ -281,9 +303,24 @@ Visual States:
 
 ## Implementation Details
 
-### Judge Service Integration
+### Discovery Service Integration (shipped)
 
-Modify `_evaluate_with_mlflow()` in `judge_service.py`:
+`discovery_service.py` resolves the custom provider when generating follow-up questions:
+
+```python
+if model_name == "custom":
+    custom_config = self.db_service.get_custom_llm_provider_config(workshop_id)
+    if custom_config and custom_config.is_enabled:
+        custom_base_url = custom_config.base_url
+        custom_model_name = custom_config.model_name
+        custom_api_key = token_storage.get_token(f"custom_llm_{workshop_id}")
+```
+
+`FollowUpQuestionService._call_llm()` then constructs the LM with `build_custom_llm(base_url=..., model_name=..., api_key=...)` from `discovery_dspy.py`, which prefixes the model name with `openai/` (avoiding double prefixes) and falls back to `dspy.LM(model=...)` if the installed dspy version rejects the keyword arguments.
+
+### Judge Service Integration (roadmap — not implemented)
+
+The planned change is to modify `_evaluate_with_mlflow()` in `judge_service.py`:
 
 ```python
 def _evaluate_with_mlflow(self, workshop_id: str, prompt: JudgePrompt, ...):
@@ -423,28 +460,35 @@ Some users may use proxies that translate Anthropic API to OpenAI format. This s
 
 ## Success Criteria
 
+<SpecCoverage spec="CUSTOM_LLM_PROVIDER_SPEC" />
+
 ### Configuration
 - [ ] Users can configure custom LLM provider via UI
 - [ ] Base URL, API key, and model name are captured
 - [ ] API key is stored securely in memory (not database)
 - [ ] Configuration persists across page refreshes (except API key which requires re-entry after 24h)
+- [ ] Configuration can be updated without losing other workshop data
+- [ ] Configuration can be deleted, removing both the stored config and the in-memory API key
 
 ### Connection Testing
-- [ ] "Test Connection" button verifies endpoint is reachable
+- [ ] Test Connection button verifies endpoint is reachable
 - [ ] Clear error messages for common failures (auth, timeout, invalid URL)
 - [ ] Response time is displayed on success
 
-### Judge Evaluation
-- [ ] When custom provider is enabled, judge evaluation uses the custom endpoint
-- [ ] `proxy_url` parameter is correctly passed to MLflow
-- [ ] Evaluation results are identical in format to Databricks FMAPI results
-- [ ] Errors from custom provider are properly surfaced to UI
+### Discovery Follow-up Generation
+- [ ] Custom provider option appears in the Discovery model selector when configured and enabled
+- [ ] When the Discovery follow-up model is set to custom, follow-up questions are generated through the configured endpoint via build_custom_llm
 
-### UI/UX
-- [ ] Custom provider option appears in model selector when configured
-- [ ] Clear indication of which provider is being used
-- [ ] Easy to switch between Databricks and custom provider
-- [ ] Configuration can be updated without losing other workshop data
+### Roadmap
+
+> **Drift note (v1.10 audit):** the criteria below were written as if judge evaluation already consumed custom providers, but that integration was never built. `judge_service.py` has zero custom-provider code paths, `proxy_url` exists nowhere in the codebase, the judge model selector exposes no custom option, and `JudgeTuningPage`'s `onConfigChange` handler is an empty body. The shipped consumer is Discovery follow-up generation (criteria above).
+
+- [ ] When custom provider is enabled, judge evaluation uses the custom endpoint (roadmap)
+- [ ] proxy_url parameter is correctly passed to MLflow (roadmap)
+- [ ] Evaluation results are identical in format to Databricks FMAPI results (roadmap)
+- [ ] Errors from custom provider are properly surfaced to UI (roadmap)
+- [ ] Custom provider option appears in the judge model selector when configured (roadmap)
+- [ ] Easy to switch between Databricks and custom provider for judge evaluation (roadmap)
 
 ## Security Considerations
 

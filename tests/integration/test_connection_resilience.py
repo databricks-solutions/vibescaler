@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import DisconnectionError, OperationalError
+from sqlalchemy.exc import TimeoutError as SATimeoutError
 
 pytestmark = [
     pytest.mark.integration,
@@ -16,6 +17,11 @@ pytestmark = [
 ]
 
 
+@pytest.mark.req(
+    "Connection resilience tested: connection errors classified as transient vs not, "
+    "`_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff "
+    "and gives up after 3 attempts"
+)
 class TestIsConnectionError:
     """Verify _is_connection_error classifies errors correctly."""
 
@@ -50,7 +56,6 @@ class TestIsConnectionError:
         "ssl connection has been closed unexpectedly",
         "could not connect to server",
         "connection refused",
-        "connection timed out",
         "invalid authorization",
         "database is locked",
     ])
@@ -60,9 +65,35 @@ class TestIsConnectionError:
         exc = Exception(message)
         assert _is_connection_error(exc) is True
 
+    def test_pool_exhaustion_timeout_is_not_connection_error(self):
+        """SQLAlchemy QueuePool TimeoutError must NOT be classified as a
+        transient connection error.  Treating saturation as such triggers
+        engine.dispose() during the retry path, which drops in-flight
+        connections held by other concurrent requests and amplifies the
+        outage.  See gh#163.
+        """
+        from server.database import _is_connection_error
 
+        exc = SATimeoutError(
+            "QueuePool limit of size 5 overflow 5 reached, "
+            "connection timed out, timeout 30.00",
+            None,
+            None,
+        )
+        assert _is_connection_error(exc) is False
+
+
+@pytest.mark.req(
+    "Connection resilience tested: connection errors classified as transient vs not, "
+    "`_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff "
+    "and gives up after 3 attempts"
+)
 class TestResetConnectionPool:
-    """Verify _reset_connection_pool disposes engine and refreshes OAuth."""
+    """Verify _reset_connection_pool disposes the engine.
+
+    Note: no explicit OAuth refresh happens here — Postgres credentials are
+    re-injected per new connection via the do_connect listener.
+    """
 
     def test_reset_disposes_engine(self):
         from server.database import _reset_connection_pool, engine
@@ -71,20 +102,24 @@ class TestResetConnectionPool:
             _reset_connection_pool()
             mock_dispose.assert_called_once()
 
-    def test_reset_refreshes_oauth_for_postgres(self):
-        """When backend is PostgreSQL, force_refresh is called."""
+    def test_reset_disposes_engine_for_postgres(self):
+        """When backend is PostgreSQL, engine.dispose() is called (credentials are
+        injected per-connection via do_connect, so no explicit refresh needed)."""
         import server.database as db_mod
 
-        mock_token_mgr = MagicMock()
         with (
             patch.object(db_mod, "DATABASE_BACKEND", db_mod.DatabaseBackend.POSTGRESQL),
-            patch.object(db_mod.engine, "dispose"),
-            patch("server.db_config.get_token_manager", return_value=mock_token_mgr),
+            patch.object(db_mod.engine, "dispose") as mock_dispose,
         ):
             db_mod._reset_connection_pool()
-            mock_token_mgr.force_refresh.assert_called_once()
+            mock_dispose.assert_called_once()
 
 
+@pytest.mark.req(
+    "Connection resilience tested: connection errors classified as transient vs not, "
+    "`_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff "
+    "and gives up after 3 attempts"
+)
 class TestGetDbRetry:
     """Verify get_db retries on transient connection errors."""
 
@@ -154,3 +189,39 @@ class TestGetDbRetry:
             with pytest.raises(ValueError):
                 next(gen)
             assert call_count == 1  # No retry
+
+
+class TestStreamingEndpointsDoNotHoldSessions:
+    """Streaming/SSE endpoints must not bind a DB Session via FastAPI
+    dependency injection — doing so holds one pool connection per
+    subscriber for the entire stream lifetime and saturates the pool.
+    See gh#163 (production cascade traced to /discovery-comments/stream).
+
+    Intentionally not @req-linked: pool-saturation regression guards with no
+    matching success criterion. (A class-level AUTHENTICATION_SPEC marker was
+    removed here — module-level pytestmark overrode it in the marker collector,
+    and AUTHENTICATION_SPEC has no matching criterion.)
+    """
+
+    def _signature_params(self, fn):
+        import inspect
+
+        return inspect.signature(fn).parameters
+
+    def test_stream_discovery_comments_has_no_db_dependency(self):
+        from server.routers.discovery import stream_discovery_comments
+
+        params = self._signature_params(stream_discovery_comments)
+        assert "db" not in params, (
+            "Streaming endpoint must not bind a Session via Depends(get_db) — "
+            "acquire SessionLocal() per poll iteration instead. See gh#163."
+        )
+
+    def test_stream_discovery_agent_run_has_no_db_dependency(self):
+        from server.routers.discovery import stream_discovery_agent_run
+
+        params = self._signature_params(stream_discovery_agent_run)
+        assert "db" not in params, (
+            "Streaming endpoint must not bind a Session via Depends(get_db) — "
+            "acquire SessionLocal() per poll iteration instead. See gh#163."
+        )

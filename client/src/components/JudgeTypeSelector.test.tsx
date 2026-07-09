@@ -7,7 +7,7 @@ import { JudgeType } from '@/client';
 
 describe('@spec:JUDGE_EVALUATION_SPEC JudgeTypeSelector', () => {
   describe('Rendering', () => {
-    it('renders all three judge type cards', () => {
+    it('renders likert and binary judge type cards only', () => {
       render(
         <JudgeTypeSelector
           selectedType={JudgeType.LIKERT}
@@ -17,7 +17,7 @@ describe('@spec:JUDGE_EVALUATION_SPEC JudgeTypeSelector', () => {
 
       expect(screen.getByText('Likert Scale Judge')).toBeInTheDocument();
       expect(screen.getByText('Binary Judge')).toBeInTheDocument();
-      expect(screen.getByText('Free-form Feedback')).toBeInTheDocument();
+      expect(screen.queryByText('Free-form Feedback')).not.toBeInTheDocument();
     });
 
     it('displays descriptions for each judge type', () => {
@@ -30,7 +30,7 @@ describe('@spec:JUDGE_EVALUATION_SPEC JudgeTypeSelector', () => {
 
       expect(screen.getByText('Rubric-based scoring with 1-5 scale ratings')).toBeInTheDocument();
       expect(screen.getByText('Simple pass/fail or yes/no evaluation')).toBeInTheDocument();
-      expect(screen.getByText('Open-ended qualitative analysis')).toBeInTheDocument();
+      expect(screen.queryByText('Open-ended qualitative analysis')).not.toBeInTheDocument();
     });
 
     it('shows features for Likert judge', () => {
@@ -59,7 +59,7 @@ describe('@spec:JUDGE_EVALUATION_SPEC JudgeTypeSelector', () => {
       expect(screen.getByText('High-speed evaluation')).toBeInTheDocument();
     });
 
-    it('shows features for Free-form judge', () => {
+    it('does not offer free-form as a selectable judge type', () => {
       render(
         <JudgeTypeSelector
           selectedType={JudgeType.FREEFORM}
@@ -67,9 +67,9 @@ describe('@spec:JUDGE_EVALUATION_SPEC JudgeTypeSelector', () => {
         />
       );
 
-      expect(screen.getByText('Detailed text feedback')).toBeInTheDocument();
-      expect(screen.getByText('Qualitative insights')).toBeInTheDocument();
-      expect(screen.getByText('Flexible format')).toBeInTheDocument();
+      expect(screen.queryByText('Free-form Feedback')).not.toBeInTheDocument();
+      expect(screen.queryByText('Detailed text feedback')).not.toBeInTheDocument();
+      expect(screen.queryByText('Qualitative insights')).not.toBeInTheDocument();
     });
 
     it('shows use cases for each judge type', () => {
@@ -86,8 +86,8 @@ describe('@spec:JUDGE_EVALUATION_SPEC JudgeTypeSelector', () => {
       // Binary use cases
       expect(screen.getByText('Safety checks')).toBeInTheDocument();
 
-      // Freeform use cases
-      expect(screen.getByText('Improvement suggestions')).toBeInTheDocument();
+      // Freeform use cases are gone
+      expect(screen.queryByText('Improvement suggestions')).not.toBeInTheDocument();
     });
   });
 
@@ -116,19 +116,6 @@ describe('@spec:JUDGE_EVALUATION_SPEC JudgeTypeSelector', () => {
 
       fireEvent.click(screen.getByText('Binary Judge'));
       expect(onTypeChange).toHaveBeenCalledWith('binary');
-    });
-
-    it('calls onTypeChange when clicking Free-form card', () => {
-      const onTypeChange = vi.fn();
-      render(
-        <JudgeTypeSelector
-          selectedType={JudgeType.LIKERT}
-          onTypeChange={onTypeChange}
-        />
-      );
-
-      fireEvent.click(screen.getByText('Free-form Feedback'));
-      expect(onTypeChange).toHaveBeenCalledWith('freeform');
     });
 
     it('highlights selected type with checkmark', () => {
@@ -170,7 +157,7 @@ describe('@spec:JUDGE_EVALUATION_SPEC JudgeTypeSelector', () => {
       );
 
       const cards = container.querySelectorAll('[class*="cursor-not-allowed"]');
-      expect(cards.length).toBe(3);
+      expect(cards.length).toBe(2);
     });
   });
 });

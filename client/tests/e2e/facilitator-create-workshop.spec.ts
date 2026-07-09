@@ -5,7 +5,7 @@ const FACILITATOR_PASSWORD = process.env.E2E_FACILITATOR_PASSWORD ?? 'facilitato
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000';
 
 test('facilitator can log in and create a workshop', {
-  tag: ['@spec:AUTHENTICATION_SPEC', '@spec:DISCOVERY_TRACE_ASSIGNMENT_SPEC'],
+  tag: ['@spec:AUTHENTICATION_SPEC'],
 }, async ({ page, request }) => {
   await page.goto('/');
 

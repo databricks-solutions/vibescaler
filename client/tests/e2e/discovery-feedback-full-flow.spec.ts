@@ -157,25 +157,29 @@ test.describe('Discovery feedback full participant flow', () => {
       );
     }
 
-    // 1. Navigate to facilitator dashboard - look for Feedback Detail tab
-    const feedbackTab = scenario.page.getByRole('tab', { name: /Feedback Detail/i });
-    if (await feedbackTab.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await feedbackTab.click();
+    // AUDIT (2026-06): this block previously hid its assertions behind an
+    // `if (await feedbackTab.isVisible())` guard keyed to a "Feedback Detail"
+    // dashboard tab that no longer exists, so the test passed vacuously.
+    // The facilitator now sees participant feedback directly on the trace
+    // cards in FacilitatorDiscoveryWorkspace — assert that unconditionally.
 
-      // 2. Verify feedback detail panel is visible
-      await expect(
-        scenario.page.getByTestId('feedback-detail-panel')
-      ).toBeVisible({ timeout: 10000 });
+    // 1. Reload so the workspace picks up the feedback submitted above.
+    //    Reloading lands on the workshop selection screen — re-enter the workshop.
+    await scenario.page.reload();
+    await scenario.page.getByTestId(`workshop-card-${workshopId}`).click();
 
-      // 3. Expand the first trace group (collapsed by default)
-      const traceGroup = scenario.page.getByTestId('feedback-trace-group').first();
-      await traceGroup.click();
+    // 2. Feedback comment is visible on the trace card
+    await expect(
+      scenario.page.getByText('Excellent response quality.')
+    ).toBeVisible({ timeout: 15000 });
 
-      // 4. Feedback comment should be visible after expanding
-      await expect(
-        scenario.page.getByText('Excellent response quality.')
-      ).toBeVisible({ timeout: 10000 });
-    }
+    // 3. Follow-up Q&A is collapsed on the card — expand and verify content
+    const qnaToggle = scenario.page.getByText(/3 follow-up/i).first();
+    await expect(qnaToggle).toBeVisible({ timeout: 10000 });
+    await qnaToggle.click();
+    await expect(
+      scenario.page.getByText('Follow-up question 1?')
+    ).toBeVisible({ timeout: 10000 });
 
     await scenario.cleanup();
   });

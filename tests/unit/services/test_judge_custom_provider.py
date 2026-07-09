@@ -1,70 +1,32 @@
-"""Tests for custom LLM provider integration with judge evaluation.
+"""Tests for custom LLM provider helpers in the workshops router.
 
-Tests verify success criteria from CUSTOM_LLM_PROVIDER_SPEC.md:
-- When custom provider is enabled, judge evaluation uses the custom endpoint
-- proxy_url parameter is correctly passed to MLflow
+Covers the helpers behind the CUSTOM_LLM_PROVIDER_SPEC Configuration and
+Connection Testing criteria: chat-completions URL construction used by the
+connection test endpoint, and the in-memory API key storage key format.
+
+NOTE: judge evaluation does NOT use custom providers — that integration
+(proxy_url to MLflow) is unbuilt and tracked under the spec's Roadmap
+section. Do not tag tests here to those roadmap criteria.
 """
-
-from datetime import datetime
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from server.database import CustomLLMProviderConfigDB
-from server.models import (
-    JudgeEvaluationRequest,
-    JudgePrompt,
-)
-from server.services.judge_service import JudgeService
-
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Test Connection button verifies endpoint is reachable")
 @pytest.mark.unit
-def test_custom_provider_sets_proxy_url_in_mlflow_configuration():
-    """When a custom LLM provider is configured and enabled, the judge service
-    should pass proxy_url to make_genai_metric_from_prompt per the spec.
-
-    From CUSTOM_LLM_PROVIDER_SPEC.md:
-    > MLflow's make_genai_metric_from_prompt() supports a proxy_url parameter
-    > that overrides the default endpoint URL.
-
-    This test verifies the integration point where:
-    1. Custom provider config is looked up for the workshop
-    2. The proxy_url is constructed from the base_url
-    3. The model URI uses openai:/ prefix for custom providers
-    """
-    # Arrange: Set up a mock DB service with custom provider config
-    mock_db_service = MagicMock()
-
-    custom_config = CustomLLMProviderConfigDB(
-        id="cfg-1",
-        workshop_id="w1",
-        provider_name="Azure OpenAI",
-        base_url="https://my-resource.openai.azure.com/openai/deployments/gpt-4",
-        model_name="gpt-4",
-        is_enabled=True,
-    )
-
-    mock_db_service.get_custom_llm_provider_config.return_value = custom_config
-
-    # Verify that _build_chat_completions_url works correctly
-    # This is imported from the workshops router where it's defined
+def test_build_chat_completions_url_appends_full_path():
+    """A bare base URL (no /v1, no /chat/completions) gets /v1/chat/completions appended."""
     from server.routers.workshops import _build_chat_completions_url
 
-    # Test URL construction per the spec
-    proxy_url = _build_chat_completions_url(custom_config.base_url)
-
-    # The base URL doesn't end with /chat/completions or /v1, so it should
-    # append /v1/chat/completions
-    assert proxy_url == "https://my-resource.openai.azure.com/openai/deployments/gpt-4/v1/chat/completions"
-
-    # Verify the model URI would be constructed correctly for custom providers
-    # Per the spec: model=f"openai:/{custom_config.model_name}"
-    expected_model_uri = f"openai:/{custom_config.model_name}"
-    assert expected_model_uri == "openai:/gpt-4"
+    url = _build_chat_completions_url(
+        "https://my-resource.openai.azure.com/openai/deployments/gpt-4"
+    )
+    assert url == "https://my-resource.openai.azure.com/openai/deployments/gpt-4/v1/chat/completions"
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Test Connection button verifies endpoint is reachable")
 @pytest.mark.unit
 def test_build_chat_completions_url_with_v1_suffix():
     """URL ending with /v1 should get /chat/completions appended."""
@@ -75,6 +37,7 @@ def test_build_chat_completions_url_with_v1_suffix():
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Test Connection button verifies endpoint is reachable")
 @pytest.mark.unit
 def test_build_chat_completions_url_already_has_suffix():
     """URL that already ends with /chat/completions should be returned as-is."""
@@ -85,6 +48,7 @@ def test_build_chat_completions_url_already_has_suffix():
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("Test Connection button verifies endpoint is reachable")
 @pytest.mark.unit
 def test_build_chat_completions_url_strips_trailing_slash():
     """Trailing slashes should be stripped before appending."""
@@ -97,6 +61,7 @@ def test_build_chat_completions_url_strips_trailing_slash():
 
 
 @pytest.mark.spec("CUSTOM_LLM_PROVIDER_SPEC")
+@pytest.mark.req("API key is stored securely in memory (not database)")
 @pytest.mark.unit
 def test_custom_provider_api_key_stored_with_correct_key_format():
     """API keys for custom providers use the format custom_llm_{workshop_id}.

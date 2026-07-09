@@ -60,3 +60,88 @@ def test_calculate_irr_for_workshop_uses_krippendorff_when_missing_data():
     assert result.details["metric_used"] == "Krippendorff's Alpha"
     assert -1.0 <= result.score <= 1.0
     assert "per_metric_scores" in result.details
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+@pytest.mark.req("Updates when new annotations added")
+def test_calculate_irr_for_workshop_reflects_newly_added_annotations():
+    """Recomputing IRR after new annotations are added changes the result.
+
+    The /irr endpoint recalculates from the current annotation set on every
+    call, so adding a disagreeing annotation pair must move the score and the
+    reported annotation counts — no caching of stale results.
+    """
+    agreeing = [
+        _ann(trace_id="t1", user_id="u1", rating=3, ratings={"q1": 3}),
+        _ann(trace_id="t1", user_id="u2", rating=3, ratings={"q1": 3}),
+        _ann(trace_id="t2", user_id="u1", rating=4, ratings={"q1": 4}),
+        _ann(trace_id="t2", user_id="u2", rating=4, ratings={"q1": 4}),
+    ]
+    before = calculate_irr_for_workshop("w1", annotations=agreeing, db=None)
+    assert before.score == 1.0  # Perfect agreement
+    assert before.details["num_annotations"] == 4
+
+    # New annotations arrive: both raters rate a third trace with extreme disagreement
+    after = calculate_irr_for_workshop(
+        "w1",
+        annotations=agreeing
+        + [
+            _ann(trace_id="t3", user_id="u1", rating=1, ratings={"q1": 1}),
+            _ann(trace_id="t3", user_id="u2", rating=5, ratings={"q1": 5}),
+        ],
+        db=None,
+    )
+    assert after.details["num_annotations"] == 6
+    assert after.score < before.score  # Disagreement pulls the score down
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+def test_calculate_irr_for_workshop_sends_no_canned_suggestions_for_low_agreement():
+    # Perfect disagreement previously triggered hard-coded recommendation text
+    annotations = [
+        _ann(trace_id="t1", user_id="u1", rating=1, ratings={"q1": 1}),
+        _ann(trace_id="t1", user_id="u2", rating=5, ratings={"q1": 5}),
+        _ann(trace_id="t2", user_id="u1", rating=5, ratings={"q1": 5}),
+        _ann(trace_id="t2", user_id="u2", rating=1, ratings={"q1": 1}),
+    ]
+    result = calculate_irr_for_workshop("w1", annotations=annotations, db=None)
+    assert result.details
+    assert result.details["suggestions"] == []
+    for metric in result.details["per_metric_scores"].values():
+        assert metric.get("suggestions", []) == []
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+def test_calculate_irr_for_workshop_sends_no_canned_suggestions_krippendorff_path():
+    annotations = [
+        _ann(trace_id="t1", user_id="u1", rating=1, ratings={"q1": 1}),
+        _ann(trace_id="t1", user_id="u2", rating=5, ratings={"q1": 5}),
+        _ann(trace_id="t2", user_id="u1", rating=5, ratings={"q1": 5}),
+        _ann(trace_id="t2", user_id="u2", rating=1, ratings={"q1": 1}),
+        _ann(trace_id="t3", user_id="u1", rating=1, ratings={"q1": 1}),
+        # u2 missing t3 -> Krippendorff's Alpha path
+    ]
+    result = calculate_irr_for_workshop("w1", annotations=annotations, db=None)
+    assert result.details
+    assert result.details["metric_used"] == "Krippendorff's Alpha"
+    assert result.details["suggestions"] == []
+    for metric in result.details["per_metric_scores"].values():
+        assert metric["suggestions"] == []
+
+
+@pytest.mark.spec("JUDGE_EVALUATION_SPEC")
+def test_problematic_patterns_gated_per_metric_on_actual_agreement():
+    # q1 has extreme disagreement on every trace; q2 has perfect agreement
+    annotations = [
+        _ann(trace_id="t1", user_id="u1", rating=1, ratings={"q1": 1, "q2": 4}),
+        _ann(trace_id="t1", user_id="u2", rating=5, ratings={"q1": 5, "q2": 4}),
+        _ann(trace_id="t2", user_id="u1", rating=1, ratings={"q1": 1, "q2": 4}),
+        _ann(trace_id="t2", user_id="u2", rating=5, ratings={"q1": 5, "q2": 4}),
+    ]
+    result = calculate_irr_for_workshop("w1", annotations=annotations, db=None)
+    assert result.details
+    metrics = result.details["per_metric_scores"]
+    assert any("disagreement" in p for p in metrics["q1"]["problematic_patterns"])
+    assert not any("disagreement" in p for p in metrics["q2"]["problematic_patterns"])
+    # Top-level list stays for backward compatibility as the per-metric union
+    assert any("disagreement" in p for p in result.details["problematic_patterns"])

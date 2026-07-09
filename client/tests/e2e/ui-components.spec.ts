@@ -6,6 +6,12 @@
  * Tests:
  * - Pagination in annotation view (page navigation works)
  * - Trace viewer renders and allows export
+ *
+ * Intentionally NOT @req-linked: the criterion-relevant assertions below are
+ * wrapped in `if (await locator.isVisible())` guards, so the tests can pass
+ * vacuously. The pagination/viewer criteria are covered by the genuine unit
+ * assertions in Pagination.test.tsx / TraceDataViewer.test.tsx instead.
+ * Do not add @req tags here without first removing the visibility guards.
  */
 
 import { test, expect } from '@playwright/test';
@@ -15,10 +21,8 @@ test.describe('Pagination Component', { tag: ['@spec:UI_COMPONENTS_SPEC']}, () =
   test('pagination in annotation view navigates between pages', {
     tag: ['@spec:UI_COMPONENTS_SPEC'],
   }, async ({ page }) => {
-    // Spec: UI_COMPONENTS_SPEC lines 340-345
-    // "Page navigation works correctly (first, prev, next, last)"
-    // "Disabled states shown for unavailable actions"
-    // "Page info accurately reflects data"
+    // Touches the pagination criteria area of UI_COMPONENTS_SPEC, but all
+    // criterion assertions are guarded by isVisible() checks — see file header.
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Pagination Test Workshop' })
       .withFacilitator()
@@ -108,10 +112,9 @@ test.describe('Trace Data Viewer', { tag: ['@spec:UI_COMPONENTS_SPEC']}, () => {
   test('trace viewer renders trace content', {
     tag: ['@spec:UI_COMPONENTS_SPEC'],
   }, async ({ browser }) => {
-    // Spec: UI_COMPONENTS_SPEC lines 347-352
-    // "JSON arrays render as tables"
-    // "CSV export includes all table data"
-    // "Copy to clipboard works for all content"
+    // Smoke test only: asserts the discovery page renders without an error
+    // banner. It does NOT verify table rendering, CSV export, or clipboard —
+    // see file header for why it carries no @req tags.
     const runId = `${Date.now()}`;
 
     // Create trace with structured JSON output for table rendering

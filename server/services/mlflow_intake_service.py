@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Literal
 
 from server.models import MLflowIntakeConfig, MLflowTraceInfo, TraceUpload
 from server.services.database_service import DatabaseService
+from server.services.databricks_service import get_databricks_host, normalize_experiment_id
 
 
 def sanitize_for_json(obj: Any) -> Any:
@@ -27,65 +28,106 @@ def sanitize_for_json(obj: Any) -> Any:
     return obj
 
 
+# Substrings identifying "trace data is unreachable over the network" failures.
+# MLflow serves trace spans via signed Databricks storage-proxy URLs
+# (*.storage.cloud.databricks.com); restricted-egress environments such as
+# Databricks Apps may be unable to reach that host even though the workspace
+# API itself is reachable.
+_STORAGE_CONNECTIVITY_MARKERS = (
+    "connection refused",
+    "failed to establish a new connection",
+    "max retries exceeded",
+    "newconnectionerror",
+    "storage.cloud.databricks.com",
+)
+
+
+def _is_storage_connectivity_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _STORAGE_CONNECTIVITY_MARKERS)
+
+
+def _uc_access_remediation(error_msg: str) -> "str | None":
+    """Operator-facing remediation for UC trace-table access failures.
+
+    Unity Catalog trace locations require the app's service principal to have
+    USE CATALOG / USE SCHEMA / SELECT on the trace tables (or the tables
+    attached as UC-securable app resources). Surface the exact grants —
+    with the real SP client id — instead of a bare REQUIRES_PRIVILEGES error.
+    """
+    import os
+    import re
+
+    if "REQUIRES_PRIVILEGES" not in error_msg and "Access control check failed" not in error_msg:
+        return None
+
+    match = re.search(r"Access control check failed for ([\w$]+(?:\.[\w$]+)+)", error_msg)
+    parts = match.group(1).split(".") if match else []
+    catalog = parts[0] if len(parts) >= 2 else "<catalog>"
+    schema = parts[1] if len(parts) >= 2 else "<schema>"
+    sp = os.getenv("DATABRICKS_CLIENT_ID") or "<app service principal client id>"
+    return (
+        f"The app's identity lacks Unity Catalog access to the trace tables. "
+        f"Ask an admin to run:\n"
+        f"  GRANT USE CATALOG ON CATALOG `{catalog}` TO `{sp}`;\n"
+        f"  GRANT USE SCHEMA, SELECT ON SCHEMA `{catalog}`.`{schema}` TO `{sp}`;\n"
+        f"Alternatively, attach the trace tables in {catalog}.{schema} to this app as "
+        f"UC-securable resources (type TABLE, permission SELECT). "
+        f"Also ensure the app uses mlflow>=3.14 — older clients fail this check even with correct grants."
+    )
+
+
 class MLflowIntakeService:
   """Service for MLflow trace intake operations."""
 
   def __init__(self, db_service: DatabaseService):
     self.db_service = db_service
+    # Number of traces ingested with server-side previews only (no spans)
+    # during the most recent ingest_traces call. Non-zero when the Databricks
+    # storage proxy is unreachable (restricted app egress).
+    self.last_ingest_preview_only = 0
 
-  def configure_mlflow(self, config: MLflowIntakeConfig) -> None:
-    """Configure MLflow with Databricks credentials."""
-    try:
-      # Validate configuration
-      if not config.databricks_host or not config.databricks_token:
-        raise ValueError('Databricks host and token are required')
-
-      # Validate host format
-      if not config.databricks_host.startswith('https://'):
-        raise ValueError('Databricks host must start with https://')
-
-      # Set tracking URI to Databricks
-      mlflow.set_tracking_uri('databricks')
-
-      # Set authentication — clear profile-related env vars that override token auth
-      import os
-
-      os.environ['DATABRICKS_HOST'] = config.databricks_host.rstrip('/')
-      os.environ['DATABRICKS_TOKEN'] = config.databricks_token
-      os.environ.pop('DATABRICKS_CONFIG_PROFILE', None)
-      os.environ.pop('DATABRICKS_AUTH_TYPE', None)
-
-    except Exception as e:
-      raise ValueError(f'Failed to configure MLflow: {str(e)}')
+  def configure_mlflow(self) -> None:
+    """MLflow is configured once during worker startup."""
+    return None
 
   def search_traces(self, config: MLflowIntakeConfig) -> List[MLflowTraceInfo]:
     """Search for traces in MLflow experiment with proper error handling."""
     try:
       # Configure MLflow
-      self.configure_mlflow(config)
+      self.configure_mlflow()
+      experiment_id = normalize_experiment_id(config.experiment_id)
+      if not experiment_id:
+        raise ValueError("MLflow experiment ID is empty after normalization.")
 
-      # Search for traces with error handling
+      # Search for traces with error handling.
+      # include_spans=False keeps this metadata-only: server-side previews are
+      # enough for the intake list, and skipping the per-trace span download
+      # avoids N fetches through the Databricks storage proxy — which
+      # restricted-egress environments (Databricks Apps) may not be able to
+      # reach at all.
       traces = mlflow.search_traces(
-        experiment_ids=[config.experiment_id],
+        locations=[experiment_id],
         max_results=config.max_traces or 100,
         filter_string=config.filter_string,
         return_type='list',
+        include_spans=False,
       )
 
       trace_info_list = []
       for trace in traces:
         try:
           if hasattr(trace, 'info') and hasattr(trace.info, 'request_id'):
-            # Extract content from JSON for previews
-            # Safely handle traces with missing or incomplete data
-            input_content = self._extract_content_from_json(
-              getattr(trace.data, 'request', None) if hasattr(trace, 'data') else None,
-              role_hint="input",
+            # Prefer server-side previews (populated at logging time); fall
+            # back to extracting from downloaded trace data for older traces.
+            raw_request = getattr(trace.info, 'request_preview', None) or (
+              getattr(trace.data, 'request', None) if getattr(trace, 'data', None) else None
             )
-            output_content = self._extract_content_from_json(
-              getattr(trace.data, 'response', None) if hasattr(trace, 'data') else None,
-              role_hint="output",
+            raw_response = getattr(trace.info, 'response_preview', None) or (
+              getattr(trace.data, 'response', None) if getattr(trace, 'data', None) else None
             )
+            input_content = self._extract_content_from_json(raw_request, role_hint="input")
+            output_content = self._extract_content_from_json(raw_response, role_hint="output")
 
             trace_info = MLflowTraceInfo(
               trace_id=trace.info.request_id,
@@ -95,7 +137,7 @@ class MLflowIntakeService:
               status=getattr(trace.info, 'status', 'UNKNOWN'),
               timestamp_ms=getattr(trace.info, 'timestamp_ms', 0),
               tags=dict(trace.info.tags) if hasattr(trace.info, 'tags') and trace.info.tags else None,
-              mlflow_url=self._generate_mlflow_url(config.databricks_host, config.experiment_id, trace.info.request_id),
+              mlflow_url=self._generate_mlflow_url(get_databricks_host(), experiment_id, trace.info.request_id),
             )
             trace_info_list.append(trace_info)
         except Exception as trace_error:
@@ -117,12 +159,18 @@ class MLflowIntakeService:
         raise ValueError(f'MLflow authentication failed. Please check your Databricks token: {error_msg}')
       elif '404' in error_msg:
         raise ValueError(f'MLflow experiment not found. Please check your experiment ID: {error_msg}')
+      elif (uc_remediation := _uc_access_remediation(error_msg)) is not None:
+        raise ValueError(f'{uc_remediation}\n\nUnderlying error: {error_msg}')
       else:
         raise ValueError(f'Failed to search MLflow traces: {error_msg}')
 
   def ingest_traces(self, workshop_id: str, config: MLflowIntakeConfig) -> int:
     """Ingest traces from MLflow into the workshop."""
     try:
+      experiment_id = normalize_experiment_id(config.experiment_id)
+      if not experiment_id:
+        raise ValueError("MLflow experiment ID is empty after normalization.")
+
       # Search for traces
       trace_infos = self.search_traces(config)
 
@@ -131,10 +179,44 @@ class MLflowIntakeService:
 
       # Convert to TraceUpload objects
       trace_uploads = []
+      preview_only_ids: list[str] = []
+      self.last_ingest_preview_only = 0
+
+      def _ingest_preview_only(info: MLflowTraceInfo) -> None:
+        fallback = self._preview_only_upload(info, experiment_id)
+        if fallback is not None:
+          trace_uploads.append(fallback)
+          preview_only_ids.append(info.trace_id)
+        else:
+          print(f'Warning: Trace {info.trace_id} skipped — spans unreachable and no previews available')
+
+      # Span payloads are served via signed Databricks storage-proxy URLs; if
+      # this environment's egress can't reach that host (e.g. restricted
+      # Databricks Apps networking), each get_trace call burns minutes in
+      # connection retries. Probe once up front and skip straight to the
+      # preview-only path for every trace when the host is unreachable.
+      storage_blocked = self._probe_storage_proxy(trace_infos[0].trace_id) is False
+      if storage_blocked:
+        print(
+          "⚠️  MLflow span storage is unreachable from this environment; "
+          "ingesting all traces with server-side previews only (skipping span downloads)."
+        )
+
       for trace_info in trace_infos:
         try:
-          # Get full trace data
-          full_trace = mlflow.get_trace(trace_info.trace_id)
+          if storage_blocked:
+            _ingest_preview_only(trace_info)
+            continue
+          # Get full trace data, falling back to server-side previews if the
+          # storage proxy turns out to be unreachable mid-run.
+          try:
+            full_trace = mlflow.get_trace(trace_info.trace_id)
+          except Exception as fetch_error:
+            if not _is_storage_connectivity_error(fetch_error):
+              raise
+            storage_blocked = True  # stop hammering the unreachable host for the rest
+            _ingest_preview_only(trace_info)
+            continue
 
           # Extract content from JSON input/output
           # Safely handle traces with missing or incomplete data
@@ -168,13 +250,13 @@ class MLflowIntakeService:
             },
             trace_metadata={
               'mlflow_trace_id': trace_info.trace_id,
-              'mlflow_host': config.databricks_host,
-              'mlflow_experiment_id': config.experiment_id,
+              'mlflow_host': get_databricks_host(),
+              'mlflow_experiment_id': experiment_id,
             },
             mlflow_trace_id=trace_info.trace_id,
-            mlflow_url=self._generate_mlflow_url(config.databricks_host, config.experiment_id, trace_info.trace_id),
-            mlflow_host=config.databricks_host,
-            mlflow_experiment_id=config.experiment_id,
+            mlflow_url=self._generate_mlflow_url(get_databricks_host(), experiment_id, trace_info.trace_id),
+            mlflow_host=get_databricks_host(),
+            mlflow_experiment_id=experiment_id,
           )
           trace_uploads.append(trace_upload)
 
@@ -187,6 +269,18 @@ class MLflowIntakeService:
           else:
             print(f'Warning: Failed to process trace {trace_info.trace_id} ({error_type}): {str(trace_error)}')
           continue
+
+      if preview_only_ids:
+        self.last_ingest_preview_only = len(preview_only_ids)
+        print(
+          f"⚠️  {len(preview_only_ids)}/{len(trace_uploads)} traces ingested with server-side previews only: "
+          "MLflow trace data (spans) is served via the public storage gateway "
+          "(*.storage.cloud.databricks.com), which is not routable from Databricks Apps/serverless "
+          "compute — egress allowlisting does not help. Annotation works on previews, but spans power "
+          "summarization and judge features. For full spans, log traces to a Unity Catalog trace "
+          "location (catalog.schema) or use UC Volume-backed artifact storage for the experiment, "
+          "then delete traces and re-ingest."
+        )
 
       # Add traces to workshop
       if trace_uploads:
@@ -203,6 +297,107 @@ class MLflowIntakeService:
         raise ValueError(f'MLflow authentication failed during ingestion: {error_msg}')
       else:
         raise ValueError(f'Failed to ingest traces: {error_msg}')
+
+  def _probe_storage_proxy(self, trace_id: str) -> "bool | None":
+    """Cheaply test whether MLflow's span-download host is reachable.
+
+    Vends the signed download URL for one trace via the workspace API (which is
+    always reachable), then attempts a short TCP connect to the URL's host.
+    Returns False when egress is blocked — letting ingest skip per-trace retry
+    storms — True when reachable, and None when undetermined (e.g. UC/V4
+    traces have no v3 credential endpoint), in which case the normal span
+    download path is used.
+    """
+    try:
+      import socket
+      from urllib.parse import quote, urlparse
+
+      import requests
+
+      from server.services.databricks_service import resolve_databricks_token
+
+      host = get_databricks_host().rstrip('/')
+      token = resolve_databricks_token()
+      resp = requests.get(
+        f"{host}/api/2.0/mlflow/traces/{quote(str(trace_id), safe='')}/credentials-for-data-download",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=15,
+      )
+      resp.raise_for_status()
+      signed_uri = ((resp.json().get("credential_info") or {}).get("signed_uri")) or ""
+      target = urlparse(signed_uri).hostname
+      if not target:
+        return None
+      try:
+        with socket.create_connection((target, 443), timeout=4):
+          return True
+      except OSError:
+        return False
+    except Exception:
+      return None
+
+  def _fetch_server_previews(self, trace_id: str) -> "tuple[str, str] | None":
+    """Fetch untruncated server-side previews for a trace via the workspace API.
+
+    Unlike span downloads (storage proxy), this endpoint is served by the
+    workspace host, which restricted-egress environments can reach.
+    Returns (request_preview, response_preview) or None on any failure.
+    """
+    try:
+      import requests
+
+      from server.services.databricks_service import resolve_databricks_token
+
+      from urllib.parse import quote
+
+      host = get_databricks_host().rstrip('/')
+      token = resolve_databricks_token()
+      resp = requests.get(
+        f"{host}/api/2.0/mlflow/traces/{quote(str(trace_id), safe='')}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=30,
+      )
+      resp.raise_for_status()
+      info = (resp.json().get("trace") or {}).get("trace_info") or {}
+      return str(info.get("request_preview") or ""), str(info.get("response_preview") or "")
+    except Exception as e:
+      print(f"Warning: could not fetch server previews for {trace_id}: {e}")
+      return None
+
+  def _preview_only_upload(self, trace_info: MLflowTraceInfo, experiment_id: str) -> "TraceUpload | None":
+    """Build a spans-free TraceUpload from server-side previews (degraded ingest)."""
+    previews = self._fetch_server_previews(trace_info.trace_id)
+    if previews is None:
+      request_preview, response_preview = trace_info.request_preview, trace_info.response_preview
+    else:
+      request_preview, response_preview = previews
+
+    input_content = self._extract_content_from_json(request_preview, role_hint="input") or request_preview
+    output_content = self._extract_content_from_json(response_preview, role_hint="output") or response_preview
+    if not input_content and not output_content:
+      return None
+
+    return TraceUpload(
+      input=input_content,
+      output=output_content,
+      context={
+        'spans': [],
+        'preview_only': True,
+        'execution_time_ms': trace_info.execution_time_ms,
+        'status': trace_info.status,
+        'tags': trace_info.tags or {},
+      },
+      trace_metadata={
+        'mlflow_trace_id': trace_info.trace_id,
+        'mlflow_host': get_databricks_host(),
+        'mlflow_experiment_id': experiment_id,
+        'preview_only': True,
+      },
+      mlflow_trace_id=trace_info.trace_id,
+      mlflow_url=self._generate_mlflow_url(get_databricks_host(), experiment_id, trace_info.trace_id),
+      mlflow_host=get_databricks_host(),
+      mlflow_experiment_id=experiment_id,
+    )
 
   def _truncate_text(self, text: str, max_length: int) -> str:
     """Truncate text to specified length."""
@@ -424,32 +619,52 @@ class MLflowIntakeService:
       print(f'Error parsing JSON: {e}')
       return str(data)
 
-  def _generate_mlflow_url(self, databricks_host: str, experiment_id: str, trace_id: str) -> str:
-    """Generate MLflow URL for an experiment."""
+  def _generate_mlflow_url(self, databricks_host: str, experiment_id: str, trace_id: str) -> "str | None":
+    """Generate MLflow URL for an experiment-backed trace.
+
+    Unity Catalog trace locations (``catalog.schema``) have no
+    ``/ml/experiments/{id}`` page — return None instead of a broken link.
+    V4 trace IDs (``trace:/<location>/<id>``) contain '/' and ':' and are
+    URL-encoded when embedded.
+    """
+    if not experiment_id or '.' in str(experiment_id):
+      return None
+    from urllib.parse import quote
+
     # Remove protocol if present and trailing slash
     host = databricks_host.replace('https://', '').replace('http://', '').rstrip('/')
     # Use the experiment URL format: https://{host}/ml/experiments/{experiment_id}
-    return f'https://{host}/ml/experiments/{experiment_id}/traces?selectedEvaluationId={trace_id}'
+    return (
+      f'https://{host}/ml/experiments/{experiment_id}/traces'
+      f'?selectedEvaluationId={quote(str(trace_id), safe="")}'
+    )
 
   def test_connection(self, config: MLflowIntakeConfig) -> Dict[str, Any]:
     """Test MLflow connection and return experiment info."""
+    experiment_id = normalize_experiment_id(config.experiment_id)
     try:
       # Configure MLflow
-      self.configure_mlflow(config)
+      self.configure_mlflow()
+      if not experiment_id:
+        return {
+          'success': False,
+          'error': 'Invalid experiment ID',
+          'message': 'MLflow experiment ID is empty after normalization.',
+        }
 
       # Try to get experiment info
-      experiment = mlflow.get_experiment(config.experiment_id)
+      experiment = mlflow.get_experiment(experiment_id)
       if not experiment:
         return {
           'success': False,
           'error': 'Experiment not found',
-          'message': f'Experiment {config.experiment_id} not found',
+          'message': f'Experiment {experiment_id} not found',
         }
 
       # Try to search for traces to verify access (with minimal request)
       try:
         traces = mlflow.search_traces(
-          locations=[config.experiment_id],
+          locations=[experiment_id],
           max_results=1,
           return_type='list',
         )
@@ -461,7 +676,7 @@ class MLflowIntakeService:
       return {
         'success': True,
         'experiment_name': experiment.name,
-        'experiment_id': config.experiment_id,
+        'experiment_id': experiment_id,
         'trace_count': trace_count,
         'message': f"Connection successful. Found experiment '{experiment.name}' accessible traces.",
       }
@@ -478,6 +693,6 @@ class MLflowIntakeService:
         return {
           'success': False,
           'error': 'Experiment not found',
-          'message': f'Experiment {config.experiment_id} not found. Please check your experiment ID.',
+          'message': f'Experiment {experiment_id} not found. Please check your experiment ID.',
         }
       return {'success': False, 'error': str(e), 'message': f'Connection failed: {str(e)}'}

@@ -1,10 +1,9 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ListChecks, 
-  ToggleLeft, 
-  MessageSquareText,
+import {
+  ListChecks,
+  ToggleLeft,
   CheckCircle2
 } from 'lucide-react';
 import { JudgeType } from '@/client';
@@ -56,29 +55,12 @@ const judgeTypes: {
       'Policy compliance',
       'Hallucination detection'
     ]
-  },
-  {
-    type: JudgeType.FREEFORM,
-    title: 'Free-form Feedback',
-    description: 'Open-ended qualitative analysis',
-    icon: <MessageSquareText className="w-6 h-6" />,
-    features: [
-      'Detailed text feedback',
-      'Qualitative insights',
-      'Flexible format',
-      'Rich explanations'
-    ],
-    useCases: [
-      'Improvement suggestions',
-      'Error categorization',
-      'Detailed critique'
-    ]
   }
 ];
 
 export function JudgeTypeSelector({ selectedType, onTypeChange, disabled }: JudgeTypeSelectorProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {judgeTypes.map((judge) => {
         const isSelected = selectedType === judge.type;
         

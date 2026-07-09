@@ -153,3 +153,17 @@ just test-server && just spec-coverage
 - Coverage map: `specs/SPEC_COVERAGE_MAP.md`
 - Spec-tester agent: `.claude/agents/spec-tester.md`
 - Test tagging conventions: `.claude/skills/verification-testing/SKILL.md`
+
+## Release-Readiness Mode (doc-alignment)
+
+Coverage percent is necessary but not sufficient. Before a release, audit each spec against three sources at once:
+
+1. **Ship intent — `/doc/`** (the public docs are the contract for what we ship; see `doc/ABOUT_THESE_DOCS.md`). For each spec ask: does any doc page claim this capability? Is it presented as built-today or aspirational? A spec no doc mentions is either internal infrastructure (fine) or a candidate for cutting (ask).
+2. **Spec meaning — `/specs/`**: do the success criteria describe the doc-claimed behavior, or do they pin removed/changed behavior (stale) or behavior the code contradicts (drift)?
+3. **Reality — code + tests**: is each criterion verified by a currently-passing, properly-tagged test? "Tagged" is not "verified" — check the test passes and actually asserts the criterion.
+
+Verdict taxonomy per spec: `ship_ready` | `gaps` (doc claims it, verification thin) | `stale` (spec describes something we no longer ship) | `drift` (spec and code disagree) | `internal` (no doc claim needed).
+
+Findings that need a human decision (cut vs fix vs accept) go to the user as **structured interviews**: batched questions with concrete options and the evidence inline, not a wall of findings. Remediation (tagging, new tests, spec edits) happens only after those decisions.
+
+Reverse sweep: also audit doc→spec — every capability the docs claim must resolve to a real spec with real coverage (watch for links to spec pages that don't exist).

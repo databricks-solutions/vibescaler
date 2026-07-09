@@ -5,18 +5,23 @@ import os
 import sys
 import time
 from contextlib import asynccontextmanager
+from logging import StreamHandler
+from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from server.config import ServerConfig
 from server.db_bootstrap import maybe_bootstrap_db_on_startup
 from server.db_config import DatabaseBackend, detect_database_backend
 from server.routers import router
+from server.services.databricks_service import configure_databricks_mlflow_once
 from server.sqlite_rescue import (
     backup_to_volume,
     get_rescue_status,
@@ -27,12 +32,95 @@ from server.sqlite_rescue import (
 )
 
 logger = logging.getLogger(__name__)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CLIENT_BUILD_DIR = PROJECT_ROOT / "client" / "build"
+DOCS_BUILD_DIR = PROJECT_ROOT / "docs" / "build"
+DOCS_SETUP_PATH = "/docs/lakebase-setup/"
+
+
+def _public_redirect_url(request: Request, location: str) -> str:
+    """Rewrite internal localhost redirects to the public app URL or a relative path.
+
+    Databricks Apps terminate TLS at the edge; the app process often sees requests as
+    localhost:8000. StaticFiles trailing-slash redirects then emit Location:
+    http://localhost:8000/... which escapes the public hostname in the browser.
+    """
+    if location.startswith("/") and not location.startswith("//"):
+        return location
+
+    parsed = urlparse(location)
+    if not parsed.scheme:
+        return location
+
+    internal_host = (parsed.hostname or "").lower()
+    if internal_host not in ("localhost", "127.0.0.1", "0.0.0.0"):
+        return location
+
+    forwarded_host = request.headers.get("x-forwarded-host")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    if forwarded_host:
+        public_host = forwarded_host.split(",")[0].strip()
+        return urlunparse(
+            (
+                forwarded_proto,
+                public_host,
+                parsed.path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment,
+            )
+        )
+
+    # Fall back to a relative path so the browser keeps the current public origin.
+    if parsed.path:
+        return parsed.path + (f"?{parsed.query}" if parsed.query else "")
+    return location
+
+
+class FixRedirectLocationMiddleware(BaseHTTPMiddleware):
+    """Ensure redirect Location headers never point the browser at localhost:8000."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if response.status_code not in (301, 302, 303, 307, 308):
+            return response
+        location = response.headers.get("location")
+        if not location:
+            return response
+        fixed = _public_redirect_url(request, location)
+        if fixed != location:
+            response.headers["location"] = fixed
+        return response
+
+
+def _configure_app_log_levels() -> None:
+    """Set app logger levels for non-uvicorn modules.
+
+    Uvicorn config controls access/error logger verbosity, but app module
+    loggers (`server.*`) can still remain too restrictive. Mirror uvicorn
+    verbosity unless APP_LOG_LEVEL is explicitly set.
+    """
+    requested = os.getenv("APP_LOG_LEVEL") or os.getenv("UVICORN_LOG_LEVEL") or "INFO"
+    level = getattr(logging, requested.upper(), logging.INFO)
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        handler = StreamHandler(sys.stdout)
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
+        )
+        root_logger.addHandler(handler)
+    root_logger.setLevel(level)
+    logging.getLogger("server").setLevel(level)
+    logging.getLogger("uvicorn.error").setLevel(level)
+    logger.info("Configured app logger level level=%s", logging.getLevelName(level))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan with proper startup and shutdown."""
     print("🚀 Application startup - lifespan function called!")
+    _configure_app_log_levels()
+    configure_databricks_mlflow_once()
 
     # Detect database backend
     db_backend = detect_database_backend()
@@ -87,10 +175,10 @@ async def lifespan(app: FastAPI):
         from sqlalchemy import text
 
         from server.database import Base, engine
-        from server.db_config import LakebaseConfig
+        from server.db_config import LakebaseConfig, get_lakebase_schema_name
 
         lakebase_cfg = LakebaseConfig.from_env()
-        schema_name = lakebase_cfg.app_name.replace("-", "_") if lakebase_cfg else "human_eval_workshop"
+        schema_name = get_lakebase_schema_name(lakebase_cfg)
         pg_user = os.getenv("PGUSER", "")
 
         try:
@@ -131,6 +219,35 @@ async def lifespan(app: FastAPI):
                     print(f"✅ PostgreSQL privileges granted to '{pg_user}' on schema '{schema_name}'")
         except Exception as e:
             print(f"ℹ️  PostgreSQL privilege grant skipped: {e}")
+
+        # Ownership audit: Postgres requires table OWNERSHIP (not just privileges)
+        # for ALTER TABLE, so migrations will fail on tables still owned by a
+        # previous identity (rotated service principal, manual bootstrap as a human
+        # user). Surface exactly what an admin must run instead of failing later
+        # mid-migration with a bare InsufficientPrivilege.
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        "SELECT tablename, tableowner FROM pg_tables "
+                        "WHERE schemaname = :s AND tableowner != current_user"
+                    ),
+                    {"s": schema_name},
+                ).fetchall()
+            if rows:
+                owners = sorted({r[1] for r in rows})
+                print(
+                    f"⚠️  {len(rows)} tables in schema '{schema_name}' are owned by {owners}, not the app "
+                    "identity — future migrations that ALTER these tables will fail."
+                )
+                for owner in owners:
+                    print(
+                        f'   Remediation (as a member of both roles, or a superuser): '
+                        f'REASSIGN OWNED BY "{owner}" TO "{pg_user}";'
+                    )
+                print("   Or set LAKEBASE_SCHEMA_NAME to a fresh schema name to start clean.")
+        except Exception as e:
+            print(f"ℹ️  Table ownership audit skipped: {e}")
 
         try:
             # Fix: make users.workshop_id nullable (facilitators don't have a workshop)
@@ -210,8 +327,16 @@ app = FastAPI(
     title="Databricks App API",
     description="Modern FastAPI application template for Databricks Apps with React frontend",
     version="0.1.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+# Trust X-Forwarded-* from Databricks Apps / reverse proxies so redirects and
+# absolute URLs use the public app hostname instead of localhost:8000.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+app.add_middleware(FixRedirectLocationMiddleware)
 
 # Add middleware in order (last added is first executed)
 app.add_middleware(DatabaseErrorMiddleware)
@@ -277,6 +402,99 @@ async def test():
     return {"message": "App is working!"}
 
 
+def _lakebase_schema_access() -> bool | None:
+    """Probe whether the app identity can use its Lakebase schema.
+
+    Returns True (schema exists and is usable), False (schema exists but the app
+    identity lacks USAGE — e.g. a rotated service principal), or None (schema not
+    created yet, or database unreachable — not a stranded-schema condition).
+    """
+    try:
+        from sqlalchemy import text
+
+        from server.database import engine
+        from server.db_config import get_lakebase_schema_name
+
+        schema = get_lakebase_schema_name()
+        with engine.connect() as conn:
+            exists = conn.execute(text("SELECT 1 FROM pg_namespace WHERE nspname = :s"), {"s": schema}).first()
+            if not exists:
+                return None  # bootstrap will create it on next startup
+            usable = conn.execute(
+                text("SELECT has_schema_privilege(current_user, :s, 'USAGE')"), {"s": schema}
+            ).scalar()
+            return bool(usable)
+    except Exception:
+        return None  # unreachable/waking database; the lakebase_configured gate covers this
+
+
+@app.get("/deployment/status")
+async def deployment_status():
+    """Return DB-independent deployment setup status for the frontend shell."""
+    from server.db_bootstrap import schema_access_remediation
+    from server.db_config import DatabaseBackend, LakebaseConfig, detect_database_backend, get_lakebase_schema_name
+
+    lakebase_configured = LakebaseConfig.from_env() is not None
+    # Lakebase setup is only required when targeting postgres; sqlite
+    # deployments (local dev, E2E) are fully operable without it.
+    postgres_target = detect_database_backend() == DatabaseBackend.POSTGRESQL or (
+        os.getenv("DATABASE_ENV", "sqlite").lower() == "postgres"
+    )
+    # Stranded-schema detection: the schema exists but the app identity cannot use
+    # it (service principal rotated). Setup is required until an admin remediates.
+    schema_access: bool | None = None
+    if postgres_target and lakebase_configured:
+        schema_access = _lakebase_schema_access()
+    payload = {
+        "lakebase_configured": lakebase_configured,
+        "schema_access": schema_access,
+        "setup_required": (postgres_target and not lakebase_configured) or schema_access is False,
+        "docs_url": DOCS_SETUP_PATH,
+        "docs_build_exists": DOCS_BUILD_DIR.exists(),
+        "docs_build_dir": str(DOCS_BUILD_DIR),
+        "client_build_exists": CLIENT_BUILD_DIR.exists(),
+        "client_build_dir": str(CLIENT_BUILD_DIR),
+    }
+    if schema_access is False:
+        payload["setup_reason"] = "schema_access"
+        payload["remediation"] = schema_access_remediation(
+            get_lakebase_schema_name(), os.getenv("PGUSER") or "<app identity>"
+        )
+    return payload
+
+
+# Serve the Docusaurus docs site before the catch-all React mount.
+if DOCS_BUILD_DIR.exists():
+    logger.info("Mounting Docusaurus docs from %s", DOCS_BUILD_DIR)
+
+    @app.get("/docs", include_in_schema=False)
+    async def redirect_docs_root():
+        """Redirect extensionless docs root to the Docusaurus index route."""
+        return RedirectResponse(url="/docs/", status_code=307)
+
+    @app.get("/docs/lakebase-setup", include_in_schema=False)
+    async def redirect_lakebase_setup():
+        """Avoid StaticFiles emitting an absolute localhost trailing-slash redirect."""
+        return RedirectResponse(url=DOCS_SETUP_PATH, status_code=307)
+
+    app.mount("/docs", StaticFiles(directory=str(DOCS_BUILD_DIR), html=True), name="docs")
+else:
+    logger.warning("Docusaurus docs build not found at %s", DOCS_BUILD_DIR)
+
+    @app.get("/docs", include_in_schema=False)
+    @app.get("/docs/{path:path}", include_in_schema=False)
+    async def docs_not_built(path: str = ""):
+        """Explain why the docs site is unavailable in an unbuilt local tree."""
+        return HTMLResponse(
+            "<h1>Judge Builder Workshop setup</h1>"
+            "<p>Build the Docusaurus site with <code>npm -C docs install && npm -C docs run build</code> "
+            "to view the full setup guide at <code>/docs</code>.</p>"
+        )
+
+
 # Serve static files from client build directory (must come after API routes)
-if os.path.exists("client/build"):
-    app.mount("/", StaticFiles(directory="client/build", html=True), name="static")
+if CLIENT_BUILD_DIR.exists():
+    logger.info("Mounting React client from %s", CLIENT_BUILD_DIR)
+    app.mount("/", StaticFiles(directory=str(CLIENT_BUILD_DIR), html=True), name="static")
+else:
+    logger.warning("React client build not found at %s", CLIENT_BUILD_DIR)

@@ -1,3 +1,10 @@
+---
+id: TESTING_SPEC
+title: Testing Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Testing Specification
 
 ## Overview
@@ -80,7 +87,7 @@ tests/
 │   ├── test_phase_transitions.py
 │   ├── test_annotation_submission.py
 │   ├── test_discovery_findings.py
-│   └── test_connection_resilience.py  # Postgres-only: pool reset, retry, OAuth refresh
+│   └── test_connection_resilience.py  # Error classification, pool reset, retry
 └── contract/
     ├── conftest.py                    # MLflow mock fixtures
     └── test_mlflow_contracts.py       # Contract shape & call-site tests
@@ -177,9 +184,11 @@ Tests use the **transaction-rollback** pattern:
 3. **Phase transitions** — intake → discovery (requires traces), discovery → annotation (requires rubric). Validates prerequisite enforcement returns HTTP 400.
 4. **Annotation submission** — Create annotation, verify upsert semantics (same user+trace updates existing record), verify different users create separate records. Unique constraint `(user_id, trace_id)` enforced at DB level.
 5. **Discovery findings** — Submit finding, verify upsert semantics (same user+trace updates), verify user-filtered retrieval.
-6. **Connection resilience** (Postgres-only) — Verify `pool_pre_ping` detects stale connections, `_reset_connection_pool()` disposes engine + refreshes OAuth token, `get_db()` retries on transient connection failures with exponential backoff and gives up after 3 attempts.
+6. **Connection resilience** — Verify `_is_connection_error()` classifies transient connection failures (and does NOT treat pool-exhaustion timeouts as transient — see gh#163), `_reset_connection_pool()` disposes the engine (Postgres credentials are re-injected per new connection via the `do_connect` listener; `pool_pre_ping` is intentionally disabled — see AUTHENTICATION_SPEC), and `get_db()` retries transient failures with exponential backoff, giving up after 3 attempts.
 
 ### Success Criteria
+
+<SpecCoverage spec="TESTING_SPEC" />
 
 - [ ] `tests/integration/conftest.py` provides real-DB fixtures with transaction rollback isolation
 - [ ] Integration tests run against SQLite (default) and Postgres (via testcontainers)
@@ -191,7 +200,7 @@ Tests use the **transaction-rollback** pattern:
 - [ ] Discovery finding upsert semantics verified at DB level
 - [ ] All integration tests tagged with `@pytest.mark.integration` and `@pytest.mark.spec()`
 - [ ] External services (MLflow, Databricks) mocked — only database is real
-- [ ] Connection resilience tested (Postgres-only): pool reset disposes + refreshes OAuth, `get_db()` retries with backoff, stale connections detected via `pool_pre_ping`
+- [ ] Connection resilience tested: connection errors classified as transient vs not, `_reset_connection_pool()` disposes the engine, `get_db()` retries with backoff and gives up after 3 attempts
 - [ ] Tests are hermetic: no shared state, runnable in any order
 
 ---
@@ -314,13 +323,21 @@ Contract tests verify our mock fidelity and call-site correctness:
 
 ### Success Criteria
 
-- [ ] Contract shapes documented for all 5 MLflow domains (trace ops, feedback, evaluation, alignment, experiment management)
+> The contract shapes for all 5 MLflow domains are documented in this section, and
+> contract tests are tagged `@pytest.mark.spec("TESTING_SPEC")` via module-level
+> `pytestmark` — both are documentation/tagging policy, not test targets, so they
+> are not listed as checklist criteria.
+>
+> Known gap: the current "call-site" tests in `tests/contract/test_mlflow_contracts.py`
+> patch `mlflow.*` and then call it **from the test itself** — they demonstrate the
+> contract but do not execute service code, so they must NOT be linked to the
+> call-site criterion below. It stays uncovered until tests drive the real services.
+
 - [ ] Mock shape tests verify test mocks match real MLflow response structures
 - [ ] Call-site tests verify services pass correct parameter types to MLflow methods
 - [ ] Error classification tested: retryable vs non-retryable errors handled correctly
 - [ ] Feedback value types validated: binary (0.0/1.0 float), likert (1.0-5.0 float)
 - [ ] Assessment limit (50 per trace) handling tested
-- [ ] Contract tests tagged with `@pytest.mark.spec("TESTING_SPEC")`
 
 ---
 
@@ -523,6 +540,25 @@ just e2e ui           # Playwright UI
 | `client/src/hooks/` | 20% | 50% |
 | `client/src/components/` | 10% | 40% |
 
+### Spec Coverage Analyzer Honesty Rules
+
+`tools/spec_coverage_analyzer.py` builds the requirement-level coverage map. To keep
+coverage numbers honest it must:
+
+1. **Exclude skipped tests.** A test statically carrying `@pytest.mark.skip`,
+   `@pytest.mark.skipif`, or `@pytest.mark.xfail` (directly, on its enclosing class,
+   or via module-level `pytestmark`), or a Playwright test declared with `test.skip`
+   / `test.fixme` or inside a `test.describe.skip` block, does NOT count toward
+   coverage. Criteria whose only tests are skipped render as uncovered with a
+   distinct `(skipped-only)` annotation so the reason is visible.
+2. **Exclude roadmap criteria.** A success criterion line ending in `(roadmap)`, or
+   listed under a `### Roadmap` heading, is excluded from the coverage denominator
+   and rendered in a separate "Roadmap (not shipping)" list.
+3. **Report unknown spec tags loudly.** Tags referencing specs not registered in
+   `KNOWN_SPECS` (e.g. a tag without a matching spec file) are reported prominently
+   in console, JSON, and markdown output with the number of tagged tests; they never
+   crash the analyzer.
+
 ---
 
 ## Test Data & Fixtures
@@ -617,14 +653,19 @@ jobs:
 
 ## Success Criteria
 
-- [ ] Server unit tests pass with >20% coverage
-- [ ] Client unit tests pass with >20% coverage
-- [ ] Integration tests pass against real database (SQLite + Postgres)
-- [ ] Contract tests verify MLflow integration boundaries
-- [ ] E2E tests pass for critical flows
+> Integration- and contract-test criteria live in their own sections above; E2E
+> criteria for critical flows live in the feature specs they exercise. Criteria
+> below cover the suite-wide infrastructure. Coverage-percentage targets and
+> flake tracking are aspirational (ratchet plan above) and are marked `(roadmap)`
+> until a CI gate actually enforces them.
+
 - [ ] Tests run in CI on every PR
-- [ ] Coverage reports generated and accessible
-- [ ] No flaky tests (consistent pass/fail)
+- [ ] pytest `--spec` option filters collection to tests tagged for the requested spec
+- [ ] pytest emits coverage reports (term, HTML, XML) via `addopts` in `pyproject.toml`
 - [ ] Test isolation (no shared state between tests)
-- [ ] `just test-integration` recipe works
 - [ ] `just test-contract` recipe works
+- [ ] Coverage thresholds (server >20%, client >20%) enforced by a CI gate (roadmap)
+- [ ] Flaky-test detection and quarantine process in place (roadmap)
+- [ ] Coverage analyzer excludes skipped and xfail tests from requirement coverage and annotates skipped-only criteria
+- [ ] Coverage analyzer excludes roadmap criteria from the coverage denominator and lists them separately
+- [ ] Coverage analyzer reports unknown spec tags with tagged test counts without crashing

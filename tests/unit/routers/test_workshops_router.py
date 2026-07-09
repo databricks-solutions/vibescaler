@@ -2,11 +2,9 @@ from datetime import datetime
 
 import pytest
 
-from server.models import JudgePrompt, Workshop, WorkshopPhase, WorkshopStatus
+from server.models import JudgePrompt, Workshop, WorkshopMode, WorkshopPhase, WorkshopStatus
 
 
-@pytest.mark.spec("DISCOVERY_TRACE_ASSIGNMENT_SPEC")
-@pytest.mark.req("Phase/round context properly scoped in database")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_workshop_404_when_missing(async_client, override_get_db, monkeypatch):
@@ -27,8 +25,6 @@ async def test_get_workshop_404_when_missing(async_client, override_get_db, monk
     assert resp.json()["detail"] == "Workshop not found"
 
 
-@pytest.mark.spec("DISCOVERY_TRACE_ASSIGNMENT_SPEC")
-@pytest.mark.req("Annotation traces randomized per (user_id, trace_set) pair")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_traces_requires_user_id(async_client, override_get_db):
@@ -37,8 +33,6 @@ async def test_get_traces_requires_user_id(async_client, override_get_db):
     assert "user_id is required" in resp.json()["detail"]
 
 
-@pytest.mark.spec("DISCOVERY_TRACE_ASSIGNMENT_SPEC")
-@pytest.mark.req("Switching between discovery rounds hides/shows appropriate traces")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_workshop_success(async_client, override_get_db, monkeypatch):
@@ -339,3 +333,72 @@ async def test_auto_evaluation_results_endpoint_returns_stored_results(
     # Verify metrics are included for display
     assert body["metrics"] is not None
     assert body["metrics"]["accuracy"] == 0.85
+
+
+@pytest.mark.spec("EVAL_MODE_SPEC")
+@pytest.mark.req("Eval-mode workshops do not use the global rubric system")
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_create_rubric_returns_conflict_for_eval_mode(async_client, override_get_db, monkeypatch):
+    import server.routers.workshops as workshops_router
+
+    eval_workshop = Workshop(
+        id="w-eval",
+        name="Eval mode workshop",
+        description=None,
+        facilitator_id="fac",
+        status=WorkshopStatus.ACTIVE,
+        current_phase=WorkshopPhase.RUBRIC,
+        mode=WorkshopMode.EVAL,
+        created_at=datetime.now(),
+    )
+
+    class FakeDatabaseService:
+        def __init__(self, db):
+            self.db = db
+
+        def get_workshop(self, workshop_id):
+            assert workshop_id == "w-eval"
+            return eval_workshop
+
+    monkeypatch.setattr(workshops_router, "DatabaseService", FakeDatabaseService)
+
+    resp = await async_client.post(
+        "/workshops/w-eval/rubric",
+        json={"question": "Q: D", "created_by": "fac"},
+    )
+    assert resp.status_code == 409
+    assert "disabled for eval mode" in resp.json()["detail"]
+
+
+@pytest.mark.spec("EVAL_MODE_SPEC")
+@pytest.mark.req("Eval-mode workshops do not use the global rubric system")
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_rubric_returns_conflict_for_eval_mode(async_client, override_get_db, monkeypatch):
+    import server.routers.workshops as workshops_router
+
+    eval_workshop = Workshop(
+        id="w-eval",
+        name="Eval mode workshop",
+        description=None,
+        facilitator_id="fac",
+        status=WorkshopStatus.ACTIVE,
+        current_phase=WorkshopPhase.RUBRIC,
+        mode=WorkshopMode.EVAL,
+        created_at=datetime.now(),
+    )
+
+    class FakeDatabaseService:
+        def __init__(self, db):
+            self.db = db
+
+        def get_workshop(self, workshop_id):
+            assert workshop_id == "w-eval"
+            return eval_workshop
+
+    monkeypatch.setattr(workshops_router, "DatabaseService", FakeDatabaseService)
+
+    resp = await async_client.get("/workshops/w-eval/rubric")
+    assert resp.status_code == 409
+    assert "disabled for eval mode" in resp.json()["detail"]

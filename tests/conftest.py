@@ -12,7 +12,7 @@ def pytest_addoption(parser):
         "--spec",
         action="store",
         default=None,
-        help="Only run tests marked with the given spec name (e.g., --spec ASSISTED_FACILITATION_SPEC)",
+        help="Only run tests marked with the given spec name (e.g., --spec DISCOVERY_SPEC)",
     )
 
 

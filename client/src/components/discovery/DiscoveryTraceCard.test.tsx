@@ -89,19 +89,9 @@ describe('DiscoveryTraceCard', () => {
     expect(screen.getByText(/Too terse/)).toBeInTheDocument();
   });
 
-  it('renders analysis findings pinned above feedback when provided', () => {
-    render(
-      <DiscoveryTraceCard
-        trace={mockTrace}
-        feedback={mockFeedback}
-        findings={mockFindings}
-        disagreements={mockDisagreements}
-        onPromote={vi.fn()}
-      />
-    );
-    expect(screen.getByText(/Brevity tolerance varies/)).toBeInTheDocument();
-    expect(screen.getByText(/Opposite ratings/)).toBeInTheDocument();
-  });
+  // NOTE (2026-06 audit): findings-section tests moved to
+  // DiscoveryTraceCard.findings.test.tsx so they can carry the
+  // "Trace-specific analysis findings..." criterion (vitest: one @req per file).
 
   it('calls onPromote with finding text when promote button clicked', async () => {
     const onPromote = vi.fn();
@@ -114,23 +104,12 @@ describe('DiscoveryTraceCard', () => {
         onPromote={onPromote}
       />
     );
-    const promoteButtons = screen.getAllByRole('button', { name: /add to draft/i });
+    const promoteButtons = screen.getAllByRole('button', { name: /draft/i });
     // promoteButtons[0] is the disagreement, [1] is the finding
     await userEvent.click(promoteButtons[1]);
     expect(onPromote).toHaveBeenCalledWith(
       expect.objectContaining({ text: mockFindings[0].text })
     );
-  });
-
-  it('does not render analysis section when no findings provided', () => {
-    render(
-      <DiscoveryTraceCard
-        trace={mockTrace}
-        feedback={mockFeedback}
-        onPromote={vi.fn()}
-      />
-    );
-    expect(screen.queryByText(/Analysis Findings/i)).not.toBeInTheDocument();
   });
 
   it('renders follow-up Q&A as collapsible', async () => {

@@ -40,6 +40,24 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Docs media generation: drives the app and records screenshots/.webm for
+    // the docs site (docs/static/demos). Opt-in via PW_DEMOS=1 (`just docs-demos`)
+    // so the regular e2e suite never runs demos.
+    ...(process.env.PW_DEMOS === '1'
+      ? [
+          {
+            name: 'demos',
+            testMatch: /demos\/.*\.demo\.ts/,
+            use: {
+              ...devices['Desktop Chrome'],
+              viewport: { width: 1440, height: 900 },
+              video: { mode: 'on' as const, size: { width: 1440, height: 900 } },
+              trace: 'off' as const,
+              screenshot: 'off' as const,
+            },
+          },
+        ]
+      : []),
   ],
   webServer: useWebServer
     ? {

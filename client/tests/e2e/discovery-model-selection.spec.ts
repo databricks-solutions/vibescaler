@@ -54,6 +54,13 @@ test.describe('Discovery model selection', {
       .inPhase(WorkshopPhase.DISCOVERY)
       .build();
 
+    // Models are fetched dynamically; the shared api-mocker has no route.
+    await page.route(/\/workshops\/[^/?]+\/available-models$/, (route) =>
+      route.fulfill({
+        json: [{ name: 'databricks-claude-sonnet-4-5', state: 'READY', task: 'llm/v1/chat' }],
+      }),
+    );
+
     await scenario.loginAs(scenario.facilitator);
 
     // Wait for the model selector
@@ -68,7 +75,7 @@ test.describe('Discovery model selection', {
     await expect(demoOption).toBeVisible();
 
     // Databricks model options should also be listed (disabled without config)
-    const claudeOption = page.getByRole('option', { name: /Claude Opus/i });
+    const claudeOption = page.getByRole('option', { name: /Claude Sonnet/i });
     await expect(claudeOption).toBeVisible();
 
     // Click demo to close dropdown without changing selection

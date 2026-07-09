@@ -1,22 +1,37 @@
+---
+id: TRACE_DISPLAY_SPEC
+title: Trace JSONPath Display Customization Spec
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Trace JSONPath Display Customization Spec
 
 ## Overview
 
-This feature allows facilitators to optionally configure JSONPath queries to extract specific values from trace inputs and outputs for cleaner display in the TraceViewer. This helps when raw trace data contains complex JSON objects that are not readable for non-technical workshop participants.
+This feature allows facilitators to optionally configure how trace inputs and outputs are displayed in the TraceViewer. Two opt-in stages are applied in order:
 
-**Key Principle**: This is an **opt-in** feature. When not configured, trace inputs/outputs display exactly as they do today.
+1. **Span attribute filter** — select a specific span from the trace (by name, type, and/or attribute) and display its inputs/outputs instead of the root trace data.
+2. **JSONPath extraction** — extract specific values from the (possibly span-filtered) input/output JSON.
+
+This helps when raw trace data contains complex JSON objects that are not readable for non-technical workshop participants.
+
+**Key Principle**: Both stages are **opt-in** features. When not configured, trace inputs/outputs display exactly as the raw trace data.
 
 ---
 
 ## Core Concepts
 
 ### JSONPath Query
-A JSONPath expression (e.g., `$.messages[0].content`, `$.response.text`) that extracts a specific value from a JSON object. Applied to the trace's `input` and/or `output` fields.
+A JSONPath expression (e.g., `$.messages[0].content`, `$.response.text`) that extracts a specific value from a JSON object. Applied to the trace's `input` and/or `output` fields (after span filtering, if configured).
+
+### Span Attribute Filter
+An optional per-workshop filter with up to four fields: `span_name`, `span_type`, `attribute_key`, `attribute_value`. Criteria are AND-combined and the first matching span in the trace context wins; its inputs/outputs replace the root trace input/output before JSONPath extraction. An empty filter means no filtering (root trace data is used).
 
 ### Scope
 - Configured **per workshop** by the facilitator
 - Applied to **all traces** displayed in the TraceViewer for that workshop
-- Stored in workshop settings
+- Stored in workshop settings (`input_jsonpath`, `output_jsonpath`, `span_attribute_filter`)
 
 ---
 
@@ -36,45 +51,50 @@ A JSONPath expression (e.g., `$.messages[0].content`, `$.response.text`) that ex
 
 ### Workshop Model Extension
 
-Add two optional fields to the `Workshop` model:
+Three optional fields on the `Workshop` model:
 
 ```python
 # server/models.py - Workshop model
 class Workshop(BaseModel):
     # ... existing fields ...
-    input_jsonpath: Optional[str] = None   # JSONPath query for input extraction
-    output_jsonpath: Optional[str] = None  # JSONPath query for output extraction
+    input_jsonpath: str | None = None        # JSONPath query for extracting trace input display
+    output_jsonpath: str | None = None       # JSONPath query for extracting trace output display
+    span_attribute_filter: dict | None = None  # Filter config for selecting a span's inputs/outputs
 ```
 
-### Database Migration
+### Database Migrations
 
-```sql
--- Alembic migration
-ALTER TABLE workshops ADD COLUMN input_jsonpath TEXT;
-ALTER TABLE workshops ADD COLUMN output_jsonpath TEXT;
-```
+- `migrations/versions/0005_add_jsonpath_columns.py` — adds `input_jsonpath` and `output_jsonpath` TEXT columns to `workshops`
+- `migrations/versions/0016_add_span_attribute_filter.py` — adds the `span_attribute_filter` column to `workshops`
 
 ---
 
 ## Behavior
 
-### JSONPath Evaluation
+### Display Pipeline
 
-When displaying a trace in TraceViewer:
+When displaying a trace in the TraceViewer (and when backend services consume trace text), the same two-stage pipeline applies:
 
-1. **If JSONPath is configured (non-empty)**:
-   - Parse the trace's input/output as JSON
+1. **Span attribute filter (if configured)**:
+   - Match spans in the trace context against the filter criteria (AND-combined, first matching span wins)
+   - On a match, the span's inputs/outputs become the working input/output
+   - String span inputs/outputs are used as-is (no double serialization); non-string values are JSON-serialized
+   - If no span matches or no filter is configured, the root trace input/output is used
+
+2. **JSONPath extraction (if configured, non-empty)**:
+   - Parse the working input/output as JSON
    - Apply the JSONPath query
    - **If multiple values match**: Concatenate with newlines (`\n`)
    - **If query succeeds and returns non-empty/non-null**: Display extracted value(s)
-   - **If query fails, returns empty string, or returns null**: Fall back to raw display
+   - **If query fails, returns empty string, or returns null**: Fall back to the working (span-filtered or raw) text
 
-2. **If JSONPath is not configured (empty/null)**:
-   - Display the raw input/output as today (unchanged behavior)
+If neither stage is configured, the raw input/output displays unchanged.
+
+On the backend, the pipeline is implemented once in `server/utils/trace_display_utils.py` (`get_display_text(trace, workshop)`), which also supports optional milestone-context enrichment (appending the trace's milestone summary to the output text for LLM consumers such as judges).
 
 ### Fallback Cases
 
-The system falls back to displaying raw JSON when:
+JSONPath extraction falls back to the working (span-filtered or raw) text when:
 - JSONPath field is empty or null
 - Input/output is not valid JSON
 - JSONPath query syntax is invalid
@@ -100,7 +120,7 @@ Values are joined with newline characters for readable display.
 
 ### Facilitator Settings Panel
 
-Location: Existing facilitator settings (likely in FacilitatorDashboard or a settings modal)
+Location: `client/src/components/JsonPathSettings.tsx` — the "Trace Display Settings" card in the facilitator settings. It contains a Span Attribute Filter section (span name, span type, attribute key, attribute value — with its own Preview/Save/Clear buttons) followed by the Input/Output JSONPath fields. The span filter section and both JSONPath fields carry an "optional" badge; the attribute value input is disabled until an attribute key is entered.
 
 ```
 +--------------------------------------------------+
@@ -175,13 +195,43 @@ Request body:
 }
 ```
 
-Response: Updated `Workshop` object
+Response: Updated `Workshop` object. Invalid JSONPath syntax is rejected with a 400 error containing the validation message.
+
+### Update Span Attribute Filter
+
+```
+PUT /workshops/{workshop_id}/span-attribute-filter
+```
+
+Request body:
+```json
+{
+  "span_attribute_filter": {
+    "span_name": "AzureChatOpenAI",
+    "span_type": "CHAT_MODEL",
+    "attribute_key": "model",
+    "attribute_value": "gpt-4"
+  }
+}
+```
+
+All filter fields are optional; send `"span_attribute_filter": null` to clear the filter. Response: Updated `Workshop` object.
+
+### Preview Span Filter
+
+```
+POST /workshops/{workshop_id}/preview-span-filter
+```
+
+Applies the candidate filter against the first workshop trace and returns `trace_id`, `matched`, `input_result`, and `output_result`.
 
 ### Preview JSONPath
 
 ```
 POST /workshops/{workshop_id}/preview-jsonpath
 ```
+
+The preview applies the workshop's **saved** span attribute filter first, then the candidate JSONPath expressions — mirroring the display pipeline.
 
 Request body:
 ```json
@@ -215,118 +265,31 @@ If no traces exist:
 
 ### Backend (Python)
 
-Use the `jsonpath-ng` library for JSONPath evaluation:
+Shipped modules (JSONPath evaluation uses the `jsonpath-ng` library):
 
-```python
-from jsonpath_ng import parse
-import json
+- `server/utils/jsonpath_utils.py` — `apply_jsonpath(data_str, jsonpath_expr) -> (extracted_value | None, success)` plus `validate_jsonpath(expr)` used by the settings endpoint. Multiple matches are joined with newlines; empty/null results report failure so callers fall back.
+- `server/utils/span_filter_utils.py` — `apply_span_filter(trace_context, span_attribute_filter) -> (input | None, output | None)`. Criteria are AND-combined, the first matching span wins, and string span inputs/outputs are returned as-is (no double serialization).
+- `server/utils/trace_display_utils.py` — `get_display_text(trace, workshop)`, the single source of truth for the span-filter → JSONPath pipeline, plus `format_milestone_context(...)` for optional milestone-context enrichment of the output text.
 
-def apply_jsonpath(data_str: str, jsonpath_expr: str) -> tuple[str | None, bool]:
-    """
-    Apply JSONPath to data string.
-
-    Returns:
-        (extracted_value, success)
-        - On success: (extracted_string, True)
-        - On failure: (None, False)
-    """
-    if not jsonpath_expr or not jsonpath_expr.strip():
-        return None, False
-
-    try:
-        data = json.loads(data_str)
-    except json.JSONDecodeError:
-        return None, False
-
-    try:
-        expr = parse(jsonpath_expr)
-        matches = [match.value for match in expr.find(data)]
-    except Exception:
-        return None, False
-
-    if not matches:
-        return None, False
-
-    # Concatenate multiple matches with newlines
-    result = "\n".join(str(m) for m in matches)
-
-    # Fall back if empty or null
-    if not result or result == "None" or result == "null":
-        return None, False
-
-    return result, True
-```
+Backend consumers of `get_display_text`: `server/services/judge_service.py`, `server/services/discovery_service.py`, `server/services/discovery_analysis_service.py`.
 
 ### Frontend (React)
 
-#### TraceViewer Changes
-
-```tsx
-// TraceViewer.tsx
-interface TraceViewerProps {
-  trace: TraceData;
-  inputJsonPath?: string;  // From workshop settings
-  outputJsonPath?: string; // From workshop settings
-}
-
-// Use a utility function or hook to apply JSONPath
-const displayInput = useJsonPathExtraction(trace.input, inputJsonPath);
-const displayOutput = useJsonPathExtraction(trace.output, outputJsonPath);
-```
-
-#### JSONPath Utility Hook
-
-```tsx
-// hooks/useJsonPathExtraction.ts
-import { useMemo } from 'react';
-import { JSONPath } from 'jsonpath-plus';
-
-export function useJsonPathExtraction(
-  data: string,
-  jsonPath: string | undefined
-): string {
-  return useMemo(() => {
-    if (!jsonPath || !jsonPath.trim()) {
-      return data;
-    }
-
-    try {
-      const parsed = JSON.parse(data);
-      const results = JSONPath({ path: jsonPath, json: parsed });
-
-      if (!results || results.length === 0) {
-        return data;
-      }
-
-      const extracted = results.map(r => String(r)).join('\n');
-
-      if (!extracted || extracted === 'null' || extracted === 'undefined') {
-        return data;
-      }
-
-      return extracted;
-    } catch {
-      return data;
-    }
-  }, [data, jsonPath]);
-}
-```
+- `client/src/hooks/useJsonPathExtraction.ts` — applies JSONPath via the `jsonpath-plus` library; returns the original data on any failure (invalid JSON, no matches, null/empty results).
+- `client/src/components/TraceViewer.tsx` — applies the workshop's span attribute filter against the trace context (memoized), then `useJsonPathExtraction` on the resulting input/output.
+- `client/src/components/JsonPathSettings.tsx` — facilitator settings UI for both stages (see UI Components above).
 
 ### Dependencies
 
-**Backend**:
-```
-jsonpath-ng>=1.5.3
-```
+**Backend**: `jsonpath-ng>=1.5.3` (in `pyproject.toml`)
 
-**Frontend** (choose one):
-```
-jsonpath-plus  # Full-featured, ~15KB gzipped
-```
+**Frontend**: `jsonpath-plus` (in `client/package.json`)
 
 ---
 
 ## Success Criteria
+
+<SpecCoverage spec="TRACE_DISPLAY_SPEC" />
 
 ### Functional — JSONPath
 
@@ -351,6 +314,7 @@ jsonpath-plus  # Full-featured, ~15KB gzipped
 ### Functional — Consistency
 
 - [ ] All backend services that consume trace input/output apply the same span filter and JSONPath pipeline as the TraceViewer
+- [ ] Copy Output copies the representation currently displayed (formatted vs raw)
 
 ### Non-Functional
 
@@ -362,127 +326,22 @@ jsonpath-plus  # Full-featured, ~15KB gzipped
 
 ## Testing
 
+Shipped test locations:
+
 ### Unit Tests
 
-```python
-# test_jsonpath.py
-def test_simple_extraction():
-    data = '{"message": "hello"}'
-    result, success = apply_jsonpath(data, "$.message")
-    assert success is True
-    assert result == "hello"
-
-def test_nested_extraction():
-    data = '{"response": {"text": "answer"}}'
-    result, success = apply_jsonpath(data, "$.response.text")
-    assert success is True
-    assert result == "answer"
-
-def test_array_extraction_multiple():
-    data = '{"messages": [{"content": "a"}, {"content": "b"}]}'
-    result, success = apply_jsonpath(data, "$.messages[*].content")
-    assert success is True
-    assert result == "a\nb"
-
-def test_no_match_returns_failure():
-    data = '{"foo": "bar"}'
-    result, success = apply_jsonpath(data, "$.missing")
-    assert success is False
-    assert result is None
-
-def test_invalid_json_returns_failure():
-    data = 'not json'
-    result, success = apply_jsonpath(data, "$.anything")
-    assert success is False
-
-def test_null_result_returns_failure():
-    data = '{"value": null}'
-    result, success = apply_jsonpath(data, "$.value")
-    assert success is False
-
-def test_empty_jsonpath_returns_failure():
-    data = '{"message": "hello"}'
-    result, success = apply_jsonpath(data, "")
-    assert success is False
-
-    result, success = apply_jsonpath(data, None)
-    assert success is False
-```
+- `tests/unit/utils/test_jsonpath_utils.py` — JSONPath extraction, multiple matches, and fallback cases
+- `tests/unit/utils/test_span_filter_utils.py` — span matching, AND-combination, string passthrough
+- `tests/unit/services/test_trace_display_pipeline_consistency.py` — backend services use the shared `get_display_text` pipeline
+- `tests/unit/routers/test_preview_jsonpath_performance.py` — preview endpoint behavior and responsiveness
+- `client/src/hooks/useJsonPathExtraction.test.ts` — frontend extraction hook
+- `client/src/components/JsonPathSettings.attrValueDisabled.test.tsx` — attribute value input disabled until attribute key set
+- `client/src/components/JsonPathSettings.optionalLabels.test.tsx` — JSONPath fields labeled optional and not required
+- `client/src/components/TraceViewer.copyOutput.test.tsx` — Copy Output copies the displayed representation
 
 ### E2E Tests
 
-```typescript
-// jsonpath-settings.spec.ts
-test('facilitator can configure and preview JSONPath', async ({ page }) => {
-  // Navigate to settings
-  // Enter JSONPath expressions
-  // Click preview
-  // Verify preview shows extracted values
-  // Save settings
-  // Navigate to trace viewer
-  // Verify traces display extracted content
-});
-```
-
----
-
-## Implementation Plan
-
-### Phase 1: Backend Foundation
-
-1. **Add database fields**
-   - Create Alembic migration adding `input_jsonpath` and `output_jsonpath` columns to `workshops` table
-   - Update `Workshop` model in `server/models.py` with optional string fields
-
-2. **Add JSONPath utility**
-   - Add `jsonpath-ng` to requirements
-   - Create `server/utils/jsonpath_utils.py` with `apply_jsonpath(data_str, jsonpath_expr)` function
-   - Write unit tests for the utility
-
-3. **Add API endpoints**
-   - `PUT /workshops/{workshop_id}/jsonpath-settings` - save settings
-   - `POST /workshops/{workshop_id}/preview-jsonpath` - preview extraction against first trace
-   - Add to `server/routers/workshops.py`
-
-### Phase 2: Frontend Settings UI
-
-4. **Update TypeScript types**
-   - Regenerate client types or manually add `input_jsonpath` and `output_jsonpath` to `Workshop` type
-
-5. **Create settings UI component**
-   - Add JSONPath settings section to facilitator settings (in `FacilitatorDashboard.tsx` Quick Actions or a new settings modal)
-   - Two text inputs with "(optional)" labels
-   - Preview button
-   - Preview results display panel
-
-6. **Wire up API calls**
-   - Hook for saving JSONPath settings
-   - Hook for preview endpoint
-   - Handle loading/error states
-
-### Phase 3: TraceViewer Integration
-
-7. **Create JSONPath extraction hook**
-   - Add `jsonpath-plus` to client dependencies
-   - Create `hooks/useJsonPathExtraction.ts`
-
-8. **Update TraceViewer**
-   - Pass workshop's JSONPath settings to TraceViewer
-   - Apply extraction to input/output display
-   - Ensure fallback to raw display works correctly
-
-### Phase 4: Testing & Polish
-
-9. **Write tests**
-   - Backend unit tests for JSONPath utility
-   - API endpoint tests
-   - Frontend component tests for settings UI
-   - E2E test for full flow
-
-10. **Manual QA**
-    - Test with various JSON structures
-    - Test fallback scenarios
-    - Test with empty/null JSONPath values
+- `client/tests/e2e/jsonpath-trace-display.spec.ts` — facilitator configures, previews, and saves settings; TraceViewer reflects them
 
 ---
 
@@ -503,4 +362,13 @@ The following are explicitly **not** included in this implementation:
 
 - [UI_COMPONENTS_SPEC](./UI_COMPONENTS_SPEC.md) - TraceViewer component
 - [DATASETS_SPEC](./DATASETS_SPEC.md) - Trace data structure
-- [DISCOVERY_TRACE_ASSIGNMENT_SPEC](./DISCOVERY_TRACE_ASSIGNMENT_SPEC.md) - Trace display phases
+- [DISCOVERY_SPEC](./DISCOVERY_SPEC.md) - Trace assignment & display phases
+
+---
+
+## Implementation Log
+
+| Date | Plan | Status | Summary |
+|------|------|--------|---------|
+| 2026-04-15 | [Pipeline Consistency Fix](../.claude/plans/2026-04-15-trace-display-pipeline-consistency.md) | partial | Shared helper `get_display_text` extracted and wired into judge_service, discovery_service, and discovery_analysis_service; alignment_service not yet wired (owner decision pending) |
+| 2026-06-10 | — | complete | alignment_service evaluation inputs/outputs wired through get_display_text; consistency tests now cover alignment_service |

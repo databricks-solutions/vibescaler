@@ -38,7 +38,7 @@ export interface RubricSuggestion {
   positive?: string;
   negative?: string;
   examples?: string;
-  judgeType: 'likert' | 'binary' | 'freeform';
+  judgeType: 'likert' | 'binary';
 }
 
 interface RubricSuggestionPanelProps {
@@ -84,8 +84,13 @@ export function RubricSuggestionPanel({
         throw new Error(errorData.detail || 'Failed to generate suggestions');
       }
 
-      const data: RubricSuggestion[] = await response.json();
-      setSuggestions(data);
+      const data: Array<Omit<RubricSuggestion, 'judgeType'> & { judgeType?: string }> = await response.json();
+      // Free-form criteria are no longer supported; coerce unknown types to likert
+      const normalized: RubricSuggestion[] = data.map(suggestion => ({
+        ...suggestion,
+        judgeType: suggestion.judgeType === 'binary' ? 'binary' : 'likert',
+      }));
+      setSuggestions(normalized);
 
       toast.success(`Generated ${data.length} rubric suggestions`);
     } catch (err) {
@@ -138,7 +143,7 @@ export function RubricSuggestionPanel({
   };
 
   const toggleJudgeType = (index: number) => {
-    const types: Array<'likert' | 'binary' | 'freeform'> = ['likert', 'binary', 'freeform'];
+    const types: Array<'likert' | 'binary'> = ['likert', 'binary'];
     const suggestion = editingIndex === index ? editedSuggestion : suggestions[index];
     if (!suggestion) return;
 
@@ -160,8 +165,6 @@ export function RubricSuggestionPanel({
         return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
       case 'binary':
         return 'bg-green-100 text-green-800 hover:bg-green-200';
-      case 'freeform':
-        return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
       default:
         return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
     }
@@ -316,7 +319,7 @@ export function RubricSuggestionPanel({
                           placeholder="Clear definition of what this measures"
                         />
                       ) : (
-                        <p className="text-gray-900 mt-1">{displaySuggestion.description}</p>
+                        <p className="text-gray-900 mt-1 whitespace-pre-wrap">{displaySuggestion.description}</p>
                       )}
                     </div>
 
@@ -338,7 +341,7 @@ export function RubricSuggestionPanel({
                             placeholder="What excellent responses demonstrate"
                           />
                         ) : (
-                          <p className="text-green-900 text-sm mt-1">{displaySuggestion.positive}</p>
+                          <p className="text-green-900 text-sm mt-1 whitespace-pre-wrap">{displaySuggestion.positive}</p>
                         )}
                       </div>
                     )}
@@ -361,7 +364,7 @@ export function RubricSuggestionPanel({
                             placeholder="What poor responses demonstrate"
                           />
                         ) : (
-                          <p className="text-red-900 text-sm mt-1">{displaySuggestion.negative}</p>
+                          <p className="text-red-900 text-sm mt-1 whitespace-pre-wrap">{displaySuggestion.negative}</p>
                         )}
                       </div>
                     )}
@@ -384,7 +387,7 @@ export function RubricSuggestionPanel({
                             placeholder="Concrete examples: 'Good: X. Bad: Y.'"
                           />
                         ) : (
-                          <p className="text-amber-900 text-sm mt-1">{displaySuggestion.examples}</p>
+                          <p className="text-amber-900 text-sm mt-1 whitespace-pre-wrap">{displaySuggestion.examples}</p>
                         )}
                       </div>
                     )}

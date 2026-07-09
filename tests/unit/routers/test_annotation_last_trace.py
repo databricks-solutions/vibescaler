@@ -143,7 +143,7 @@ async def test_all_10_annotations_can_be_saved(async_client, override_get_db, mo
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
-@pytest.mark.req("Changes automatically save on navigation (Next/Previous)")
+@pytest.mark.req("Annotation upsert persists every trace submission, including the final trace in a session")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_10th_annotation_specifically(async_client, override_get_db, monkeypatch):

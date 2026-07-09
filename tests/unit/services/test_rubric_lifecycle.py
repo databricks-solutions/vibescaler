@@ -188,6 +188,30 @@ class TestRubricSuggestionValidation:
         assert len(valid) == 1
         assert valid[0].judgeType == 'likert'
 
+    @pytest.mark.req("Invalid judge type in suggestions defaults to likert")
+    def test_legacy_freeform_suggestion_coerced_to_likert(self):
+        """Legacy 'freeform' judgeType is accepted but coerced to likert."""
+        svc = self._make_generation_service()
+        suggestions = [
+            {'title': 'Feedback Depth', 'description': 'How detailed is the qualitative feedback?', 'judgeType': 'freeform'},
+        ]
+
+        valid = svc._validate_suggestions(suggestions)
+        assert len(valid) == 1
+        assert valid[0].judgeType == 'likert'
+
+    @pytest.mark.req("Invalid judge type in suggestions defaults to likert")
+    def test_rubric_suggestion_model_coerces_freeform(self):
+        """The RubricSuggestion Pydantic model accepts 'freeform' but stores 'likert'."""
+        from server.models import RubricSuggestion
+
+        suggestion = RubricSuggestion(
+            title="Legacy Criterion",
+            description="A legacy free-form criterion from old data",
+            judgeType="freeform",
+        )
+        assert suggestion.judgeType == "likert"
+
 
 @pytest.mark.spec("RUBRIC_SPEC")
 @pytest.mark.req("Facilitator can create a rubric question with title and description")
@@ -405,6 +429,8 @@ class TestAnnotationDataPreserved:
 
     def test_delete_question_does_not_touch_annotations(self):
         """Deleting a rubric question does NOT delete annotation data."""
+        from server.database import AnnotationDB
+
         service, mock_session = _make_db_service()
 
         existing_rubric = MagicMock()
@@ -421,17 +447,25 @@ class TestAnnotationDataPreserved:
         mock_session.commit = MagicMock()
         mock_session.refresh = MagicMock()
 
-        service.delete_rubric_question("ws-1", "q_1")
+        result = service.delete_rubric_question("ws-1", "q_1")
 
-        # Verify that the AnnotationDB model was never queried for deletion
-        # The delete_rubric_question method only modifies the rubric question text,
-        # NOT the annotations table
-        for call in mock_session.delete.call_args_list:
-            deleted_obj = call[0][0]
-            assert deleted_obj is not existing_rubric, (
-                "Only the rubric itself should be deletable (when last question is removed), "
-                "never annotation records"
-            )
+        # The question itself was removed from the rubric...
+        assert result is not None
+        assert "Q1" not in existing_rubric.question
+        assert "Q2" in existing_rubric.question
+
+        # ...but nothing was deleted from the database: with one question
+        # remaining, session.delete must not be called at all (the rubric row
+        # is only deleted when the LAST question is removed), and the
+        # annotations table must never be touched.
+        mock_session.delete.assert_not_called()
+        queried_models = [
+            call.args[0] for call in mock_session.query.call_args_list if call.args
+        ]
+        assert AnnotationDB not in queried_models, (
+            "delete_rubric_question must not query (or delete from) AnnotationDB; "
+            "annotation data is preserved when rubric questions are deleted"
+        )
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
@@ -439,24 +473,70 @@ class TestAnnotationDataPreserved:
 class TestMlflowReSync:
     """Test that MLflow re-sync is triggered on rubric operations."""
 
-    def test_resync_annotations_method_exists(self):
-        """DatabaseService has a resync_annotations_to_mlflow method."""
-        service, _ = _make_db_service()
-        assert hasattr(service, 'resync_annotations_to_mlflow'), (
-            "DatabaseService must have resync_annotations_to_mlflow method"
-        )
+    def _call_create_rubric_endpoint(self):
+        """Invoke the create_rubric endpoint with mocked dependencies.
 
-    @patch("threading.Thread")
-    def test_create_rubric_endpoint_triggers_background_resync(self, mock_thread):
-        """The create_rubric endpoint starts a background thread for MLflow re-sync."""
-        # Verify the endpoint code uses threading.Thread for background sync
-        import inspect
-        from server.routers.workshops import create_rubric
+        Returns (result, mock_thread) where mock_thread captured the background
+        thread the endpoint started.
+        """
+        import asyncio
 
-        source = inspect.getsource(create_rubric)
-        assert "Thread" in source and "background_resync" in source, (
-            "create_rubric must trigger a background thread for MLflow re-sync"
-        )
+        from server.models import RubricCreate
+        from server.routers import workshops as workshops_module
+
+        mock_db = MagicMock()
+        mock_service = MagicMock()
+        mock_workshop = MagicMock()
+        mock_workshop.mode = "workshop"
+        mock_service.get_workshop.return_value = mock_workshop
+        mock_rubric = MagicMock()
+        mock_service.create_rubric.return_value = mock_rubric
+
+        rubric_data = RubricCreate(question="Quality: Rate quality", created_by="f-1")
+
+        with patch.object(workshops_module, "DatabaseService", return_value=mock_service), \
+             patch.object(workshops_module.threading, "Thread") as mock_thread:
+            result = asyncio.run(
+                workshops_module.create_rubric("ws-1", rubric_data, mock_db)
+            )
+        return result, mock_rubric, mock_thread
+
+    def test_create_rubric_endpoint_starts_background_resync_thread(self):
+        """create_rubric starts a daemon thread whose target re-syncs MLflow."""
+        from server.routers import workshops as workshops_module
+
+        result, mock_rubric, mock_thread = self._call_create_rubric_endpoint()
+
+        assert result is mock_rubric
+        mock_thread.assert_called_once()
+        thread_kwargs = mock_thread.call_args.kwargs
+        assert thread_kwargs.get("daemon") is True
+        mock_thread.return_value.start.assert_called_once()
+
+        # Running the captured target must perform the actual MLflow re-sync
+        # against a fresh background session.
+        target = thread_kwargs["target"]
+        bg_service = MagicMock()
+        with patch("server.database.SessionLocal") as mock_session_local, \
+             patch.object(workshops_module, "DatabaseService", return_value=bg_service):
+            mock_session_local.return_value.__enter__.return_value = MagicMock()
+            target()
+        bg_service.resync_annotations_to_mlflow.assert_called_once_with("ws-1")
+
+    def test_resync_failure_does_not_block_rubric_create(self):
+        """Re-sync is best-effort: a failing re-sync must not raise from the target."""
+        from server.routers import workshops as workshops_module
+
+        _, _, mock_thread = self._call_create_rubric_endpoint()
+        target = mock_thread.call_args.kwargs["target"]
+
+        bg_service = MagicMock()
+        bg_service.resync_annotations_to_mlflow.side_effect = RuntimeError("mlflow down")
+        with patch("server.database.SessionLocal") as mock_session_local, \
+             patch.object(workshops_module, "DatabaseService", return_value=bg_service):
+            mock_session_local.return_value.__enter__.return_value = MagicMock()
+            target()  # must swallow the exception (logged, not raised)
+        bg_service.resync_annotations_to_mlflow.assert_called_once_with("ws-1")
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
@@ -515,7 +595,7 @@ class TestRubricRequiredForAnnotation:
                 from fastapi import HTTPException
 
                 with pytest.raises(HTTPException) as exc_info:
-                    asyncio.get_event_loop().run_until_complete(
+                    asyncio.run(
                         advance_to_annotation("ws-1", mock_db)
                     )
                 assert exc_info.value.status_code == 400
@@ -542,7 +622,7 @@ class TestRubricRequiredForAnnotation:
                 mock_phase.RUBRIC = "rubric"
                 mock_phase.ANNOTATION = "annotation"
 
-                result = asyncio.get_event_loop().run_until_complete(
+                result = asyncio.run(
                     advance_to_annotation("ws-1", mock_db)
                 )
                 assert result["phase"] == "annotation"
@@ -583,7 +663,7 @@ class TestAISuggestionGeneration:
             }]
         }
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             svc.generate_rubric_suggestions("ws-1")
         )
 
@@ -604,7 +684,7 @@ class TestAISuggestionGeneration:
         svc.db_service.get_participant_notes.return_value = []
 
         with pytest.raises(ValueError, match="No discovery feedback available"):
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 svc.generate_rubric_suggestions("ws-1")
             )
 
@@ -703,3 +783,80 @@ class TestSuggestionAcceptRejectEdit:
         assert parsed[0]['judge_type'] == 'binary'
         assert parsed[1]['title'] == 'Helpfulness'
         assert parsed[1]['judge_type'] == 'likert'
+
+
+@pytest.mark.spec("RUBRIC_SPEC")
+@pytest.mark.req("Binary feedback logged as 0/1 to MLflow (not 3)")
+class TestBinaryFeedbackLoggedAsZeroOne:
+    """Binary annotation ratings reach mlflow.log_feedback as 0/1 values.
+
+    Guards against the historical bug where binary ratings were replaced by
+    the likert 'neutral' default of 3 before being logged to MLflow.
+    """
+
+    def _make_sync_fixture(self, rating_value):
+        """Build a DatabaseService + annotation wired for _sync_annotation_with_mlflow."""
+        mock_session = MagicMock()
+
+        mock_config = MagicMock()
+        mock_config.databricks_host = "https://test.databricks.com"
+        mock_config.experiment_id = "exp-1"
+
+        mock_rubric = MagicMock()
+        mock_rubric.question = "Correct: Is this correct?|||JUDGE_TYPE|||binary"
+        mock_rubric.workshop_id = "ws-1"
+
+        mock_workshop = MagicMock()
+        mock_workshop.judge_name = "correct_judge"
+
+        def query_side_effect(model):
+            chain = MagicMock()
+            model_name = getattr(model, "__name__", str(model))
+            if "MLflowIntakeConfig" in model_name:
+                chain.filter.return_value.first.return_value = mock_config
+            elif "Rubric" in model_name:
+                chain.filter.return_value.first.return_value = mock_rubric
+            elif "Workshop" in model_name:
+                chain.filter.return_value.first.return_value = mock_workshop
+            else:
+                chain.filter.return_value.first.return_value = None
+            return chain
+
+        mock_session.query.side_effect = query_side_effect
+        service = DatabaseService(mock_session)
+
+        annotation_db = MagicMock()
+        annotation_db.trace_id = "trace-1"
+        annotation_db.user_id = "user-1"
+        annotation_db.ratings = {"q_1": rating_value}
+        annotation_db.rating = None
+        annotation_db.comment = None
+        annotation_db.trace = MagicMock()
+        annotation_db.trace.mlflow_trace_id = "tr-abc123"
+        return service, annotation_db
+
+    @pytest.mark.parametrize("binary_value", [0, 1])
+    @patch(
+        "server.services.databricks_service.resolve_databricks_token",
+        return_value="test-token",
+    )
+    def test_binary_rating_logged_verbatim(self, mock_token, binary_value, monkeypatch):
+        """A binary rating of 0 or 1 is logged to MLflow verbatim (never 3)."""
+        monkeypatch.delenv("E2E_MLFLOW_FEEDBACK_RECORDER_PATH", raising=False)
+        service, annotation_db = self._make_sync_fixture(binary_value)
+
+        with patch("mlflow.set_experiment"), \
+             patch("mlflow.set_trace_tag"), \
+             patch("mlflow.get_trace") as mock_get_trace, \
+             patch("mlflow.log_feedback") as mock_log:
+            mock_trace = MagicMock()
+            mock_trace.info.assessments = []
+            mock_get_trace.return_value = mock_trace
+
+            result = service._sync_annotation_with_mlflow("ws-1", annotation_db)
+
+        assert result["logged"] == 1, f"Expected one logged feedback, got {result}"
+        mock_log.assert_called_once()
+        logged_value = mock_log.call_args.kwargs["value"]
+        assert logged_value == binary_value
+        assert logged_value != 3, "Binary feedback must never collapse to the neutral 3"

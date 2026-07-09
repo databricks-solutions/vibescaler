@@ -27,7 +27,7 @@ export type RubricSuggestion = {
      */
     examples?: (string | null);
     /**
-     * Judge type
+     * Judge type (legacy 'freeform' is accepted but coerced to 'likert')
      */
     judgeType?: string;
 };

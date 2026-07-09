@@ -21,6 +21,7 @@ pytestmark = [
 # 1. Mock Shape Tests — verify mocks match real MLflow API shapes
 # ============================================================================
 
+@pytest.mark.req("Mock shape tests verify test mocks match real MLflow response structures")
 class TestTraceShape:
     """Verify mock trace objects have the expected attribute hierarchy."""
 
@@ -46,6 +47,7 @@ class TestTraceShape:
         assert hasattr(span, "outputs")
 
 
+@pytest.mark.req("Mock shape tests verify test mocks match real MLflow response structures")
 class TestAssessmentShape:
     """Verify mock assessment objects match the real shape."""
 
@@ -60,6 +62,7 @@ class TestAssessmentShape:
         assert hasattr(mock_assessment.source, "source_id")
 
 
+@pytest.mark.req("Mock shape tests verify test mocks match real MLflow response structures")
 class TestExperimentShape:
     """Verify mock experiment objects match the real shape."""
 
@@ -74,6 +77,9 @@ class TestExperimentShape:
 # 2. Error Classification Tests — _retry_mlflow_operation
 # ============================================================================
 
+@pytest.mark.req(
+    "Error classification tested: retryable vs non-retryable errors handled correctly"
+)
 class TestRetryErrorClassification:
     """Verify _retry_mlflow_operation correctly classifies errors."""
 
@@ -217,7 +223,12 @@ class TestRetryErrorClassification:
 # ============================================================================
 
 class TestFeedbackValueTypes:
-    """Verify feedback value normalization for binary and likert judges."""
+    """Verify feedback value normalization for binary and likert judges.
+
+    Only test_rating_normalization is @req-linked: the two tests below it
+    assert properties of literals (not product code) and intentionally do
+    not count toward spec coverage.
+    """
 
     def test_binary_values_are_float(self):
         """Binary judge values should be 0.0 or 1.0 (float, not bool)."""
@@ -232,6 +243,9 @@ class TestFeedbackValueTypes:
             float_val = float(val)
             assert 1.0 <= float_val <= 5.0
 
+    @pytest.mark.req(
+        "Feedback value types validated: binary (0.0/1.0 float), likert (1.0-5.0 float)"
+    )
     def test_rating_normalization(self):
         """DatabaseService._validate_and_normalize_rating converts to correct types."""
         from server.services.database_service import DatabaseService
@@ -251,6 +265,12 @@ class TestFeedbackValueTypes:
 
 # ============================================================================
 # 4. Call-Site Tests — verify parameter types at MLflow boundaries
+#
+# NOTE: these tests patch mlflow.* and then call it from the test itself —
+# they document the contract but do not execute service code. They are
+# intentionally NOT @req-linked to the call-site criterion in TESTING_SPEC
+# (which requires tests that drive the real services). See the "Known gap"
+# note in specs/TESTING_SPEC.md.
 # ============================================================================
 
 class TestLogFeedbackCallSite:
@@ -352,8 +372,13 @@ class TestSearchTracesCallSite:
 # ============================================================================
 
 class TestAssessmentLimit:
-    """Verify the 50-assessment-per-trace limit is handled."""
+    """Verify the 50-assessment-per-trace limit is handled.
 
+    test_dedup_check_counts_existing_assessments is intentionally not
+    @req-linked: it only manipulates a mock and asserts on the mock.
+    """
+
+    @pytest.mark.req("Assessment limit (50 per trace) handling tested")
     def test_assessment_limit_error_returns_none(self):
         """When the 50-assessment limit is hit, retry returns None (not exception)."""
         from server.services.database_service import _retry_mlflow_operation

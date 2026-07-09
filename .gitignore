@@ -7,10 +7,14 @@ __pycache__
 .env
 node_modules/
 client/node_modules/
+docs/.docusaurus/
+docs/build/
 # Allow client/build for deployment (built files needed for Databricks Apps)
 client/build/*
-.claude/mlflow/claude_tracing.log
+# Match nested copies too (e.g. client/.claude/mlflow/claude_tracing.log)
+**/.claude/mlflow/claude_tracing.log
 .claude/worktrees/
+.claude/skills/*-workspace/
 .coverage
 coverage.xml
 # !client/build/README.md
@@ -28,6 +32,12 @@ workshop.db
 
 # Test results (JSON reports for LLM agents)
 .test-results/
+test-results/
+e2e-test-output.txt
 htmlcov/
 coverage/
 .coverage
+
+# Local backup / build-timestamp artifacts (should never be committed)
+*.bak
+client/vite.config.ts.timestamp-*.mjs

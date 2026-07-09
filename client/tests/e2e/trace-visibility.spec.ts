@@ -1,11 +1,11 @@
 /**
- * E2E tests for trace visibility across rounds and sessions.
+ * E2E tests for trace visibility across selections and sessions.
  *
- * Verifies that participants only see current-round traces,
- * old traces are hidden after round change, and annotation
- * order persists across page reload.
+ * Verifies that participants only see traces in the active discovery
+ * selection, traces dropped from the selection are hidden (not deleted),
+ * and annotation order persists across page reload.
  *
- * @spec DISCOVERY_TRACE_ASSIGNMENT_SPEC
+ * @spec DISCOVERY_SPEC
  */
 
 import { test, expect } from '@playwright/test';
@@ -17,10 +17,10 @@ const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:8000';
 declare const process: { env: Record<string, string | undefined> };
 
 test.describe('Trace Visibility', {
-  tag: ['@spec:DISCOVERY_TRACE_ASSIGNMENT_SPEC'],
+  tag: ['@spec:DISCOVERY_SPEC'],
 }, () => {
   test('participant sees only current round traces', {
-    tag: ['@req:Participants only see traces in current active discovery dataset'],
+    tag: ['@spec:DISCOVERY_SPEC', '@req:Participants only see traces in the current active discovery trace list'],
   }, async ({ page }) => {
     // Create scenario with discovery phase and specific traces
     const scenario = await TestScenario.create(page)
@@ -45,18 +45,19 @@ test.describe('Trace Visibility', {
     const visibleTraces = (await discResp.json()) as Array<{ id: string }>;
     const visibleIds = visibleTraces.map((t) => t.id);
 
-    // All 5 traces from the current round should be visible
+    // All 5 traces from the active selection should be visible — and nothing else
     for (const trace of allTraces) {
       expect(visibleIds).toContain(trace.id);
     }
+    expect(visibleTraces.length).toBe(allTraces.length);
 
     await scenario.cleanup();
   });
 
-  test('old traces hidden after round change', {
-    tag: ['@req:When new discovery round starts, old traces hidden (not deleted)'],
+  test('old traces hidden after discovery selection changes', {
+    tag: ['@spec:DISCOVERY_SPEC', '@req:Traces outside the active discovery selection are hidden from participants but not deleted'],
   }, async ({ page }) => {
-    // Create scenario with discovery phase
+    // Create scenario with discovery phase (active selection = 3 traces)
     const scenario = await TestScenario.create(page)
       .withWorkshop({ name: 'Round Change Visibility' })
       .withFacilitator()
@@ -68,9 +69,8 @@ test.describe('Trace Visibility', {
 
     const workshopId = scenario.workshop.id;
     const participant = scenario.users.participant[0];
-    const round1TraceIds = scenario.traces.map((t) => t.id);
 
-    // Verify round 1 traces are visible
+    // Verify the initial 3 active traces are visible
     const r1Resp = await page.request.get(
       `${API_URL}/workshops/${workshopId}/traces?user_id=${participant.id}`
     );
@@ -78,7 +78,7 @@ test.describe('Trace Visibility', {
     const r1Traces = (await r1Resp.json()) as Array<{ id: string }>;
     expect(r1Traces.length).toBe(3);
 
-    // Upload new traces (simulating a new round)
+    // Upload two more traces (workshop now holds 5 traces total)
     const newTracesResp = await page.request.post(
       `${API_URL}/workshops/${workshopId}/traces`,
       {
@@ -91,37 +91,44 @@ test.describe('Trace Visibility', {
     );
     expect(newTracesResp.ok()).toBeTruthy();
 
-    // Reset discovery with new traces via reset-discovery endpoint
+    // Reset discovery (clears the active selection), then start discovery
+    // again with a limit of 2 — the new active selection is a strict subset.
     const resetResp = await page.request.post(
-      `${API_URL}/workshops/${workshopId}/reset-discovery`,
-      {
-        headers: { 'Content-Type': 'application/json' },
-        data: { trace_limit: 2 },
-      }
+      `${API_URL}/workshops/${workshopId}/reset-discovery`
     );
+    expect(resetResp.ok()).toBeTruthy();
 
-    // If reset-discovery is available, verify the round change
-    if (resetResp.ok()) {
-      const r2Resp = await page.request.get(
-        `${API_URL}/workshops/${workshopId}/traces?user_id=${participant.id}`
-      );
-      expect(r2Resp.ok()).toBeTruthy();
-      const r2Traces = (await r2Resp.json()) as Array<{ id: string }>;
+    const beginResp = await page.request.post(
+      `${API_URL}/workshops/${workshopId}/begin-discovery?trace_limit=2`
+    );
+    expect(beginResp.ok()).toBeTruthy();
 
-      // Old round 1 traces should no longer be the active set
-      // (the active set should have changed)
-      const r2TraceIds = r2Traces.map((t) => t.id);
+    // Participant now sees ONLY the 2 traces in the new active selection
+    const r2Resp = await page.request.get(
+      `${API_URL}/workshops/${workshopId}/traces?user_id=${participant.id}`
+    );
+    expect(r2Resp.ok()).toBeTruthy();
+    const r2Traces = (await r2Resp.json()) as Array<{ id: string }>;
+    expect(r2Traces.length).toBe(2);
 
-      // At minimum, the trace count should reflect the new dataset
-      // and old traces should not all be present if the set changed
-      expect(r2Traces.length).toBeGreaterThan(0);
-    }
+    // Hidden traces are NOT deleted — all 5 remain retrievable via all-traces
+    const allResp = await page.request.get(
+      `${API_URL}/workshops/${workshopId}/all-traces`
+    );
+    expect(allResp.ok()).toBeTruthy();
+    const allTraces = (await allResp.json()) as Array<{ id: string }>;
+    expect(allTraces.length).toBe(5);
+
+    // Exactly 3 traces are hidden from the participant view
+    const visibleIds = new Set(r2Traces.map((t) => t.id));
+    const hiddenIds = allTraces.map((t) => t.id).filter((id) => !visibleIds.has(id));
+    expect(hiddenIds.length).toBe(3);
 
     await scenario.cleanup();
   });
 
   test('annotation order persistent across reload', {
-    tag: ['@req:Randomization persistent across page reloads for same trace set'],
+    tag: ['@spec:DISCOVERY_SPEC', '@req:Annotation trace order is deterministic per user and persists across page reloads'],
   }, async ({ page }) => {
     // Create scenario with annotation phase and randomization enabled
     const scenario = await TestScenario.create(page)

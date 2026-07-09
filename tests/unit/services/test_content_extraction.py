@@ -28,7 +28,7 @@ MULTI_TURN_MESSAGES = '{"messages": [' \
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("input_prefers_user_message")
+@pytest.mark.req("Input extraction prefers the last user-role message from the request payload")
 class TestMessagesFormatInputExtraction:
     """Input extraction from {"messages": [...]} should prefer user messages."""
 
@@ -47,7 +47,7 @@ class TestMessagesFormatInputExtraction:
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("output_prefers_assistant_message")
+@pytest.mark.req("Output extraction prefers the last assistant-role message from the response payload")
 class TestMessagesFormatOutputExtraction:
     """Output extraction from {"messages": [...]} should prefer assistant messages."""
 
@@ -64,7 +64,7 @@ class TestMessagesFormatOutputExtraction:
 # --- Unique extraction per trace (the customer bug) ---
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("unique_input_per_trace")
+@pytest.mark.req("Each trace gets its own unique extracted input (no shared-prefix duplication)")
 class TestUniqueInputPerTrace:
     """Different traces with shared conversation prefix must extract different inputs."""
 
@@ -89,7 +89,7 @@ class TestUniqueInputPerTrace:
 # --- {"request": {"input": [...]}} format ---
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("handles_request_input_format")
+@pytest.mark.req('Extraction handles the `{"messages": [...]}` and `{"request": {"input": [...]}}` formats')
 class TestRequestInputFormat:
     """The {"request": {"input": [...]}} format should extract user content."""
 
@@ -102,6 +102,7 @@ class TestRequestInputFormat:
 # --- Default role_hint is "output" for backward compatibility ---
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
+@pytest.mark.req('Extraction handles the `{"messages": [...]}` and `{"request": {"input": [...]}}` formats')
 class TestDefaultRoleHint:
     """Default role_hint should be 'output' for backward compatibility."""
 
@@ -113,7 +114,7 @@ class TestDefaultRoleHint:
 # --- Fallback behavior ---
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
-@pytest.mark.req("extraction_fallback")
+@pytest.mark.req("Extraction falls back to cleaned raw text when no structured format matches")
 class TestFallbackBehavior:
     """Unrecognized formats fall back to cleaned raw text."""
 

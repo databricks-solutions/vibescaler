@@ -1,3 +1,10 @@
+---
+id: DISCOVERY_SPEC
+title: Discovery Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Discovery Phase Specification
 
 ## Overview
@@ -46,7 +53,9 @@ An LLM analyzes all feedback in a single batch to extract evaluation criteria �
 ### Draft Rubric Items
 The facilitator can promote distilled criteria into draft rubric items, which bridge Discovery output into the Rubric Creation phase.
 
-### Alternative Approaches (Assisted Facilitation — Future)
+### Alternative Approaches (Assisted Facilitation — Roadmap)
+
+> **Spec retirement note (2026-06)**: The standalone `ASSISTED_FACILITATION_SPEC` was retired and folded into this section. None of the behaviors below shipped to the UI — they are roadmap, not requirements, and carry no success criteria. The v1 backend endpoints still exist in `server/routers/discovery.py` but are dormant (no UI callers): `POST /findings-v2`, `GET /traces/{trace_id}/discovery-state`, `GET /discovery-progress`, `POST /findings/{finding_id}/promote`, `PUT /traces/{trace_id}/thresholds`, `GET /traces/{trace_id}/discovery-questions`, and the legacy `GET /draft-rubric` alias.
 
 The `feat/discovery-update` branch implemented a more sophisticated real-time approach that may be revisited in future iterations:
 
@@ -77,7 +86,7 @@ Reference implementation: `server/services/discovery_service.py`, `server/servic
 
 ### Facilitator Flow (Starting Discovery)
 
-1. Select traces for discovery using existing trace assignment mechanism (see `DISCOVERY_TRACE_ASSIGNMENT_SPEC`)
+1. Select traces for discovery using the existing trace assignment mechanism (see [Trace Assignment & Ordering](#trace-assignment--ordering))
 2. Configure trace limit (default: 10, or custom)
 3. Toggle randomization (randomize trace order per participant, off by default)
 4. Click "Start Discovery Phase" — workshop phase changes to DISCOVERY
@@ -424,6 +433,43 @@ When the facilitator clicks `[+ Add to Draft]` on any finding (trace-specific or
 - Analysis run API and history
 - All backend services and API endpoints (unchanged)
 
+## Trace Assignment & Ordering
+
+> Folded in from the retired `DISCOVERY_TRACE_ASSIGNMENT_SPEC` (2026-06). Only the shipped mechanism is specified here. The dataset-composition model from that spec (union/subtract operations with audit trail, per-cohort assignment, phase/round metadata on assignments, randomization seeds that include phase/round) was never built and is roadmap — it carries no success criteria.
+
+### Active Trace Lists
+
+The workshop record holds the active trace selection per phase:
+
+- `active_discovery_trace_ids` — set when the facilitator starts Discovery (`POST /workshops/{id}/begin-discovery`, optional `trace_limit` and `randomize`)
+- `active_annotation_trace_ids` — set when annotation starts (`POST /workshops/{id}/begin-annotation`)
+
+`GET /workshops/{id}/traces?user_id=...` requires a `user_id` and filters by phase:
+
+- In the discovery phase, only traces in `active_discovery_trace_ids` are returned to participants
+- In the annotation phase, only traces in `active_annotation_trace_ids` are returned
+- Otherwise (facilitator management views), all traces are returned
+
+Traces outside the active selection are hidden from participants but never deleted — `GET /workshops/{id}/all-traces` continues to return every trace in the workshop.
+
+Resetting discovery (`POST /workshops/{id}/reset-discovery`) clears the active discovery list, per-user trace orders, findings, and completion records so the facilitator can re-select traces; starting discovery again establishes a new active list.
+
+### Per-User Randomized Ordering
+
+Annotation (and Discovery, when the randomize toggle is on) uses deterministic per-user trace ordering, persisted in `UserTraceOrder`:
+
+```
+seed = MD5(f"{user_id}::{','.join(sorted(trace_ids))}") % 2**31
+random.Random(seed).shuffle(trace_ids)
+```
+
+Properties of the shipped algorithm (`DatabaseService._generate_randomized_trace_order`):
+
+- Same user + same trace set → same order every time (stable across page reloads)
+- Different users → different orders over the same trace set, which enables inter-rater reliability measurement
+- Traces added mid-round are appended (in randomized order) after the user's existing order — already-seen traces are not reshuffled
+- A different trace set yields a different seed → fresh randomization
+
 ## Data Model
 
 ### DiscoveryFeedback Table
@@ -481,7 +527,7 @@ ALTER TABLE workshops ADD COLUMN discovery_started BOOLEAN DEFAULT FALSE;
 ALTER TABLE workshops ADD COLUMN discovery_randomize_traces BOOLEAN DEFAULT FALSE;
 ```
 
-> Trace selection for Discovery uses the existing mechanism defined in `DISCOVERY_TRACE_ASSIGNMENT_SPEC`. No additional columns needed.
+> Trace selection for Discovery uses the active trace list mechanism described in [Trace Assignment & Ordering](#trace-assignment--ordering). No additional columns needed.
 
 ### Pydantic Models
 ```python
@@ -777,16 +823,27 @@ well-defined groups over many small ones.
 ### LLM Provider
 Discovery uses the same model selection as judge evaluation: **Databricks foundation models** (via `modelMapping.ts`) and optionally a **Custom LLM Provider** (via `CustomLLMProviderConfig`). The facilitator picks a model in the Discovery dashboard UI. No discovery-specific LLM configuration needed.
 
+### Dev Instrumentation
+When the `MLFLOW_DSPY_DEV_EXPERIMENT_ID` environment variable is set, the discovery DSPy infrastructure (`server/services/discovery_dspy.py`) enables MLflow DSPy autologging against that experiment. When the variable is unset, autologging is a no-op.
+
 ### Defaults
 - **Trace limit**: 10 (configurable by facilitator)
-- **Follow-up questions**: 3 per trace (fixed)
+- **Follow-up questions**: 3 per trace (legacy path; can be disabled)
 - **All questions required** (no skip)
 - **Randomization**: Off by default
+- **Discovery mode**: `analysis` (existing findings/promotion UX) or `social` (threaded collaboration UX)
+- **Assistant mentions**: Facilitator can invoke `@assistant` fixed intents (`summarize thread`, `tools at milestone`). Responses are deterministic templates — no LLM (LLM-backed replies are roadmap).
+- **Agent mentions**: Facilitator can invoke `@agent` bounded tool loop with streamed progress and output. The loop is a deterministic pass over trace-context tools — no LLM tool-calling (roadmap).
 
 ## Success Criteria
 
+<SpecCoverage spec="DISCOVERY_SPEC" />
+
+
 ### Step 1: Feedback Collection (#81)
 - [ ] Facilitator can start Discovery phase with configurable trace limit
+
+
 - [ ] Participants view traces and provide GOOD/BAD + comment
 - [ ] Facilitator can select LLM model for follow-up question generation in Discovery dashboard
 - [ ] AI generates 3 follow-up questions per trace based on feedback
@@ -826,11 +883,41 @@ Discovery uses the same model selection as judge evaluation: **Databricks founda
 - [ ] Draft rubric items available during Rubric Creation phase
 - [ ] Source traceability maintained (which traces support each item)
 
+### Step 4: Social Threads & Mentions (#new)
+
+<!-- AUDIT (2026-06): the shipped @assistant/@agent responders are deterministic template
+     stubs — no LLM is invoked. The criteria below cover only the shipped thread/mention
+     mechanics. LLM-backed assistant/agent capabilities live under "### Roadmap". -->
+
+- [ ] Facilitator can switch Discovery workspace between `analysis` mode and `social` mode
+- [ ] In social mode, users can create trace-level comments
+- [ ] In social mode, users can create milestone-level comments
+- [ ] Users can reply to comments in-thread
+- [ ] Users can upvote/downvote comments (single vote per user per comment with toggle behavior)
+- [ ] Thread updates appear live in the workspace while participants collaborate
+- [ ] Facilitator can moderate social discussion threads by deleting comments
+- [ ] Only facilitator can delete social thread comments
+- [ ] Non-facilitator mentions do not trigger assistant/agent execution (treated as plain text mentions)
+- [ ] Facilitator `@assistant` mentions post an automated assistant reply in-thread (deterministic template stub)
+- [ ] Facilitator can invoke `@agent` to run a bounded tool loop and receive a persisted agent reply in-thread with clear success/failure status
+- [ ] `@agent` run lifecycle is visible (`running`, `completed`, `failed`, `timeout`) with final persisted reply
+
 ### Data Integrity
 - [ ] One feedback record per (workshop, trace, user) — upsert behavior
 - [ ] Q&A pairs appended in order to JSON array
 - [ ] Multiple analysis records per workshop allowed (history preserved)
 - [ ] Draft rubric items track promotion source and promoter
+
+### Trace Assignment & Ordering
+- [ ] Participants only see traces in the current active discovery trace list
+- [ ] Traces outside the active discovery selection are hidden from participants but not deleted
+- [ ] Annotation trace order is deterministic per user and persists across page reloads
+- [ ] Annotators see the same trace set in different per-user orders, enabling inter-rater reliability measurement
+- [ ] Adding annotation traces mid-round appends them without reshuffling a user's existing order
+- [ ] Changing the annotation trace set produces a fresh randomized order
+
+### Instrumentation
+- [ ] DSPy MLflow autologging activates only when MLFLOW_DSPY_DEV_EXPERIMENT_ID is set
 
 ### Error Handling
 - [ ] LLM failures show error toast with retry
@@ -844,6 +931,7 @@ Discovery uses the same model selection as judge evaluation: **Databricks founda
 - [ ] Submit buttons disabled until required fields filled
 - [ ] Clear progress indication (X of Y traces completed)
 - [ ] Smooth transitions between feedback states
+- [ ] When follow-up questions are disabled, participant flow is GOOD/BAD + comment only
 
 ### UX — Facilitator Discovery Workspace
 - [ ] Single two-panel workspace replaces multi-page flow (no FacilitatorDashboard discovery tabs, no FindingsReviewPage)
@@ -853,10 +941,21 @@ Discovery uses the same model selection as judge evaluation: **Databricks founda
 - [ ] Overview bar shows stats inline + compact controls (Run Analysis, Add Traces, Pause, Model selector)
 - [ ] Draft rubric sidebar is always visible while browsing traces
 - [ ] Promote action visibly moves items from trace feed/summary into the sidebar
-- [ ] Draft rubric items show trace reference badges (interactive: hover for preview, click to scroll)
+- [ ] Draft rubric items link to their origin (inline origin link; click routes to the originating trace/finding)
 - [ ] Draft rubric items do NOT show source-type badges (Finding, Disagreement, etc.)
 - [ ] Disagreements color-coded by priority (red/yellow/blue) on trace cards
 - [ ] "Create Rubric →" in sidebar transitions to rubric creation with groups pre-populated as criteria
+
+### Roadmap
+
+> Not shipped in v1.10. The live `@assistant`/`@agent` implementation is a deterministic
+> template stub with no LLM behind it — these criteria describe the intended LLM-backed
+> capability and are excluded from the coverage denominator.
+
+- [ ] Facilitator `@assistant summarize this thread` returns a grounded summary as a thread reply (roadmap)
+- [ ] Facilitator `@assistant` tool-availability questions for a milestone return grounded context as a thread reply (roadmap)
+- [ ] Facilitator `@agent` starts a bounded tool-calling run and posts streamed partial output in the thread (roadmap)
+- [ ] Social mode provides a modern live collaboration experience with streamed in-thread updates for assistant/agent responses (roadmap)
 
 ## Existing Code Reference
 
