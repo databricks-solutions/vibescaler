@@ -47,6 +47,36 @@ def _is_storage_connectivity_error(exc: Exception) -> bool:
     return any(marker in msg for marker in _STORAGE_CONNECTIVITY_MARKERS)
 
 
+def _uc_access_remediation(error_msg: str) -> "str | None":
+    """Operator-facing remediation for UC trace-table access failures.
+
+    Unity Catalog trace locations require the app's service principal to have
+    USE CATALOG / USE SCHEMA / SELECT on the trace tables (or the tables
+    attached as UC-securable app resources). Surface the exact grants —
+    with the real SP client id — instead of a bare REQUIRES_PRIVILEGES error.
+    """
+    import os
+    import re
+
+    if "REQUIRES_PRIVILEGES" not in error_msg and "Access control check failed" not in error_msg:
+        return None
+
+    match = re.search(r"Access control check failed for ([\w$]+(?:\.[\w$]+)+)", error_msg)
+    parts = match.group(1).split(".") if match else []
+    catalog = parts[0] if len(parts) >= 2 else "<catalog>"
+    schema = parts[1] if len(parts) >= 2 else "<schema>"
+    sp = os.getenv("DATABRICKS_CLIENT_ID") or "<app service principal client id>"
+    return (
+        f"The app's identity lacks Unity Catalog access to the trace tables. "
+        f"Ask an admin to run:\n"
+        f"  GRANT USE CATALOG ON CATALOG `{catalog}` TO `{sp}`;\n"
+        f"  GRANT USE SCHEMA, SELECT ON SCHEMA `{catalog}`.`{schema}` TO `{sp}`;\n"
+        f"Alternatively, attach the trace tables in {catalog}.{schema} to this app as "
+        f"UC-securable resources (type TABLE, permission SELECT). "
+        f"Also ensure the app uses mlflow>=3.14 — older clients fail this check even with correct grants."
+    )
+
+
 class MLflowIntakeService:
   """Service for MLflow trace intake operations."""
 
@@ -129,6 +159,8 @@ class MLflowIntakeService:
         raise ValueError(f'MLflow authentication failed. Please check your Databricks token: {error_msg}')
       elif '404' in error_msg:
         raise ValueError(f'MLflow experiment not found. Please check your experiment ID: {error_msg}')
+      elif (uc_remediation := _uc_access_remediation(error_msg)) is not None:
+        raise ValueError(f'{uc_remediation}\n\nUnderlying error: {error_msg}')
       else:
         raise ValueError(f'Failed to search MLflow traces: {error_msg}')
 

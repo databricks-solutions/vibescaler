@@ -297,6 +297,34 @@ def test_unity_catalog_traces_flow_through_intake(monkeypatch):
 
 
 @pytest.mark.spec("TRACE_INGESTION_SPEC")
+def test_uc_access_error_surfaces_grant_remediation(monkeypatch):
+    """UC REQUIRES_PRIVILEGES failures surface copy-paste grants with the real SP id."""
+    db_service = _DummyDbService()
+    service = MLflowIntakeService(db_service)
+    config = MLflowIntakeConfig(experiment_id="exp-1", max_traces=5, filter_string=None)
+
+    def _denied(**kwargs):
+        raise Exception(
+            "PERMISSION_DENIED: Access control check failed for "
+            "vibescaler_test.traces.mlflow_experiment_trace_otel_spans due to: REQUIRES_PRIVILEGES"
+        )
+
+    import server.services.mlflow_intake_service as intake_module
+
+    monkeypatch.setenv("DATABRICKS_CLIENT_ID", "55407baa-4bf7-4c08-809a-503cc7eebc33")
+    monkeypatch.setattr(intake_module.mlflow, "search_traces", _denied)
+
+    with pytest.raises(ValueError) as excinfo:
+        service.search_traces(config)
+
+    message = str(excinfo.value)
+    assert "GRANT USE CATALOG ON CATALOG `vibescaler_test` TO `55407baa-4bf7-4c08-809a-503cc7eebc33`" in message
+    assert "GRANT USE SCHEMA, SELECT ON SCHEMA `vibescaler_test`.`traces`" in message
+    assert "UC-securable resources" in message
+    assert "mlflow>=3.14" in message
+
+
+@pytest.mark.spec("TRACE_INGESTION_SPEC")
 def test_ingest_skips_trace_on_non_connectivity_error(monkeypatch):
     """Non-connectivity get_trace failures keep existing skip behavior (no fallback)."""
     db_service = _DummyDbService()
