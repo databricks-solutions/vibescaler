@@ -1,5 +1,6 @@
 """Database service layer for workshop operations."""
 
+import json
 import logging
 import os
 import uuid
@@ -12,9 +13,11 @@ from sqlalchemy.orm import Session
 from server.database import (
   AnnotationDB,
   ClassifiedFindingDB,
-  DatabricksTokenDB,
   DisagreementDB,
   DiscoveryAnalysisDB,
+  DiscoveryAgentRunDB,
+  DiscoveryCommentDB,
+  DiscoveryCommentVoteDB,
   DiscoveryFeedbackDB,
   DiscoveryFindingDB,
   DiscoveryQuestionDB,
@@ -25,8 +28,11 @@ from server.database import (
   JudgePromptDB,
   MLflowIntakeConfigDB,
   ParticipantNoteDB,
+  CriterionEvaluationDB,
   RubricDB,
+  SummarizationJobDB,
   TraceDB,
+  TraceCriterionDB,
   TraceDiscoveryThresholdDB,
   UserDB,
   UserDiscoveryCompletionDB,
@@ -38,6 +44,10 @@ from server.models import (
   Annotation,
   AnnotationCreate,
   DiscoveryFeedback,
+  DiscoveryAgentRun,
+  DiscoveryComment,
+  DiscoveryCommentCreate,
+  DiscoveryCommentVoteRequest,
   DiscoveryFeedbackCreate,
   DiscoveryFinding,
   DiscoveryFindingCreate,
@@ -56,6 +66,7 @@ from server.models import (
   ParticipantNoteCreate,
   Rubric,
   RubricCreate,
+  SummarizationJob,
   Trace,
   TraceUpload,
   User,
@@ -65,15 +76,24 @@ from server.models import (
   UserTraceOrder,
   Workshop,
   WorkshopCreate,
+  WorkshopMode,
   WorkshopParticipant,
   WorkshopPhase,
 )
-from server.services.token_storage_service import token_storage
 from server.utils.config import get_facilitator_config
 from server.utils.password import generate_default_password, hash_password, verify_password
 
 
 logger = logging.getLogger(__name__)
+
+
+def _write_e2e_mlflow_record(record: dict[str, Any]) -> None:
+  """Append an MLflow sync record for E2E tests when explicitly enabled."""
+  recorder_path = os.getenv("E2E_MLFLOW_FEEDBACK_RECORDER_PATH")
+  if not recorder_path:
+    return
+  with open(recorder_path, "a", encoding="utf-8") as f:
+    f.write(json.dumps(record, sort_keys=True) + "\n")
 
 
 def _retry_mlflow_operation(operation, max_retries: int = 3, base_delay: float = 1.0, description: str = "MLflow operation"):
@@ -133,6 +153,7 @@ class DatabaseService:
       name=workshop_data.name,
       description=workshop_data.description,
       facilitator_id=workshop_data.facilitator_id,
+      mode=workshop_data.mode.value if hasattr(workshop_data.mode, "value") else str(workshop_data.mode),
     )
     self.db.add(db_workshop)
     self.db.commit()
@@ -159,6 +180,8 @@ class DatabaseService:
       annotation_randomize_traces=getattr(db_workshop, 'annotation_randomize_traces', False) or False,
       judge_name=db_workshop.judge_name or 'workshop_judge',
       discovery_questions_model_name=getattr(db_workshop, 'discovery_questions_model_name', 'demo') or 'demo',
+      discovery_mode=(getattr(db_workshop, "discovery_mode", "analysis") or "analysis"),
+      discovery_followups_enabled=getattr(db_workshop, "discovery_followups_enabled", True),
       input_jsonpath=getattr(db_workshop, 'input_jsonpath', None),
       output_jsonpath=getattr(db_workshop, 'output_jsonpath', None),
       auto_evaluation_job_id=getattr(db_workshop, 'auto_evaluation_job_id', None),
@@ -166,6 +189,10 @@ class DatabaseService:
       auto_evaluation_model=getattr(db_workshop, 'auto_evaluation_model', None),
       show_participant_notes=getattr(db_workshop, 'show_participant_notes', False) or False,
       span_attribute_filter=getattr(db_workshop, 'span_attribute_filter', None),
+      summarization_enabled=getattr(db_workshop, 'summarization_enabled', False) or False,
+      summarization_model=getattr(db_workshop, 'summarization_model', None),
+      summarization_guidance=getattr(db_workshop, 'summarization_guidance', None),
+      mode=WorkshopMode(getattr(db_workshop, 'mode', WorkshopMode.WORKSHOP.value) or WorkshopMode.WORKSHOP.value),
       created_at=db_workshop.created_at,
     )
 
@@ -256,6 +283,32 @@ class DatabaseService:
 
     return self.get_workshop(workshop_id)
 
+  def get_workshop_mode(self, workshop_id: str) -> Optional[WorkshopMode]:
+    """Get the persisted workshop mode."""
+    db_workshop = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
+    if not db_workshop:
+      return None
+    mode = getattr(db_workshop, "mode", WorkshopMode.WORKSHOP.value) or WorkshopMode.WORKSHOP.value
+    return WorkshopMode(mode)
+
+  def is_eval_mode(self, workshop_id: str) -> bool:
+    mode = self.get_workshop_mode(workshop_id)
+    return mode == WorkshopMode.EVAL if mode else False
+
+  def update_workshop_mode(self, workshop_id: str, mode: WorkshopMode) -> Optional[Workshop]:
+    """Set workshop mode once; mode is immutable after creation."""
+    db_workshop = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
+    if not db_workshop:
+      return None
+
+    current_mode = getattr(db_workshop, "mode", WorkshopMode.WORKSHOP.value) or WorkshopMode.WORKSHOP.value
+    requested = mode.value if hasattr(mode, "value") else str(mode)
+    if current_mode != requested:
+      raise ValueError("Workshop mode is immutable after creation")
+
+    # No-op update preserves immutable contract while returning current state.
+    return self._workshop_from_db(db_workshop)
+
   def update_discovery_questions_model_name(self, workshop_id: str, model_name: str) -> Optional[Workshop]:
     """Update the discovery questions model name for a workshop."""
     db_workshop = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
@@ -320,6 +373,132 @@ class DatabaseService:
     self.db.refresh(db_workshop)
 
     return self.get_workshop(workshop_id)
+
+  def update_workshop_summarization_settings(
+    self,
+    workshop_id: str,
+    summarization_enabled: bool,
+    summarization_model: str | None,
+    summarization_guidance: str | None,
+  ) -> Optional[Workshop]:
+    """Update trace summarization settings for a workshop."""
+    db_workshop = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
+    if not db_workshop:
+      return None
+
+    db_workshop.summarization_enabled = summarization_enabled
+    db_workshop.summarization_model = summarization_model
+    db_workshop.summarization_guidance = summarization_guidance
+    self.db.commit()
+    self.db.refresh(db_workshop)
+
+    return self.get_workshop(workshop_id)
+
+  def update_trace_summary(self, trace_id: str, summary: dict | None) -> None:
+    """Update a trace's summary (structured milestone view)."""
+    db_trace = self.db.query(TraceDB).filter(TraceDB.id == trace_id).first()
+    if db_trace:
+      db_trace.summary = summary
+      self.db.commit()
+
+  # --- Summarization Job CRUD ---
+
+  def create_summarization_job(self, workshop_id: str, total: int) -> "SummarizationJob":
+    """Create a new summarization job for tracking batch progress."""
+    db_job = SummarizationJobDB(
+      workshop_id=workshop_id,
+      status="pending",
+      total=total,
+      completed_traces=[],
+      failed_traces=[],
+    )
+    self.db.add(db_job)
+    self.db.commit()
+    self.db.refresh(db_job)
+    return self._job_from_db(db_job)
+
+  def get_summarization_job(self, job_id: str) -> "SummarizationJob | None":
+    """Get a summarization job by ID."""
+    db_job = self.db.query(SummarizationJobDB).filter(SummarizationJobDB.id == job_id).first()
+    if not db_job:
+      return None
+    return self._job_from_db(db_job)
+
+  def update_summarization_job_status(self, job_id: str, status: str) -> "SummarizationJob | None":
+    """Update the status of a summarization job."""
+    db_job = self.db.query(SummarizationJobDB).filter(SummarizationJobDB.id == job_id).first()
+    if not db_job:
+      return None
+    db_job.status = status
+    self.db.commit()
+    self.db.refresh(db_job)
+    return self._job_from_db(db_job)
+
+  def add_summarization_job_completed(self, job_id: str, trace_id: str) -> "SummarizationJob | None":
+    """Append a trace ID to the job's completed list."""
+    db_job = self.db.query(SummarizationJobDB).filter(SummarizationJobDB.id == job_id).first()
+    if not db_job:
+      return None
+    completed = list(db_job.completed_traces or [])
+    completed.append(trace_id)
+    db_job.completed_traces = completed
+    self.db.commit()
+    self.db.refresh(db_job)
+    return self._job_from_db(db_job)
+
+  def add_summarization_job_failed(self, job_id: str, trace_id: str, error: str) -> "SummarizationJob | None":
+    """Append a failed trace entry to the job's failed list."""
+    db_job = self.db.query(SummarizationJobDB).filter(SummarizationJobDB.id == job_id).first()
+    if not db_job:
+      return None
+    failed = list(db_job.failed_traces or [])
+    failed.append({"trace_id": trace_id, "error": error})
+    db_job.failed_traces = failed
+    self.db.commit()
+    self.db.refresh(db_job)
+    return self._job_from_db(db_job)
+
+  def get_latest_summarization_job(self, workshop_id: str) -> "SummarizationJob | None":
+    """Get the most recent summarization job for a workshop."""
+    db_job = (
+      self.db.query(SummarizationJobDB)
+      .filter(SummarizationJobDB.workshop_id == workshop_id)
+      .order_by(SummarizationJobDB.created_at.desc())
+      .first()
+    )
+    if not db_job:
+      return None
+    return self._job_from_db(db_job)
+
+  def get_summarization_status(self, workshop_id: str) -> dict:
+    """Get summary coverage stats and last job for a workshop."""
+    with_summary = self.db.query(TraceDB).filter(
+      TraceDB.workshop_id == workshop_id,
+      TraceDB.summary.isnot(None),
+    ).count()
+    without_summary = self.db.query(TraceDB).filter(
+      TraceDB.workshop_id == workshop_id,
+      TraceDB.summary.is_(None),
+    ).count()
+    last_job = self.get_latest_summarization_job(workshop_id)
+    return {
+      "traces_with_summaries": with_summary,
+      "traces_without_summaries": without_summary,
+      "last_job": last_job,
+    }
+
+  def _job_from_db(self, db_job: SummarizationJobDB) -> "SummarizationJob":
+    """Convert a SummarizationJobDB row to a Pydantic model."""
+    return SummarizationJob(
+      id=db_job.id,
+      workshop_id=db_job.workshop_id,
+      status=db_job.status,
+      total=db_job.total,
+      completed_traces=db_job.completed_traces or [],
+      failed_traces=db_job.failed_traces or [],
+      created_at=db_job.created_at,
+      updated_at=db_job.updated_at,
+    )
 
   def update_workshop_phase(self, workshop_id: str, new_phase: WorkshopPhase) -> Optional[Workshop]:
     """Update the current phase of a workshop."""
@@ -414,6 +593,26 @@ class DatabaseService:
     self.db.commit()
     self.db.refresh(db_workshop)
 
+    return self._workshop_from_db(db_workshop)
+
+  def update_discovery_settings(
+    self,
+    workshop_id: str,
+    discovery_mode: Optional[str] = None,
+    discovery_followups_enabled: Optional[bool] = None,
+  ) -> Optional[Workshop]:
+    """Update discovery mode and/or follow-up toggle for a workshop."""
+    db_workshop = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
+    if not db_workshop:
+      return None
+
+    if discovery_mode is not None:
+      db_workshop.discovery_mode = discovery_mode
+    if discovery_followups_enabled is not None:
+      db_workshop.discovery_followups_enabled = discovery_followups_enabled
+
+    self.db.commit()
+    self.db.refresh(db_workshop)
     return self._workshop_from_db(db_workshop)
 
   def update_annotation_randomize_setting(self, workshop_id: str, randomize: bool) -> Optional[Workshop]:
@@ -1300,7 +1499,8 @@ class DatabaseService:
         question_id: The ID of the question to update (e.g., "q_1", "q_2")
         title: New question title
         description: New question description
-        judge_type: Optional judge type ('likert', 'binary', 'freeform')
+        judge_type: Optional judge type ('likert' or 'binary'; legacy 'freeform'
+            values coerce to 'likert' when the rubric is re-parsed)
     """
     # Get existing rubric
     existing_rubric = self.db.query(RubricDB).filter(RubricDB.workshop_id == workshop_id).first()
@@ -1414,8 +1614,11 @@ class DatabaseService:
         content_part, type_part = part.split(JUDGE_TYPE_DELIMITER, 1)
         content = content_part.strip()
         parsed_type = type_part.strip()
-        if parsed_type in ('likert', 'binary', 'freeform'):
+        if parsed_type in ('likert', 'binary'):
           judge_type = parsed_type
+        # Legacy 'freeform' (and any unknown type) coerces to the 'likert' default
+        # at the parse boundary — mirrors parseRubricQuestions in rubricUtils.ts,
+        # keeping legacy rows readable without exposing 'freeform' downstream.
         
       # Split only at the first colon to separate title from description
       if ':' in content:
@@ -1564,7 +1767,7 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     Returns a list of dicts, each containing:
     - judge_name: The derived judge name (e.g., "helpful_judge")
     - judge_prompt: The prompt for this specific criterion
-    - judge_type: 'likert', 'binary', or 'freeform'
+    - judge_type: 'likert' or 'binary' (legacy 'freeform' coerces to likert on parse)
     - question_id: The question ID (e.g., "q_1")
     - title: The question title
     """
@@ -1961,6 +2164,79 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     snake_case = re.sub(r'[^a-z0-9]+', '_', title.lower()).strip('_')
     return f"{snake_case}_judge" if snake_case else "workshop_judge"
 
+  def _record_e2e_mlflow_feedback_sync(self, workshop_id: str, annotation_db: AnnotationDB) -> Dict[str, Any]:
+    """Record MLflow feedback calls for E2E tests without hitting MLflow APIs."""
+    mlflow_trace_id = getattr(annotation_db.trace, "mlflow_trace_id", None)
+    if not mlflow_trace_id:
+      return {"logged": 0, "updated": 0, "skipped": 0, "error": "no mlflow_trace_id"}
+
+    rubric_db = self.db.query(RubricDB).filter(RubricDB.workshop_id == workshop_id).first()
+    question_titles_by_index = {}
+    if rubric_db and rubric_db.question:
+      QUESTION_DELIMITER_NEW = '|||QUESTION_SEPARATOR|||'
+      QUESTION_DELIMITER_LEGACY = '---'
+      questions = (
+        rubric_db.question.split(QUESTION_DELIMITER_NEW)
+        if QUESTION_DELIMITER_NEW in rubric_db.question
+        else rubric_db.question.split(QUESTION_DELIMITER_LEGACY)
+      )
+      for idx, q in enumerate(questions):
+        q = q.strip()
+        if not q:
+          continue
+        content_part = q.split('|||JUDGE_TYPE|||')[0] if '|||JUDGE_TYPE|||' in q else q
+        colon_idx = content_part.find(':')
+        question_titles_by_index[idx] = content_part[:colon_idx].strip() if colon_idx > 0 else content_part.strip()
+
+    current_user_id = annotation_db.user_id or workshop_id
+    rationale = annotation_db.comment.strip() if annotation_db.comment else None
+    for key, value in {"align": "true", "workshop_id": workshop_id}.items():
+      _write_e2e_mlflow_record(
+        {"event": "set_trace_tag", "trace_id": mlflow_trace_id, "key": key, "value": value, "source_id": current_user_id}
+      )
+
+    logged_count = 0
+    if annotation_db.ratings:
+      for question_id, rating_value in annotation_db.ratings.items():
+        if rating_value is None:
+          continue
+        try:
+          index = int(question_id.split('_')[-1])
+          if question_id.startswith('q_'):
+            index -= 1
+        except (ValueError, IndexError):
+          index = 0
+        question_title = question_titles_by_index.get(index, f"question_{index + 1}")
+        judge_name = self._derive_judge_name_from_title(question_title)
+        _write_e2e_mlflow_record(
+          {
+            "event": "log_feedback",
+            "trace_id": mlflow_trace_id,
+            "name": judge_name,
+            "value": rating_value,
+            "source_id": current_user_id,
+            "rationale": rationale if logged_count == 0 else None,
+          }
+        )
+        logged_count += 1
+    elif annotation_db.rating is not None:
+      workshop_db = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
+      judge_name = workshop_db.judge_name if workshop_db and workshop_db.judge_name else 'workshop_judge'
+      _write_e2e_mlflow_record(
+        {
+          "event": "log_feedback",
+          "trace_id": mlflow_trace_id,
+          "name": judge_name,
+          "value": annotation_db.rating,
+          "source_id": current_user_id,
+          "rationale": rationale,
+        }
+      )
+      logged_count = 1
+
+    logger.info("E2E MLflow feedback recorder captured %d feedback calls for trace %s", logged_count, mlflow_trace_id)
+    return {"logged": logged_count, "updated": 0, "skipped": 0, "error": None}
+
   def _sync_annotation_with_mlflow(self, workshop_id: str, annotation_db: AnnotationDB) -> dict:
     """Ensure MLflow trace carries SME tag + feedback once an annotation is captured.
 
@@ -1990,16 +2266,20 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       .filter(MLflowIntakeConfigDB.workshop_id == workshop_id)
       .first()
     )
-    if not config or not config.databricks_host or not config.experiment_id:
+    if not config or not config.experiment_id:
       logger.debug('Skipping MLflow sync: config missing for workshop %s', workshop_id)
       result['error'] = 'config missing'
       return result
 
-    databricks_token = token_storage.get_token(workshop_id)
-    if not databricks_token:
-      databricks_token = self.get_databricks_token(workshop_id)
-      if databricks_token:
-        token_storage.store_token(workshop_id, databricks_token)
+    if os.getenv("E2E_MLFLOW_FEEDBACK_RECORDER_PATH"):
+      return self._record_e2e_mlflow_feedback_sync(workshop_id, annotation_db)
+
+    from server.services.databricks_service import resolve_databricks_token
+
+    try:
+      databricks_token = resolve_databricks_token()
+    except RuntimeError:
+      databricks_token = None
     if not databricks_token:
       logger.debug('Skipping MLflow sync: token missing for workshop %s', workshop_id)
       result['error'] = 'token missing'
@@ -2007,18 +2287,11 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
 
     try:
       import mlflow
-      from mlflow.entities import AssessmentSource, AssessmentSourceType
+      from mlflow.entities import AssessmentSource, AssessmentSourceType, Feedback
     except ImportError:
       logger.warning('MLflow is not available; cannot sync annotation feedback.')
       result['error'] = 'mlflow not available'
       return result
-
-    os.environ['DATABRICKS_HOST'] = config.databricks_host.rstrip('/')
-    os.environ['DATABRICKS_TOKEN'] = databricks_token
-    os.environ.pop('DATABRICKS_CLIENT_ID', None)
-    os.environ.pop('DATABRICKS_CLIENT_SECRET', None)
-
-    mlflow.set_tracking_uri('databricks')
 
     try:
       mlflow.set_experiment(experiment_id=config.experiment_id)
@@ -2083,9 +2356,12 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       source_id=annotation_db.user_id or workshop_id,
     )
 
-    # Check existing assessments on this trace to avoid duplicates and hitting the 50 limit
-    # Track by (name, source_id) tuple so different users can have assessments with the same name
-    existing_assessments = set()  # Set of (name, source_id) tuples
+    # Check existing assessments on this trace to detect duplicates / edits
+    # Map (name, source_id) -> (assessment_id, value) so we can compare values
+    # and call mlflow.update_assessment() when an SME edits their rating.
+    # assessment_id may be None for older SDK response shapes; in that case we
+    # can still skip same-value re-syncs but cannot safely update in place.
+    existing_assessments: dict = {}  # Dict[(name, source_id), (assessment_id | None, value)]
     current_user_id = annotation_db.user_id or workshop_id
     try:
       trace = mlflow.get_trace(mlflow_trace_id)
@@ -2096,8 +2372,14 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
             if hasattr(assessment.source, 'source_type') and assessment.source.source_type == AssessmentSourceType.HUMAN:
               if hasattr(assessment, 'name'):
                 source_id = getattr(assessment.source, 'source_id', None)
-                existing_assessments.add((assessment.name, source_id))
-      logger.info(f"📊 Trace {mlflow_trace_id[:12]}... has existing HUMAN assessments: {existing_assessments}")
+                assessment_id = getattr(assessment, 'assessment_id', None)
+                # Extract current value (defensive — support both old/new shapes)
+                existing_value = getattr(assessment, 'value', None)
+                feedback_obj = getattr(assessment, 'feedback', None)
+                if feedback_obj is not None:
+                  existing_value = getattr(feedback_obj, 'value', None)
+                existing_assessments[(assessment.name, source_id)] = (assessment_id, existing_value)
+      logger.info(f"📊 Trace {mlflow_trace_id[:12]}... has existing HUMAN assessments: {list(existing_assessments.keys())}")
       logger.info(f"📊 Current user: {current_user_id}")
     except Exception as e:
       logger.warning(f"Could not fetch existing assessments for trace {mlflow_trace_id}: {e}")
@@ -2109,6 +2391,8 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     if annotation_db.ratings:
       logged_count = 0
       skipped_count = 0
+      updated_count = 0
+      update_failed_count = 0
       for question_id, rating_value in annotation_db.ratings.items():
         if rating_value is None:
           logger.debug(f"Skipping question_id={question_id} (rating is None)")
@@ -2138,16 +2422,59 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
         judge_name = self._derive_judge_name_from_title(question_title)
         logger.info(f"📊 Question {question_id}: index={index} → title='{question_title}' → judge_name='{judge_name}'")
         
-        # Skip if THIS USER already has a HUMAN assessment with this judge name on this trace
-        # Different users can have their own assessments with the same judge name
-        if (judge_name, current_user_id) in existing_assessments:
-          logger.info(f"✓ Skipping {judge_name} for user {current_user_id} - already exists on trace {mlflow_trace_id[:12]}...")
-          skipped_count += 1
+        # Three-way branch:
+        #  (a) no existing assessment → log_feedback
+        #  (b) existing assessment, same value → skip (no-op re-sync)
+        #  (c) existing assessment, different value → update_assessment (SME edited)
+        rationale_for_this = rationale if (logged_count + updated_count) == 0 else None
+        existing_entry = existing_assessments.get((judge_name, current_user_id))
+
+        if existing_entry is not None:
+          existing_assessment_id, existing_value = existing_entry
+          if existing_value == rating_value:
+            # Case (b): identical re-sync — preserves "Duplicate feedback entries skipped" spec intent
+            logger.info(f"✓ Skipping {judge_name} for user {current_user_id} - same value ({rating_value}) already on trace {mlflow_trace_id[:12]}...")
+            skipped_count += 1
+            continue
+
+          if existing_assessment_id is None:
+            update_failed_count += 1
+            logger.warning(
+              f"⚠️ Cannot update existing {judge_name} assessment for user {current_user_id} "
+              f"on trace {mlflow_trace_id}; assessment_id missing, refusing to log duplicate"
+            )
+            continue
+
+          # Case (c): SME edit — update in place so MemAlign trains on the fresh value.
+          # name=None: Databricks MLflow treats assessment name as immutable. Passing a non-null name
+          # (even unchanged) triggers "assessmentName may not be updated". The store's update_assessment
+          # (databricks_rest_store.py:638) uses a field mask — None excludes name from the mask and
+          # leaves the existing name intact.
+          def _update_assessment(_tid=mlflow_trace_id, _aid=existing_assessment_id, _val=rating_value, _src=source, _rat=rationale_for_this):
+            new_feedback = Feedback(
+              name=None,
+              value=_val,
+              source=_src,
+              rationale=_rat,
+            )
+            mlflow.update_assessment(trace_id=_tid, assessment_id=_aid, assessment=new_feedback)
+            return True
+
+          api_result = _retry_mlflow_operation(
+            _update_assessment,
+            max_retries=3,
+            description=f"update_assessment({judge_name}) for trace {mlflow_trace_id[:12]}..."
+          )
+          if api_result:
+            updated_count += 1
+            logger.info(f"Updated MLflow feedback: {judge_name}: {existing_value} → {rating_value} for trace {mlflow_trace_id}")
+          else:
+            # Intentionally do NOT fall through to log_feedback — that would create a duplicate
+            update_failed_count += 1
+            logger.warning(f"⚠️ Failed to update existing {judge_name} assessment for user {current_user_id} on trace {mlflow_trace_id}; stale value remains")
           continue
-        
-        # Use retry logic for MLflow API call
-        rationale_for_this = rationale if logged_count == 0 else None
-        # Bind loop variables via default args to avoid closure issues
+
+        # Case (a): no existing — log new feedback
         def _log_feedback(_tid=mlflow_trace_id, _name=judge_name, _val=rating_value, _src=source, _rat=rationale_for_this):
           mlflow.log_feedback(
             trace_id=_tid,
@@ -2167,23 +2494,65 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
           logged_count += 1
           logger.info(f"Logged MLflow feedback: {judge_name}={rating_value} for trace {mlflow_trace_id}")
 
-      if logged_count > 0 or skipped_count > 0:
-        logger.info(f"MLflow sync for trace {mlflow_trace_id[:12]}...: logged={logged_count}, skipped={skipped_count}")
-        return {'logged': logged_count, 'skipped': skipped_count, 'error': None}
+      error = "update failed" if update_failed_count > 0 else None
+      logger.info(
+        f"MLflow sync for trace {mlflow_trace_id[:12]}...: "
+        f"logged={logged_count}, updated={updated_count}, skipped={skipped_count}, update_failed={update_failed_count}"
+      )
+      return {
+        'logged': logged_count,
+        'updated': updated_count,
+        'skipped': skipped_count,
+        'update_failed': update_failed_count,
+        'error': error,
+      }
 
     # Fallback: log legacy single rating if no ratings dict
     if annotation_db.rating is not None:
       # Get the workshop's judge_name as fallback
       workshop_db = self.db.query(WorkshopDB).filter(WorkshopDB.id == workshop_id).first()
       judge_name = workshop_db.judge_name if workshop_db and workshop_db.judge_name else 'workshop_judge'
-
-      # Skip if THIS USER already has this assessment
-      if (judge_name, current_user_id) in existing_assessments:
-        logger.info(f"✓ Skipping legacy {judge_name} for user {current_user_id} - already exists on trace {mlflow_trace_id[:12]}...")
-        return {'logged': 0, 'skipped': 1, 'error': None}
-
-      # Use retry logic for legacy rating
       rating_val = annotation_db.rating
+
+      # Three-way branch (same shape as the multi-question loop above)
+      existing_entry = existing_assessments.get((judge_name, current_user_id))
+      if existing_entry is not None:
+        existing_assessment_id, existing_value = existing_entry
+        if existing_value == rating_val:
+          # Same value — no-op re-sync
+          logger.info(f"✓ Skipping legacy {judge_name} for user {current_user_id} - same value ({rating_val}) already on trace {mlflow_trace_id[:12]}...")
+          return {'logged': 0, 'updated': 0, 'skipped': 1, 'error': None}
+
+        if existing_assessment_id is None:
+          logger.warning(
+            f"⚠️ Cannot update legacy {judge_name} assessment for user {current_user_id} "
+            f"on trace {mlflow_trace_id}; assessment_id missing, refusing to log duplicate"
+          )
+          return {'logged': 0, 'updated': 0, 'skipped': 0, 'update_failed': 1, 'error': 'update failed'}
+
+        # Value changed — update in place. See _update_assessment() above for rationale on name=None.
+        def _update_legacy_assessment(_tid=mlflow_trace_id, _aid=existing_assessment_id, _val=rating_val, _src=source, _rat=rationale):
+          new_feedback = Feedback(
+            name=None,
+            value=_val,
+            source=_src,
+            rationale=_rat,
+          )
+          mlflow.update_assessment(trace_id=_tid, assessment_id=_aid, assessment=new_feedback)
+          return True
+
+        api_result = _retry_mlflow_operation(
+          _update_legacy_assessment,
+          max_retries=3,
+          description=f"update_assessment(legacy {judge_name}) for trace {mlflow_trace_id[:12]}..."
+        )
+        if api_result:
+          logger.info(f"Updated MLflow legacy feedback: {judge_name}: {existing_value} → {rating_val} for trace {mlflow_trace_id}")
+          return {'logged': 0, 'updated': 1, 'skipped': 0, 'error': None}
+        logger.warning(f"⚠️ Failed to update legacy {judge_name} assessment for user {current_user_id} on trace {mlflow_trace_id}; stale value remains")
+        return {'logged': 0, 'updated': 0, 'skipped': 0, 'error': 'update failed'}
+
+      # No existing entry — log new
       def _log_legacy_feedback(_tid=mlflow_trace_id, _name=judge_name, _val=rating_val, _src=source, _rat=rationale):
         mlflow.log_feedback(
           trace_id=_tid,
@@ -2201,9 +2570,9 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       )
       if api_result:
         logger.info(f"Logged MLflow legacy feedback: {judge_name}={rating_val} for trace {mlflow_trace_id}")
-        return {'logged': 1, 'skipped': 0, 'error': None}
+        return {'logged': 1, 'updated': 0, 'skipped': 0, 'error': None}
 
-    return {'logged': 0, 'skipped': 0, 'error': 'no ratings to sync'}
+    return {'logged': 0, 'updated': 0, 'skipped': 0, 'error': 'no ratings to sync'}
 
   def resync_annotations_to_mlflow(self, workshop_id: str) -> Dict[str, Any]:
     """Re-sync all annotations to MLflow with judge names derived from rubric questions.
@@ -2330,15 +2699,16 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       .filter(MLflowIntakeConfigDB.workshop_id == workshop_id)
       .first()
     )
-    if not config or not config.databricks_host or not config.experiment_id:
+    if not config or not config.experiment_id:
       logger.warning('Skipping MLflow eval sync: config missing for workshop %s', workshop_id)
       return {'synced': 0, 'error': 'MLflow config missing'}
 
-    databricks_token = token_storage.get_token(workshop_id)
-    if not databricks_token:
-      databricks_token = self.get_databricks_token(workshop_id)
-      if databricks_token:
-        token_storage.store_token(workshop_id, databricks_token)
+    from server.services.databricks_service import resolve_databricks_token
+
+    try:
+      databricks_token = resolve_databricks_token()
+    except RuntimeError:
+      databricks_token = None
     if not databricks_token:
       logger.warning('Skipping MLflow eval sync: token missing for workshop %s', workshop_id)
       return {'synced': 0, 'error': 'Databricks token missing'}
@@ -2349,13 +2719,6 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     except ImportError:
       logger.warning('MLflow is not available; cannot sync evaluation feedback.')
       return {'synced': 0, 'error': 'MLflow not available'}
-
-    os.environ['DATABRICKS_HOST'] = config.databricks_host.rstrip('/')
-    os.environ['DATABRICKS_TOKEN'] = databricks_token
-    os.environ.pop('DATABRICKS_CLIENT_ID', None)
-    os.environ.pop('DATABRICKS_CLIENT_SECRET', None)
-
-    mlflow.set_tracking_uri('databricks')
 
     try:
       mlflow.set_experiment(experiment_id=config.experiment_id)
@@ -2480,8 +2843,13 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       logger.warning('Skipping MLflow tagging: config missing for workshop %s', workshop_id)
       return {'tagged': 0, 'failed': trace_ids, 'error': 'MLflow config missing'}
 
-    # Get token from token storage
-    databricks_token = token_storage.get_token(workshop_id)
+    # Get token via SDK auth
+    from server.services.databricks_service import resolve_databricks_token
+
+    try:
+      databricks_token = resolve_databricks_token()
+    except RuntimeError:
+      databricks_token = None
     if not databricks_token:
       logger.warning('Skipping MLflow tagging: token missing for workshop %s', workshop_id)
       return {'tagged': 0, 'failed': trace_ids, 'error': 'Databricks token missing'}
@@ -2491,14 +2859,6 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     except ImportError:
       logger.warning('MLflow is not available; cannot tag traces.')
       return {'tagged': 0, 'failed': trace_ids, 'error': 'MLflow not available'}
-
-    # Set up MLflow credentials
-    os.environ['DATABRICKS_HOST'] = config.databricks_host.rstrip('/')
-    os.environ['DATABRICKS_TOKEN'] = databricks_token
-    os.environ.pop('DATABRICKS_CLIENT_ID', None)
-    os.environ.pop('DATABRICKS_CLIENT_SECRET', None)
-
-    mlflow.set_tracking_uri('databricks')
 
     try:
       mlflow.set_experiment(experiment_id=config.experiment_id)
@@ -3147,7 +3507,7 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     workshop_id: str,
     trace_id: str,
     user_id: str,
-    qna: Dict[str, str],
+    qna: Dict[str, Any],
   ) -> DiscoveryFeedback:
     """Append a Q&A pair to an existing feedback record (DI-2)."""
     row = (
@@ -3342,7 +3702,6 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
 
     if existing_config:
       # Update existing config
-      existing_config.databricks_host = config_data.databricks_host
       existing_config.experiment_id = config_data.experiment_id
       existing_config.max_traces = config_data.max_traces
       existing_config.filter_string = config_data.filter_string
@@ -3355,8 +3714,6 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       self.db.refresh(existing_config)
 
       return MLflowIntakeConfig(
-        databricks_host=existing_config.databricks_host,
-        databricks_token=config_data.databricks_token,  # Return the provided token, not from DB
         experiment_id=existing_config.experiment_id,
         max_traces=existing_config.max_traces,
         filter_string=existing_config.filter_string,
@@ -3367,7 +3724,6 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       db_config = MLflowIntakeConfigDB(
         id=config_id,
         workshop_id=workshop_id,
-        databricks_host=config_data.databricks_host,
         experiment_id=config_data.experiment_id,
         max_traces=config_data.max_traces,
         filter_string=config_data.filter_string,
@@ -3378,50 +3734,23 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       self.db.refresh(db_config)
 
       return MLflowIntakeConfig(
-        databricks_host=db_config.databricks_host,
-        databricks_token=config_data.databricks_token,  # Return the provided token, not from DB
         experiment_id=db_config.experiment_id,
         max_traces=db_config.max_traces,
         filter_string=db_config.filter_string,
       )
 
   def get_mlflow_config(self, workshop_id: str) -> Optional[MLflowIntakeConfig]:
-    """Get MLflow intake configuration for a workshop (without token)."""
+    """Get MLflow intake configuration for a workshop."""
     db_config = self.db.query(MLflowIntakeConfigDB).filter(MLflowIntakeConfigDB.workshop_id == workshop_id).first()
 
     if not db_config:
       return None
 
     return MLflowIntakeConfig(
-      databricks_host=db_config.databricks_host,
-      databricks_token='',  # Token is not stored in database
       experiment_id=db_config.experiment_id,
       max_traces=db_config.max_traces,
       filter_string=db_config.filter_string,
     )
-
-  def set_databricks_token(self, workshop_id: str, token: str) -> None:
-    """Persist Databricks token for a workshop."""
-    if not token:
-      return
-
-    db_token = self.db.query(DatabricksTokenDB).filter(DatabricksTokenDB.workshop_id == workshop_id).first()
-
-    if db_token:
-      db_token.token = token
-      db_token.updated_at = datetime.now()
-    else:
-      db_token = DatabricksTokenDB(workshop_id=workshop_id, token=token)
-      self.db.add(db_token)
-
-    self.db.commit()
-
-  def get_databricks_token(self, workshop_id: str) -> Optional[str]:
-    """Retrieve persisted Databricks token for a workshop."""
-    db_token = self.db.query(DatabricksTokenDB).filter(DatabricksTokenDB.workshop_id == workshop_id).first()
-    if db_token:
-      return db_token.token
-    return None
 
   def update_mlflow_ingestion_status(self, workshop_id: str, trace_count: int, error_message: Optional[str] = None) -> None:
     """Update MLflow ingestion status for a workshop."""
@@ -3448,12 +3777,17 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       return MLflowIntakeStatus(workshop_id=workshop_id, is_configured=False, is_ingested=False, trace_count=0)
 
     config = MLflowIntakeConfig(
-      databricks_host=db_config.databricks_host,
-      databricks_token='',  # Token is not stored in database
       experiment_id=db_config.experiment_id,
       max_traces=db_config.max_traces,
       filter_string=db_config.filter_string,
     )
+
+    from server.services.databricks_service import get_databricks_host
+
+    try:
+      host = get_databricks_host()
+    except RuntimeError:
+      host = None
 
     return MLflowIntakeStatus(
       workshop_id=workshop_id,
@@ -3463,6 +3797,7 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       last_ingestion_time=db_config.last_ingestion_time,
       error_message=db_config.error_message,
       config=config,
+      databricks_host=host,
     )
 
   # Judge Tuning operations
@@ -3566,7 +3901,14 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       self.db.commit()
 
   def store_judge_evaluations(self, evaluations: List[JudgeEvaluation]) -> None:
-    """Store judge evaluation results."""
+    """Store judge evaluation results.
+
+    .. deprecated::
+        Use AlignmentService.store_evaluation_results() for re-evaluations.
+        This method deletes all existing evaluations for the prompt before inserting,
+        which destroys pre-alignment baselines. It is still used by initial evaluation
+        call sites where delete-all is the correct behavior.
+    """
     # Clear existing evaluations for this prompt
     if evaluations:
       self.db.query(JudgeEvaluationDB).filter(JudgeEvaluationDB.prompt_id == evaluations[0].prompt_id).delete()
@@ -3691,6 +4033,27 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
   def clear_judge_evaluations(self, workshop_id: str, prompt_id: str) -> None:
     """Clear all evaluation results for a specific judge prompt."""
     self.db.query(JudgeEvaluationDB).filter(and_(JudgeEvaluationDB.workshop_id == workshop_id, JudgeEvaluationDB.prompt_id == prompt_id)).delete()
+    self.db.commit()
+
+  def _insert_judge_evaluations(self, evaluations: list) -> None:
+    """Insert judge evaluations without clearing existing ones.
+
+    Used by AlignmentService.store_evaluation_results() which handles
+    prompt versioning and rating normalization at a higher level.
+    """
+    for evaluation in evaluations:
+      db_eval = JudgeEvaluationDB(
+        id=evaluation.id,
+        workshop_id=evaluation.workshop_id,
+        prompt_id=evaluation.prompt_id,
+        trace_id=evaluation.trace_id,
+        predicted_rating=evaluation.predicted_rating,
+        human_rating=evaluation.human_rating,
+        confidence=evaluation.confidence,
+        reasoning=evaluation.reasoning,
+        predicted_feedback=evaluation.predicted_feedback,
+      )
+      self.db.add(db_eval)
     self.db.commit()
 
   def get_latest_evaluations(self, workshop_id: str) -> List[JudgeEvaluation]:
@@ -3819,6 +4182,7 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
       mlflow_experiment_id=db_trace.mlflow_experiment_id,
       include_in_alignment=db_trace.include_in_alignment if db_trace.include_in_alignment is not None else True,
       sme_feedback=db_trace.sme_feedback,
+      summary=getattr(db_trace, 'summary', None),
       created_at=db_trace.created_at,
     )
 
@@ -3886,30 +4250,39 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     # Import all related models
     from server.database import (
       AnnotationDB, UserTraceOrderDB, RubricDB, MLflowIntakeConfigDB,
-      DiscoveryFindingDB, UserDiscoveryCompletionDB, JudgePromptDB, JudgeEvaluationDB
+      DiscoveryFindingDB, UserDiscoveryCompletionDB, JudgePromptDB, JudgeEvaluationDB,
+      DiscoveryFeedbackDB, DiscoveryQuestionDB, ParticipantNoteDB,
+      ClassifiedFindingDB, DisagreementDB, TraceDiscoveryQuestionDB,
+      TraceDiscoveryThresholdDB, DraftRubricItemDB
     )
-    
+
     # Get trace IDs first
     trace_ids = [t.id for t in self.db.query(TraceDB).filter(TraceDB.workshop_id == workshop_id).all()]
-    
+
     if trace_ids:
-      # Delete annotations for these traces
+      # Delete all child rows that reference traces via FK
       self.db.query(AnnotationDB).filter(AnnotationDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
-      # Delete judge evaluations for these traces
       self.db.query(JudgeEvaluationDB).filter(JudgeEvaluationDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
-    
-    # Delete user trace orders for this workshop
+      self.db.query(DiscoveryFindingDB).filter(DiscoveryFindingDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(DiscoveryFeedbackDB).filter(DiscoveryFeedbackDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(DiscoveryQuestionDB).filter(DiscoveryQuestionDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(ParticipantNoteDB).filter(ParticipantNoteDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(ClassifiedFindingDB).filter(ClassifiedFindingDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(DisagreementDB).filter(DisagreementDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(TraceDiscoveryQuestionDB).filter(TraceDiscoveryQuestionDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(TraceDiscoveryThresholdDB).filter(TraceDiscoveryThresholdDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      # Eval-mode tables (migration 0020). FK ondelete=CASCADE is a no-op here: the app runs
+      # SQLite without PRAGMA foreign_keys=ON and uses bulk deletes, so delete explicitly.
+      # Delete evaluations before criteria (evaluations.criterion_id -> trace_criteria.id).
+      self.db.query(CriterionEvaluationDB).filter(CriterionEvaluationDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+      self.db.query(TraceCriterionDB).filter(TraceCriterionDB.trace_id.in_(trace_ids)).delete(synchronize_session=False)
+
+    # Delete workshop-level child data (no trace FK, just workshop FK)
     self.db.query(UserTraceOrderDB).filter(UserTraceOrderDB.workshop_id == workshop_id).delete(synchronize_session=False)
-    
-    # Delete discovery findings for this workshop
-    self.db.query(DiscoveryFindingDB).filter(DiscoveryFindingDB.workshop_id == workshop_id).delete(synchronize_session=False)
-    
-    # Delete user discovery completions for this workshop
     self.db.query(UserDiscoveryCompletionDB).filter(UserDiscoveryCompletionDB.workshop_id == workshop_id).delete(synchronize_session=False)
-    
-    # Delete judge prompts for this workshop (after evaluations are deleted)
     self.db.query(JudgePromptDB).filter(JudgePromptDB.workshop_id == workshop_id).delete(synchronize_session=False)
-    
+    self.db.query(DraftRubricItemDB).filter(DraftRubricItemDB.workshop_id == workshop_id).delete(synchronize_session=False)
+
     # Delete all traces
     deleted_count = self.db.query(TraceDB).filter(TraceDB.workshop_id == workshop_id).delete(synchronize_session=False)
     
@@ -4524,3 +4897,278 @@ Provide your rating as a single number (1-5) followed by a brief explanation."""
     return self.db.query(DiscoveryAnalysisDB).filter(
       DiscoveryAnalysisDB.id == analysis_id
     ).first()
+
+  # =========================================================================
+  # Discovery social thread operations
+  # =========================================================================
+
+  def _build_discovery_comment(self, row: DiscoveryCommentDB, viewer_user_id: Optional[str] = None) -> DiscoveryComment:
+    user = self.db.query(UserDB).filter(UserDB.id == row.user_id).first()
+    votes = self.db.query(DiscoveryCommentVoteDB).filter(DiscoveryCommentVoteDB.comment_id == row.id).all()
+    upvotes = sum(1 for v in votes if int(v.value) > 0)
+    downvotes = sum(1 for v in votes if int(v.value) < 0)
+    viewer_vote = 0
+    if viewer_user_id:
+      existing = next((v for v in votes if v.user_id == viewer_user_id), None)
+      if existing:
+        viewer_vote = int(existing.value)
+
+    user_name = "Unknown User"
+    user_email = ""
+    user_role = "participant"
+    if user:
+      user_name = user.name
+      user_email = user.email
+      user_role = user.role
+    elif row.author_type == "assistant":
+      user_name = "Assistant"
+      user_role = "assistant"
+    elif row.author_type == "agent":
+      user_name = "Agent"
+      user_role = "agent"
+
+    return DiscoveryComment(
+      id=row.id,
+      workshop_id=row.workshop_id,
+      trace_id=row.trace_id,
+      milestone_ref=row.milestone_ref,
+      parent_comment_id=row.parent_comment_id,
+      user_id=row.user_id,
+      user_name=user_name,
+      user_email=user_email,
+      user_role=user_role,
+      author_type=row.author_type,
+      body=row.body,
+      upvotes=upvotes,
+      downvotes=downvotes,
+      score=upvotes - downvotes,
+      viewer_vote=viewer_vote,
+      created_at=row.created_at,
+      updated_at=row.updated_at,
+    )
+
+  def create_discovery_comment(
+    self,
+    workshop_id: str,
+    data: DiscoveryCommentCreate,
+    author_type: str = "human",
+  ) -> DiscoveryComment:
+    row = DiscoveryCommentDB(
+      id=str(uuid.uuid4()),
+      workshop_id=workshop_id,
+      trace_id=data.trace_id,
+      milestone_ref=data.milestone_ref,
+      parent_comment_id=data.parent_comment_id,
+      user_id=data.user_id,
+      author_type=author_type,
+      body=data.body,
+    )
+    self.db.add(row)
+    self.db.commit()
+    self.db.refresh(row)
+    return self._build_discovery_comment(row, viewer_user_id=data.user_id)
+
+  def get_discovery_comment(self, comment_id: str, viewer_user_id: Optional[str] = None) -> Optional[DiscoveryComment]:
+    row = self.db.query(DiscoveryCommentDB).filter(DiscoveryCommentDB.id == comment_id).first()
+    if not row:
+      return None
+    return self._build_discovery_comment(row, viewer_user_id=viewer_user_id)
+
+  def list_discovery_comments(
+    self,
+    workshop_id: str,
+    trace_id: str,
+    milestone_ref: Optional[str] = None,
+    viewer_user_id: Optional[str] = None,
+  ) -> List[DiscoveryComment]:
+    query = self.db.query(DiscoveryCommentDB).filter(
+      DiscoveryCommentDB.workshop_id == workshop_id,
+      DiscoveryCommentDB.trace_id == trace_id,
+    )
+    if milestone_ref is None:
+      query = query.filter(DiscoveryCommentDB.milestone_ref.is_(None))
+    else:
+      query = query.filter(DiscoveryCommentDB.milestone_ref == milestone_ref)
+    rows = query.order_by(DiscoveryCommentDB.created_at.asc()).all()
+    return [self._build_discovery_comment(r, viewer_user_id=viewer_user_id) for r in rows]
+
+  def vote_discovery_comment(
+    self,
+    workshop_id: str,
+    comment_id: str,
+    vote_data: DiscoveryCommentVoteRequest,
+  ) -> DiscoveryComment:
+    if vote_data.value not in (-1, 1):
+      raise ValueError("vote value must be -1 or 1")
+
+    comment = self.db.query(DiscoveryCommentDB).filter(
+      DiscoveryCommentDB.id == comment_id,
+      DiscoveryCommentDB.workshop_id == workshop_id,
+    ).first()
+    if not comment:
+      raise ValueError("Comment not found")
+
+    existing = self.db.query(DiscoveryCommentVoteDB).filter(
+      DiscoveryCommentVoteDB.comment_id == comment_id,
+      DiscoveryCommentVoteDB.user_id == vote_data.user_id,
+    ).first()
+    if existing:
+      if int(existing.value) == int(vote_data.value):
+        # Toggle off same vote
+        self.db.delete(existing)
+      else:
+        existing.value = int(vote_data.value)
+    else:
+      self.db.add(
+        DiscoveryCommentVoteDB(
+          id=str(uuid.uuid4()),
+          workshop_id=workshop_id,
+          comment_id=comment_id,
+          user_id=vote_data.user_id,
+          value=int(vote_data.value),
+        )
+      )
+    self.db.commit()
+    self.db.refresh(comment)
+    return self._build_discovery_comment(comment, viewer_user_id=vote_data.user_id)
+
+  def delete_discovery_comment(self, workshop_id: str, comment_id: str) -> bool:
+    root_comment = self.db.query(DiscoveryCommentDB).filter(
+      DiscoveryCommentDB.id == comment_id,
+      DiscoveryCommentDB.workshop_id == workshop_id,
+    ).first()
+    if not root_comment:
+      return False
+
+    comment_ids: list[str] = [root_comment.id]
+    idx = 0
+    while idx < len(comment_ids):
+      parent_id = comment_ids[idx]
+      child_rows = self.db.query(DiscoveryCommentDB.id).filter(
+        DiscoveryCommentDB.workshop_id == workshop_id,
+        DiscoveryCommentDB.parent_comment_id == parent_id,
+      ).all()
+      for child_row in child_rows:
+        child_id = str(child_row.id)
+        if child_id not in comment_ids:
+          comment_ids.append(child_id)
+      idx += 1
+
+    self.db.query(DiscoveryCommentVoteDB).filter(
+      DiscoveryCommentVoteDB.comment_id.in_(comment_ids)
+    ).delete(synchronize_session=False)
+    self.db.query(DiscoveryAgentRunDB).filter(
+      DiscoveryAgentRunDB.workshop_id == workshop_id,
+      DiscoveryAgentRunDB.trigger_comment_id.in_(comment_ids),
+    ).delete(synchronize_session=False)
+    self.db.query(DiscoveryCommentDB).filter(
+      DiscoveryCommentDB.workshop_id == workshop_id,
+      DiscoveryCommentDB.id.in_(comment_ids),
+    ).delete(synchronize_session=False)
+    self.db.commit()
+    return True
+
+  def create_discovery_agent_run(
+    self,
+    workshop_id: str,
+    trace_id: str,
+    trigger_comment_id: str,
+    created_by: str,
+    milestone_ref: Optional[str] = None,
+  ) -> DiscoveryAgentRun:
+    row = DiscoveryAgentRunDB(
+      id=str(uuid.uuid4()),
+      workshop_id=workshop_id,
+      trace_id=trace_id,
+      milestone_ref=milestone_ref,
+      trigger_comment_id=trigger_comment_id,
+      status="running",
+      tool_calls_count=0,
+      partial_output="",
+      created_by=created_by,
+    )
+    self.db.add(row)
+    self.db.commit()
+    self.db.refresh(row)
+    return DiscoveryAgentRun(
+      id=row.id,
+      workshop_id=row.workshop_id,
+      trace_id=row.trace_id,
+      milestone_ref=row.milestone_ref,
+      trigger_comment_id=row.trigger_comment_id,
+      status=row.status,
+      tool_calls_count=row.tool_calls_count or 0,
+      partial_output=row.partial_output or "",
+      final_output=row.final_output,
+      error=row.error,
+      created_by=row.created_by,
+      completed_at=row.completed_at,
+      created_at=row.created_at,
+      updated_at=row.updated_at,
+    )
+
+  def get_discovery_agent_run(self, run_id: str) -> Optional[DiscoveryAgentRun]:
+    row = self.db.query(DiscoveryAgentRunDB).filter(DiscoveryAgentRunDB.id == run_id).first()
+    if not row:
+      return None
+    return DiscoveryAgentRun(
+      id=row.id,
+      workshop_id=row.workshop_id,
+      trace_id=row.trace_id,
+      milestone_ref=row.milestone_ref,
+      trigger_comment_id=row.trigger_comment_id,
+      status=row.status,
+      tool_calls_count=row.tool_calls_count or 0,
+      partial_output=row.partial_output or "",
+      final_output=row.final_output,
+      error=row.error,
+      created_by=row.created_by,
+      completed_at=row.completed_at,
+      created_at=row.created_at,
+      updated_at=row.updated_at,
+    )
+
+  def update_discovery_agent_run(
+    self,
+    run_id: str,
+    *,
+    status: Optional[str] = None,
+    tool_calls_count: Optional[int] = None,
+    partial_output: Optional[str] = None,
+    final_output: Optional[str] = None,
+    error: Optional[str] = None,
+    completed: bool = False,
+  ) -> Optional[DiscoveryAgentRun]:
+    row = self.db.query(DiscoveryAgentRunDB).filter(DiscoveryAgentRunDB.id == run_id).first()
+    if not row:
+      return None
+    if status is not None:
+      row.status = status
+    if tool_calls_count is not None:
+      row.tool_calls_count = tool_calls_count
+    if partial_output is not None:
+      row.partial_output = partial_output
+    if final_output is not None:
+      row.final_output = final_output
+    if error is not None:
+      row.error = error
+    if completed:
+      row.completed_at = datetime.utcnow()
+    self.db.commit()
+    self.db.refresh(row)
+    return DiscoveryAgentRun(
+      id=row.id,
+      workshop_id=row.workshop_id,
+      trace_id=row.trace_id,
+      milestone_ref=row.milestone_ref,
+      trigger_comment_id=row.trigger_comment_id,
+      status=row.status,
+      tool_calls_count=row.tool_calls_count or 0,
+      partial_output=row.partial_output or "",
+      final_output=row.final_output,
+      error=row.error,
+      created_by=row.created_by,
+      completed_at=row.completed_at,
+      created_at=row.created_at,
+      updated_at=row.updated_at,
+    )

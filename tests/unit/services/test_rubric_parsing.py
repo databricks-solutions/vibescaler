@@ -76,7 +76,7 @@ Line 3 after blank|||QUESTION_SEPARATOR|||Question 2: Single line"""
         assert questions[0]['title'] == 'Single Question'
         assert questions[0]['description'] == 'This is the only question'
 
-    @pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+    @pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
     def test_questions_with_judge_type(self, db_service):
         """Test parsing questions that include judge type markers."""
         raw = "Quality: Is it good?|||JUDGE_TYPE|||binary|||QUESTION_SEPARATOR|||Accuracy: Is it accurate?|||JUDGE_TYPE|||likert"
@@ -89,7 +89,7 @@ Line 3 after blank|||QUESTION_SEPARATOR|||Question 2: Single line"""
         assert questions[1]['title'] == 'Accuracy'
         assert questions[1]['judge_type'] == 'likert'
 
-    @pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+    @pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
     def test_default_judge_type_is_likert(self, db_service):
         """Test that questions without judge type default to likert."""
         raw = "Simple Question: No judge type specified"
@@ -97,9 +97,9 @@ Line 3 after blank|||QUESTION_SEPARATOR|||Question 2: Single line"""
         questions = db_service._parse_rubric_questions(raw)
 
         assert len(questions) == 1
-        assert questions[0].get('judge_type', 'likert') == 'likert'
+        assert questions[0]['judge_type'] == 'likert'
 
-    @pytest.mark.req("Parsed questions have stable UUIDs within session")
+    @pytest.mark.req("Parsed questions get sequential `q_N` ids")
     def test_questions_have_ids(self, db_service):
         """Test that parsed questions have ID fields."""
         raw = "Q1: Desc 1|||QUESTION_SEPARATOR|||Q2: Desc 2"
@@ -149,16 +149,22 @@ Line 3 after blank|||QUESTION_SEPARATOR|||Question 2: Single line"""
         # Should only get 2 questions, empty part in middle filtered
         assert len(questions) == 2
 
-    @pytest.mark.req("Questions with multi-line descriptions parse correctly")
-    def test_legacy_delimiter_supported(self, db_service):
-        """Test that legacy --- delimiter is still supported for backward compatibility."""
-        # Based on the code, legacy delimiter '---' is also supported
+    @pytest.mark.req("Delimiter never appears in user input (by design)")
+    def test_triple_dash_is_not_a_question_delimiter(self, db_service):
+        """'---' in user text does NOT split questions in the canonical parser.
+
+        The legacy '---' separator is only honored by a few read paths (e.g.
+        MLflow sync judge-name mapping), never by _parse_rubric_questions.
+        Dashes inside a description must stay part of that description.
+        """
         raw = "Q1: D1---Q2: D2"
 
         questions = db_service._parse_rubric_questions(raw)
 
-        # Should parse correctly with legacy delimiter
-        assert len(questions) >= 1
+        assert len(questions) == 1
+        assert questions[0]['title'] == 'Q1'
+        # The remainder (including '---') stays in the first question's description
+        assert questions[0]['description'] == 'D1---Q2: D2'
 
 
 @pytest.mark.spec("RUBRIC_SPEC")
@@ -179,7 +185,7 @@ class TestReconstructRubricQuestions:
         assert 'Question 1' in reconstructed
         assert 'Question 2' in reconstructed
 
-    @pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+    @pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
     def test_reconstruct_preserves_judge_type(self, db_service):
         """Test that reconstructing preserves judge type information."""
         questions = [
@@ -241,7 +247,7 @@ class TestRoundTrip:
 class TestBinaryScaleSupport:
     """Tests for binary scale support in rubrics."""
 
-    @pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+    @pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
     def test_binary_judge_type_parsed_correctly(self, db_service):
         """Test that binary judge type is correctly identified."""
         raw = "Pass/Fail Check: Does it pass?|||JUDGE_TYPE|||binary"
@@ -251,7 +257,7 @@ class TestBinaryScaleSupport:
         assert len(questions) == 1
         assert questions[0]['judge_type'] == 'binary'
 
-    @pytest.mark.req("Per-question judge_type parsed from `[JUDGE_TYPE:xxx]` format")
+    @pytest.mark.req("Per-question judge_type parsed from the `|||JUDGE_TYPE|||` delimiter")
     def test_likert_judge_type_parsed_correctly(self, db_service):
         """Test that likert judge type is correctly identified."""
         raw = "Quality Rating: Rate from 1-5|||JUDGE_TYPE|||likert"

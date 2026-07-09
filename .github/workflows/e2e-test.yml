@@ -4,33 +4,67 @@ on:
   pull_request:
     branches: [main, 'release/**']
 
+permissions:
+  contents: read
+
 jobs:
   e2e-test:
     runs-on:
       group: databricks-solutions-protected-runner-group
       labels: linux-ubuntu-latest
 
+    permissions:
+      # OIDC token exchange to authenticate against JFrog from an IT-managed runner.
+      id-token: write
+      contents: read
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
+      # Python is provisioned by uv (see .python-version); no setup-python step.
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@5a095e7a2014a4212f075830d4f7277575a9d098  # v7.3.1
+        with:
+          version: "0.11.2"
+          checksum: "7ac2ca0449c8d68dae9b99e635cd3bc9b22a4cb1de64b7c43716398447d42981"  # uv-x86_64-unknown-linux-gnu.tar.gz
+
+      - name: Setup for JFrog
+        uses: ./.github/actions/jfrog-auth
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: client/package-lock.json
 
+      # Install `just` from its official release, pinned to a version and verified
+      # against the upstream SHA-256 before use (lockdown policy: any binary fetched
+      # over the network must have its checksum checked, and the hash must live in
+      # the repo). Replaces the third-party extractions/setup-just action, which
+      # installed an unverified binary. To bump: update JUST_VERSION + JUST_SHA256
+      # from the release's SHA256SUMS (https://github.com/casey/just/releases).
       - name: Install just
-        uses: extractions/setup-just@v2
+        env:
+          JUST_VERSION: "1.45.0"
+          # sha256 of just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz
+          JUST_SHA256: "dc3f958aaf8c6506dd90426e9b03f86dd15e74a6467ee0e54929f750af3d9e49"
+        run: |
+          set -euo pipefail
+          tarball="$(mktemp)"
+          url="https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          curl -fsSL "$url" -o "$tarball"
+          printf '%s  %s\n' "$JUST_SHA256" "$tarball" | sha256sum -c -
+          install_dir="$RUNNER_TEMP/just"
+          mkdir -p "$install_dir"
+          tar -xzf "$tarball" -C "$install_dir" just
+          printf '%s\n' "$install_dir" >> "$GITHUB_PATH"
+
+      # public npm registry is blocked on the IT-managed runner; route npm through
+      # the JFrog Artifactory proxy via OIDC (writes ~/.npmrc).
+      - name: Setup JFrog npm registry
+        uses: ./.github/actions/setup-jfrog-npm
 
       - name: Install Python dependencies
         run: uv sync
@@ -82,7 +116,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
           name: playwright-report
           path: client/playwright-report/
@@ -90,7 +124,7 @@ jobs:
 
       - name: Upload test screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7.0.0
         with:
           name: test-screenshots
           path: client/test-results/

@@ -27,6 +27,10 @@ async def test_submit_annotation(client, seed_workshop, seed_trace):
     assert data["comment"] == "Good response"
 
 
+@pytest.mark.req(
+    "Annotation upsert semantics verified: same user+trace updates (not duplicates), "
+    "different users create separate records"
+)
 async def test_annotation_upsert_same_user_same_trace(client, seed_workshop, seed_trace):
     """Submitting again for same (user, trace) updates, not duplicates."""
     ws = seed_workshop()
@@ -61,6 +65,10 @@ async def test_annotation_upsert_same_user_same_trace(client, seed_workshop, see
     assert annotations[0]["comment"] == "Actually great"
 
 
+@pytest.mark.req(
+    "Annotation upsert semantics verified: same user+trace updates (not duplicates), "
+    "different users create separate records"
+)
 async def test_annotation_different_users_create_separate_records(
     client, seed_workshop, seed_trace
 ):

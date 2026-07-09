@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { RoleBasedWorkflow } from '@/components/RoleBasedWorkflow';
-import { ChevronDown, LogOut, Settings, User, PanelLeftClose } from 'lucide-react';
+import { BookOpen, ChevronDown, LogOut, Settings, User, PanelLeftClose } from 'lucide-react';
 import appIcon from '../../assets/favicon-48x48.png';
 
 interface AppSidebarProps {
@@ -76,6 +76,16 @@ export function AppSidebar({ onNavigate, showUserSwitching = false, collapsed = 
       <ScrollArea className="flex-1 px-3 py-4">
         <RoleBasedWorkflow onNavigate={onNavigate} />
       </ScrollArea>
+
+      <div className="px-3 pb-3">
+        <a
+          href="/docs/"
+          className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-gray-200 hover:bg-white hover:text-gray-900 hover:shadow-sm"
+        >
+          <BookOpen className="h-4 w-4 shrink-0" />
+          Documentation
+        </a>
+      </div>
 
       <Separator />
 

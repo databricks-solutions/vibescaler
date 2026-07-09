@@ -73,6 +73,7 @@ def create_test_note(
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_create_discovery_note(async_client, override_get_db, monkeypatch):
@@ -115,6 +116,7 @@ async def test_create_discovery_note(async_client, override_get_db, monkeypatch)
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_create_annotation_note(async_client, override_get_db, monkeypatch):
@@ -153,6 +155,7 @@ async def test_create_annotation_note(async_client, override_get_db, monkeypatch
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_create_note_defaults_to_discovery_phase(async_client, override_get_db, monkeypatch):
@@ -186,6 +189,7 @@ async def test_create_note_defaults_to_discovery_phase(async_client, override_ge
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_create_note_without_trace_id(async_client, override_get_db, monkeypatch):
@@ -221,6 +225,7 @@ async def test_create_note_without_trace_id(async_client, override_get_db, monke
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_create_note_missing_workshop_returns_404(async_client, override_get_db, monkeypatch):
@@ -248,6 +253,7 @@ async def test_create_note_missing_workshop_returns_404(async_client, override_g
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_create_note_service_error_returns_500(async_client, override_get_db, monkeypatch):
@@ -285,6 +291,7 @@ async def test_create_note_service_error_returns_500(async_client, override_get_
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_all_notes(async_client, override_get_db, monkeypatch):
@@ -320,6 +327,7 @@ async def test_get_all_notes(async_client, override_get_db, monkeypatch):
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_notes_filtered_by_user(async_client, override_get_db, monkeypatch):
@@ -354,6 +362,7 @@ async def test_get_notes_filtered_by_user(async_client, override_get_db, monkeyp
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_notes_filtered_by_discovery_phase(async_client, override_get_db, monkeypatch):
@@ -388,6 +397,7 @@ async def test_get_notes_filtered_by_discovery_phase(async_client, override_get_
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_notes_filtered_by_annotation_phase(async_client, override_get_db, monkeypatch):
@@ -423,6 +433,7 @@ async def test_get_notes_filtered_by_annotation_phase(async_client, override_get
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_notes_filtered_by_user_and_phase(async_client, override_get_db, monkeypatch):
@@ -457,6 +468,7 @@ async def test_get_notes_filtered_by_user_and_phase(async_client, override_get_d
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_get_notes_missing_workshop_returns_404(async_client, override_get_db, monkeypatch):
@@ -482,6 +494,7 @@ async def test_get_notes_missing_workshop_returns_404(async_client, override_get
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_delete_note_success(async_client, override_get_db, monkeypatch):
@@ -511,6 +524,7 @@ async def test_delete_note_success(async_client, override_get_db, monkeypatch):
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_delete_nonexistent_note_returns_404(async_client, override_get_db, monkeypatch):
@@ -539,6 +553,7 @@ async def test_delete_nonexistent_note_returns_404(async_client, override_get_db
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_delete_note_missing_workshop_returns_404(async_client, override_get_db, monkeypatch):
@@ -566,6 +581,7 @@ async def test_delete_note_missing_workshop_returns_404(async_client, override_g
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participant notes always append as new entries; existing notes are never overwritten")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_multiple_notes_same_user_same_trace_append(async_client, override_get_db, monkeypatch):
@@ -620,6 +636,7 @@ async def test_multiple_notes_same_user_same_trace_append(async_client, override
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participant notes always append as new entries; existing notes are never overwritten")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_notes_from_both_phases_coexist(async_client, override_get_db, monkeypatch):
@@ -687,6 +704,7 @@ async def test_notes_from_both_phases_coexist(async_client, override_get_db, mon
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Facilitators can toggle participant notes visibility per workshop")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_toggle_participant_notes_enables(async_client, override_get_db, monkeypatch):
@@ -740,6 +758,7 @@ async def test_toggle_participant_notes_enables(async_client, override_get_db, m
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Facilitators can toggle participant notes visibility per workshop")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_toggle_participant_notes_disables(async_client, override_get_db, monkeypatch):
@@ -789,6 +808,7 @@ async def test_toggle_participant_notes_disables(async_client, override_get_db, 
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Facilitators can toggle participant notes visibility per workshop")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_toggle_missing_workshop_returns_404(async_client, override_get_db, monkeypatch):
@@ -814,6 +834,7 @@ async def test_toggle_missing_workshop_returns_404(async_client, override_get_db
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participant notes always append as new entries; existing notes are never overwritten")
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_multiple_annotators_notes_during_annotation(async_client, override_get_db, monkeypatch):
@@ -870,6 +891,7 @@ async def test_multiple_annotators_notes_during_annotation(async_client, overrid
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 def test_participant_note_create_model_defaults():
     """Test ParticipantNoteCreate model default values."""
@@ -882,6 +904,7 @@ def test_participant_note_create_model_defaults():
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 def test_participant_note_create_model_with_annotation_phase():
     """Test ParticipantNoteCreate model with annotation phase."""
@@ -896,6 +919,7 @@ def test_participant_note_create_model_with_annotation_phase():
 
 
 @pytest.mark.spec("ANNOTATION_SPEC")
+@pytest.mark.req("Participants can create, retrieve, and delete notes during discovery and annotation phases")
 @pytest.mark.unit
 def test_participant_note_model_serialization():
     """Test ParticipantNote model serialization includes phase."""

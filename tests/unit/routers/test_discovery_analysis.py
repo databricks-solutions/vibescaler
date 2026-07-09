@@ -156,7 +156,7 @@ class TestAnalyzeDiscovery:
 
         with patch(
             "server.services.databricks_service.DatabricksService",
-            side_effect=ValueError("No Databricks host configured"),
+            side_effect=RuntimeError("No Databricks host configured"),
         ):
             resp = await async_client.post(
                 "/workshops/ws-1/analyze-discovery",

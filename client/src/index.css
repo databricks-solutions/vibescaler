@@ -10,7 +10,7 @@
     --foreground: 0 0% 10%; /* On-Surface */
 
     /* Primary palette - Tonal scale - Beautiful purple theme */
-    --primary: 262 52% 47%; /* Primary 40 - Rich Purple #6366F1 (Indigo-500) */
+    --primary: 262 52% 47%; /* Primary 40 - Rich Purple hsl(262 52% 47%) — see DESIGN_SYSTEM_SPEC tokens */
     --primary-foreground: 0 0% 100%; /* On-Primary */
     --primary-container: 262 90% 95%; /* Primary 95 - Light Purple Container */
     --primary-container-foreground: 262 52% 35%; /* On-Primary-Container */

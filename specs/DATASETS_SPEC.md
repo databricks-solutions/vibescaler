@@ -1,3 +1,10 @@
+---
+id: DATASETS_SPEC
+title: Datasets Specification
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # Datasets Specification
 
 ## Overview
@@ -283,15 +290,24 @@ Response: Traces in user's randomized order (or chronological if no user_id)
 
 ## Success Criteria
 
-- [ ] Datasets can be created with arbitrary trace lists
-- [ ] Union operation combines traces from multiple datasets
-- [ ] Subtract operation removes specified traces
+<SpecCoverage spec="DATASETS_SPEC" />
+
 - [ ] Same user sees same order for same dataset (deterministic)
 - [ ] Different users see different orders (per-user randomization)
 - [ ] Adding traces preserves existing order (incremental)
 - [ ] New round triggers fresh randomization
-- [ ] Dataset lineage tracked (source datasets, operations)
 - [ ] Facilitators see chronological order (no randomization)
+
+### Roadmap
+
+Composable dataset entities are not yet implemented — traces are managed
+directly per workshop today. The criteria below describe planned behavior
+and must not be counted as covered by tests until the features ship.
+
+- [ ] Datasets can be created with arbitrary trace lists (roadmap)
+- [ ] Union operation combines traces from multiple datasets (roadmap)
+- [ ] Subtract operation removes specified traces (roadmap)
+- [ ] Dataset lineage tracked (source datasets, operations) (roadmap)
 
 ## Future Work
 

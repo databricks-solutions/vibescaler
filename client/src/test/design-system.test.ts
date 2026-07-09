@@ -1,4 +1,9 @@
 // @spec DESIGN_SYSTEM_SPEC
+// @req No hardcoded colors in components
+// NOTE: the analyzer supports only ONE file-level @req per Vitest file. This file
+// also verifies that the :root / .dark token blocks exist in index.css; the
+// "Dark mode fully functional" criterion is roadmap (no toggle ships) and must
+// not be linked here.
 import { describe, expect, it } from 'vitest';
 import fs from 'fs';
 import path from 'path';

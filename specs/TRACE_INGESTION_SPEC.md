@@ -1,3 +1,10 @@
+---
+id: TRACE_INGESTION_SPEC
+title: TRACE_INGESTION_SPEC
+---
+
+import SpecCoverage from '@site/src/components/SpecCoverage';
+
 # TRACE_INGESTION_SPEC
 
 ## Overview
@@ -105,6 +112,8 @@ def _extract_content_from_json(self, json_text: str, role_hint: str = "output") 
 
 ## Success Criteria
 
+<SpecCoverage spec="TRACE_INGESTION_SPEC" />
+
 ### Trace Identity
 - [ ] Traces are deduplicated by `(workshop_id, mlflow_trace_id)` — re-ingest updates, not duplicates
 - [ ] `mlflow_url`, `mlflow_host`, and `mlflow_experiment_id` are persisted on ingest
@@ -115,7 +124,8 @@ def _extract_content_from_json(self, json_text: str, role_hint: str = "output") 
 - [ ] Input extraction prefers the last user-role message from the request payload
 - [ ] Output extraction prefers the last assistant-role message from the response payload
 - [ ] Each trace gets its own unique extracted input (no shared-prefix duplication)
-- [ ] Extraction handles: `{"messages": [...]}`, `{"request": {"input": [...]}}`, list-of-items, and `{"object": "response"}` formats
+- [ ] Extraction handles the `{"messages": [...]}` and `{"request": {"input": [...]}}` formats
+- [ ] Extraction handles the list-of-items and `{"object": "response"}` output formats
 - [ ] Extraction falls back to cleaned raw text when no structured format matches
 
 ### Re-ingestion Safety

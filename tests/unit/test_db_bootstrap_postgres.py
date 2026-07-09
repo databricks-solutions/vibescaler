@@ -6,13 +6,14 @@ They cover the bootstrap logic, error handling, and recovery flows.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from server.db_bootstrap import (
     BootstrapPlan,
     DatabaseBackend,
+    SchemaAccessError,
     _bootstrap_full,
     _bootstrap_full_postgres,
     _bootstrap_if_missing,
@@ -142,8 +143,18 @@ def _make_plan(url: str = "postgresql://test") -> BootstrapPlan:
     )
 
 
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req(
+    "Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap "
+    "provisions the app schema and reuses existing data across restarts"
+)
 class TestBootstrapIfMissingPostgres:
-    """Tests for _bootstrap_if_missing_postgres covering all code paths."""
+    """Tests for _bootstrap_if_missing_postgres covering all code paths.
+
+    Persistence-critical behavior: when tables already exist (data from a
+    previous deployment), bootstrap must NOT recreate them — it reuses or
+    stamps, so app restarts keep existing Lakebase data.
+    """
 
     @patch("server.db_bootstrap._widen_alembic_version_column")
     @patch("server.db_bootstrap._list_postgres_tables")
@@ -247,6 +258,11 @@ class TestBootstrapIfMissingPostgres:
 # ---------------------------------------------------------------------------
 # _bootstrap_full_postgres
 # ---------------------------------------------------------------------------
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req(
+    "Lakebase (Postgres) persistence: with `DATABASE_ENV=postgres`, bootstrap "
+    "provisions the app schema and reuses existing data across restarts"
+)
 class TestBootstrapFullPostgres:
     """Tests for _bootstrap_full_postgres covering all code paths."""
 
@@ -324,6 +340,89 @@ class TestBootstrapFullPostgres:
         with patch("server.db_bootstrap._run_alembic_upgrade_head"):
             _bootstrap_full_postgres(_make_plan())
         mock_widen.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Schema-access (identity rotation) classification
+# ---------------------------------------------------------------------------
+@pytest.mark.spec("BUILD_AND_DEPLOY_SPEC")
+@pytest.mark.req(
+    "App serves setup docs and gates the UI until Lakebase is configured "
+    "(postgres targets only; sqlite deployments are fully operable without setup)"
+)
+class TestSchemaAccessClassification:
+    """Privilege/ownership failures are classified as SchemaAccessError.
+
+    When the app's service principal rotates, a previous identity still owns the
+    schema/tables. Raw ProgrammingErrors would crash-loop the app; classification
+    lets gunicorn start in setup mode and surface exact operator remediation.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _identity_env(self, monkeypatch):
+        monkeypatch.setenv("PGAPPNAME", "vibescaler")
+        monkeypatch.setenv("PGUSER", "4db743e5-fe6b-4a94-9366-8d7490c870ea")
+
+    @patch("server.db_bootstrap._widen_alembic_version_column")
+    @patch("server.db_bootstrap._list_postgres_tables")
+    @patch("server.db_bootstrap._run_alembic_upgrade_head")
+    def test_full_upgrade_permission_denied_raises_schema_access_error(self, mock_upgrade, mock_list, mock_widen):
+        """Pending-migrations path: permission denied -> SchemaAccessError with remediation."""
+        mock_list.return_value = ["workshops", "alembic_version"]
+        mock_upgrade.side_effect = Exception("permission denied for schema vibescaler")
+
+        with pytest.raises(SchemaAccessError) as excinfo:
+            _bootstrap_full_postgres(_make_plan())
+
+        message = str(excinfo.value)
+        assert 'GRANT USAGE, CREATE ON SCHEMA "vibescaler"' in message
+        assert 'TO "4db743e5-fe6b-4a94-9366-8d7490c870ea"' in message
+        assert "REASSIGN OWNED BY" in message
+        assert "LAKEBASE_SCHEMA_NAME" in message
+
+    @patch("server.db_bootstrap._widen_alembic_version_column")
+    @patch("server.db_bootstrap._list_postgres_tables")
+    @patch("server.db_bootstrap._run_alembic_upgrade_head")
+    def test_full_empty_db_must_be_owner_raises_schema_access_error(self, mock_upgrade, mock_list, mock_widen):
+        """Empty-DB path: ownership error -> SchemaAccessError (not swallowed by recovery)."""
+        mock_list.return_value = []
+        mock_upgrade.side_effect = Exception("must be owner of table alembic_version")
+
+        with pytest.raises(SchemaAccessError):
+            _bootstrap_full_postgres(_make_plan())
+
+    @patch("server.db_bootstrap._widen_alembic_version_column")
+    @patch("server.db_bootstrap._list_postgres_tables")
+    @patch("server.db_bootstrap._run_alembic_upgrade_head")
+    def test_if_missing_permission_denied_raises_schema_access_error(self, mock_upgrade, mock_list, mock_widen):
+        """Startup-fallback path classifies permission failures the same way."""
+        mock_list.return_value = []
+        mock_upgrade.side_effect = Exception("(psycopg.errors.InsufficientPrivilege) permission denied for schema vibescaler")
+
+        with pytest.raises(SchemaAccessError):
+            _bootstrap_if_missing_postgres(_make_plan())
+
+    @patch("server.db_bootstrap._widen_alembic_version_column")
+    @patch("server.db_bootstrap._list_postgres_tables")
+    @patch("server.db_bootstrap._run_alembic_stamp_baseline")
+    def test_stamp_permission_denied_raises_schema_access_error(self, mock_stamp, mock_list, mock_widen):
+        """Stamp-to-head path (tables without alembic_version) is also classified."""
+        mock_list.return_value = ["workshops", "users"]
+        mock_stamp.side_effect = Exception("must be owner of table workshops")
+
+        with pytest.raises(SchemaAccessError):
+            _bootstrap_full_postgres(_make_plan())
+
+    @patch("server.db_bootstrap._widen_alembic_version_column")
+    @patch("server.db_bootstrap._list_postgres_tables")
+    @patch("server.db_bootstrap._run_alembic_upgrade_head")
+    def test_non_permission_errors_still_propagate_raw(self, mock_upgrade, mock_list, mock_widen):
+        """Genuine migration failures keep their type so gunicorn aborts (D7)."""
+        mock_list.return_value = ["workshops", "alembic_version"]
+        mock_upgrade.side_effect = RuntimeError("column already dropped")
+
+        with pytest.raises(RuntimeError, match="column already dropped"):
+            _bootstrap_full_postgres(_make_plan())
 
 
 # ---------------------------------------------------------------------------

@@ -1,13 +1,21 @@
 /**
- * E2E tests for DESIGN_SYSTEM_SPEC.
+ * E2E smoke tests for DESIGN_SYSTEM_SPEC.
  *
- * Tests dark mode toggle behavior and focus indicator visibility.
+ * Intentionally NOT @req-linked:
+ * - The "dark mode" test adds the .dark class itself via page.evaluate() — it
+ *   exercises the CSS variable mechanism, not a product toggle (none ships;
+ *   "Dark mode fully functional" is roadmap in the spec).
+ * - The focus-indicator test's assertions are guarded by an
+ *   `if (focusedCount > 0)` check, so it can pass vacuously.
+ * Do not add @req tags here without removing those caveats first.
+ *
+ * Tag format note: tags must be passed in test()/describe() options (below) —
+ * `test.use({ tag })` is not a Playwright option and is invisible to both the
+ * Playwright reporter and the spec coverage analyzer.
  */
 import { test, expect } from '@playwright/test';
 
-test.use({ tag: ['@spec:DESIGN_SYSTEM_SPEC'] });
-
-test.describe('Design System', () => {
+test.describe('Design System', { tag: ['@spec:DESIGN_SYSTEM_SPEC'] }, () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to a page that loads the app styles
     await page.goto('/');
@@ -15,9 +23,10 @@ test.describe('Design System', () => {
     await page.waitForLoadState('domcontentloaded');
   });
 
-  test('dark mode toggle adds .dark class to html element', async ({ page }) => {
-    // The design system uses class strategy: adding .dark to <html>
-    // Verify the mechanism works by toggling the class directly
+  test('adding .dark class to html element switches CSS variables (no product toggle ships)', async ({ page }) => {
+    // The design system uses class strategy: adding .dark to <html>.
+    // NOTE: this toggles the class directly via page.evaluate — it does NOT
+    // exercise a product dark-mode toggle (none exists; roadmap).
     const html = page.locator('html');
 
     // Initially should not have .dark class (default is light mode)

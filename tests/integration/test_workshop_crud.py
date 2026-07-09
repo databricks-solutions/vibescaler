@@ -5,6 +5,7 @@ import pytest
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.spec("TESTING_SPEC"),
+    pytest.mark.req("Workshop CRUD tested end-to-end through HTTP → DB → response"),
     pytest.mark.asyncio,
 ]
 

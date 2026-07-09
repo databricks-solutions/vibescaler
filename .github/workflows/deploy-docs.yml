@@ -1,0 +1,96 @@
+name: Deploy Docs to GitHub Pages
+
+# Builds the Docusaurus site (docs/) and publishes it to GitHub Pages.
+# Content comes from /doc, /specs, and curated /docs/plans (see docs/docusaurus.config.js).
+#
+# NOTE: This is the GitHub Actions deploy path, kept for when Actions get enabled
+# on this repo. Until then the live site is served from the `gh-pages` branch
+# (Pages → "Deploy from a branch"), rebuilt via `just docs-build` + a manual push.
+# To switch over to this workflow:
+#   1. Enable Actions for this repository (Settings → Actions → General).
+#   2. Pages → Build and deployment → Source = "GitHub Actions".
+#   3. Run it (Actions tab → "Deploy Docs to GitHub Pages" → Run workflow); it then
+#      supersedes the gh-pages branch.
+#
+# Published at: https://databrickslabs.github.io/vibescaler/
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/**"
+      - "doc/**"
+      - "specs/**"
+      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
+
+# Top-level is read-only per the repository lockdown policy; write permissions are
+# scoped to the jobs that need them below.
+permissions:
+  contents: read
+
+# Allow one concurrent deploy; let an in-progress run finish rather than cancel it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # configure-pages reads/prepares the Pages configuration.
+      pages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: docs/package-lock.json
+
+      # Install from the committed, hash-locked lockfile (npm ci is frozen: it
+      # fails rather than silently resolving if docs/package-lock.json drifts
+      # from docs/package.json). No Python step: the docs build is npm-only and
+      # consumes the committed docs/static/spec-coverage.json snapshot.
+      - name: Install docs dependencies
+        run: npm -C docs ci
+
+      # The SpecCoverage component embeds docs/static/spec-coverage.json, which is
+      # committed to the repo. We intentionally do NOT regenerate it here: the
+      # analyzer's Vitest scan needs the full client toolchain, and a partial CI run
+      # would publish understated coverage. Refresh it locally with `just docs-coverage`.
+      - name: Build Docusaurus site
+        env:
+          DOCS_URL: https://databrickslabs.github.io
+          DOCS_BASE_URL: /vibescaler/
+          DOCS_ORG: databrickslabs
+          DOCS_PROJECT: vibescaler
+          DOCS_STANDALONE: "1"
+        run: npm -C docs run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5.0.0
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b  # v4.0.0
+        with:
+          path: docs/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      # deploy-pages publishes the artifact via OIDC; scoped to the github-pages environment.
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4.0.5

@@ -1,0 +1,15 @@
+version: 2
+# The `github-actions` ecosystem is intentionally omitted: actions are pinned to
+# commit SHAs and must stay on releases predating the lockdown cutoff until there
+# is guidance on updating. Re-enable only with that guidance.
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    cooldown:
+      # 7-day cooldown for third-party packages; first-party Databricks packages
+      # are exempt.
+      default-days: 7
+      exclude:
+        - "databricks*"
+    schedule:
+      interval: "daily"

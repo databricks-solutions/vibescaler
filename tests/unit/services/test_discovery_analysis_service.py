@@ -770,7 +770,12 @@ class TestLLMDisagreementAnalysis:
 @pytest.mark.spec("DISCOVERY_SPEC")
 class TestDisagreementPriorityColorCoding:
 
-    @pytest.mark.req("Disagreements color-coded by priority (red/yellow/blue)")
+    # AUDIT (2026-06): previously tagged to the UI criterion "Disagreements color-coded by
+    # priority (red/yellow/blue) on trace cards" while asserting only that 3 priority
+    # buckets exist (data shape). The live trace card renders all priorities in rose
+    # (regression, owner decision pending), so the UI tag was removed; retagged to the
+    # deterministic-detection criterion this test actually verifies.
+    @pytest.mark.req("Disagreements detected at 3 priority levels (deterministic, no LLM)")
     def test_three_priority_levels_available_for_color_mapping(
         self, discovery_service, workshop, traces
     ):

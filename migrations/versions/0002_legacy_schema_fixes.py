@@ -80,7 +80,7 @@ def upgrade() -> None:
 
     # traces.include_in_alignment / sme_feedback (alignment filtering + concatenated feedback)
     # Use dialect-specific default for boolean: 1 for SQLite, TRUE for PostgreSQL
-    bool_default = sa.text("TRUE") if _is_postgres() else sa.text("1")
+    bool_default = sa.true()
     _add_column_if_missing(
         "traces",
         sa.Column("include_in_alignment", sa.Boolean(), server_default=bool_default),
