@@ -808,9 +808,7 @@ genai-prices==0.0.56 \
 gepa==0.0.26 \
     --hash=sha256:0119ca8022e93b6236bc154a57bb910bdb117485dc067d77777933dd3e9e9ad8 \
     --hash=sha256:331e40d8693a4192de2eb3b2b4df10d410ead49173f748d50c32a035cf746e63
-    # via
-    #   dspy
-    #   mlflow
+    # via dspy
 gitdb==4.0.12 \
     --hash=sha256:5ef71f855d191a3326fcfbc0d5da835f26b13fbcba60c32c21091c349ffdb571 \
     --hash=sha256:67073e15955400952c6565cc3e707c554a4eea2e428946f7a4c162fab9bd9bcf
@@ -1287,7 +1285,6 @@ litellm==1.81.13 \
     # via
     #   databricks-agents
     #   dspy
-    #   mlflow
 logfire-api==4.31.0 \
     --hash=sha256:3c1f502fd4eb8ef0996427a5cf275fd8f327f38600650a1f53071a8171c812db \
     --hash=sha256:fc4b01257ebd4ce297ad374ed201eb1a9213b999f6ae6df45cfca5bd0ef378f8
@@ -1472,19 +1469,19 @@ mdurl==0.1.2 \
     --hash=sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8 \
     --hash=sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba
     # via markdown-it-py
-mlflow==3.10.0 \
-    --hash=sha256:13655d611fb97972d63e1b78839511470ba9d2de95fb997eb01b2fc4fc4df19c \
-    --hash=sha256:54a6e18100623855d5d2a5b22fdec4a929543088adee49ca164d72439fdce2e3
+mlflow==3.14.0 \
+    --hash=sha256:5a1f818fa003035c724162096ce3ded7bc7bc47a1cae595df6173961983f4718 \
+    --hash=sha256:dbf77f7cdb5b5c0ec59b4671c61730b1b914b4dff7a2892e267a547cb5454f56
     # via human-eval-workshop
-mlflow-skinny==3.10.0 \
-    --hash=sha256:c711653b446214c863023e49e72ac3bae950aa82a5eeca5bdc642680065117af \
-    --hash=sha256:d864b14241f8e26a565e60b343a9644db3b2279b5039bd4e5cc2d0a6757bce99
+mlflow-skinny==3.14.0 \
+    --hash=sha256:a4880e086365871ef9d78e727a34ea5fb1ce615689579998d48e8c65ee1665a9 \
+    --hash=sha256:e50f4506422c7737157ae6643c165122af7898345f2e828fa93c4f10128653cf
     # via
     #   databricks-agents
     #   mlflow
-mlflow-tracing==3.10.0 \
-    --hash=sha256:206ca8ed2c25c15935fcfb9c9c5102198b1060a61bb2ce9df4eabb6329f3ddbf \
-    --hash=sha256:eb172a48e8f8078b0387e3e044864bf2c83124f7e773b223d37f6da79227a714
+mlflow-tracing==3.14.0 \
+    --hash=sha256:854488dd18068f15e2a56f1cc7b8868c611d09ea39068d0a691a3f07e0048cae \
+    --hash=sha256:c2f701e001d35964f23fbbdfdda36c818a76c157b912ae83781199fd714be09a
     # via mlflow
 multidict==6.7.1 \
     --hash=sha256:03ede2a6ffbe8ef936b92cb4529f27f42be7f56afcdab5ab739cd5f27fb1cbf9 \
@@ -2836,7 +2833,9 @@ sqlparse==0.5.5 \
 starlette==0.52.1 \
     --hash=sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74 \
     --hash=sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933
-    # via fastapi
+    # via
+    #   fastapi
+    #   mlflow-skinny
 tenacity==9.1.4 \
     --hash=sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55 \
     --hash=sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a
